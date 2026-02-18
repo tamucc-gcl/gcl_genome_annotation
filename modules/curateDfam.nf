@@ -16,7 +16,7 @@
 
 process CURATE_DFAM {
     label 'dfam'
-    publishDir "${params.outdir}/dfam", mode: params.publish_dir_mode
+    //publishDir "${params.outdir}/dfam", mode: params.publish_dir_mode
 
     input:
     path dfam_dir

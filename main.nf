@@ -83,10 +83,13 @@ workflow {
     // ── Step 2: Curate de novo repeats (per genome) ──────────────────────────
     CURATE_REPEATS(REPEAT_MODEL.out.families_fa)
 
-    // ── Step 3: Mask genome with combined libraries (per genome) ─────────────
+    // ── Step 3: Classify de novo repeats (per genome) ──────────────────────────
+    CLASSIFY_REPEATS(CURATE_REPEATS.out.clustered_repeats)
+
+    // ── Step 4: Mask genome with combined libraries (per genome) ─────────────
     // Join assembly path back with curated repeats on assembly_id
     ch_mask_input = ch_assemblies
-        .join(CURATE_REPEATS.out.curated_repeats)
+        .join(CLASSIFY_REPEATS.out.curated_repeats)
         // produces: [assembly_id, assembly_path, curated_repeats]
 
     REPEAT_MASK(ch_mask_input, CURATE_DFAM.out.dfam_lib)
