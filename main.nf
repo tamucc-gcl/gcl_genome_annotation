@@ -93,7 +93,8 @@ workflow {
         .join(CLASSIFY_REPEATS.out.curated_repeats)
         // produces: [assembly_id, assembly_path, curated_repeats]
 
-    REPEAT_MASK(ch_mask_input, CURATE_DFAM.out.dfam_lib)
+    REPEAT_MASK(ch_mask_input, 
+                CURATE_DFAM.out.dfam_lib.collect())
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────
