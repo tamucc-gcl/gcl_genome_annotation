@@ -60,6 +60,7 @@ include { parseSampleSheet } from './functions/parse_sample_sheet.nf'
 
 include { REPEAT_MODEL  } from './modules/repeatModel.nf'
 include { CURATE_REPEATS } from './modules/curateRepeats.nf'
+include { CLASSIFY_REPEATS } from './modules/classifyRepeats.nf'
 include { CURATE_DFAM   } from './modules/curateDfam.nf'
 include { REPEAT_MASK   } from './modules/repeatMask.nf'
 
