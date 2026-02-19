@@ -29,9 +29,9 @@ process BRAKER {
     //path augustus_config
 
     output:
-    tuple val(assembly_id), path("${assembly_id}_braker.gff3"),            emit: braker_gff3
-    tuple val(assembly_id), path("${assembly_id}_braker.aa"),              emit: braker_proteins
-    tuple val(assembly_id), path("${assembly_id}_braker.codingseq.fasta"), emit: braker_cds
+    tuple val(assembly_id), path("${assembly_id}.gff3"),            emit: braker_gff3
+    tuple val(assembly_id), path("${assembly_id}_proteins.fa"),              emit: braker_proteins
+    tuple val(assembly_id), path("${assembly_id}_cds.fa"), emit: braker_cds
 
     script:
     def prot_arg       = protein_database.name != 'NO_PROT_DB' ? "--prot_seq=${protein_database}" : ''
@@ -57,15 +57,15 @@ process BRAKER {
         ${ab_initio_arg} \
         --verbosity=3
 
-    mv braker/braker.gff3     ${assembly_id}_braker.gff3
-    mv braker/braker.aa       ${assembly_id}_braker.aa
-    mv braker/braker.codingseq ${assembly_id}_braker.codingseq.fasta
+    mv braker/braker.gff3     ${assembly_id}.gff3
+    mv braker/braker.aa       ${assembly_id}_proteins.fa
+    mv braker/braker.codingseq ${assembly_id}_cds.fa
     """
 
     stub:
     """
-    touch ${assembly_id}_braker.gff3
-    touch ${assembly_id}_braker.aa
-    touch ${assembly_id}_braker.codingseq.fasta
+    touch ${assembly_id}.gff3
+    touch ${assembly_id}_proteins.fa
+    touch ${assembly_id}_cds.fa
     """
 }
