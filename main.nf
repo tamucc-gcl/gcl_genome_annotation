@@ -44,7 +44,10 @@ params.protein_database  = null   // path to OrthoDB proteins
 
 // Structural QC
 params.busco_lineage = 'actinopterygii_odb10'
-params.busco_downloads = '/work/birdlab/databases/busco_datasets'    
+params.busco_downloads = '/work/birdlab/databases/busco_datasets' 
+params.oma_db_name = 'LUCA'   
+params.omark_downloads = '/work/birdlab/databases/omark_datasets' 
+params.ncbi_speciesID = null
 
 // ── Parameter validation ─────────────────────────────────────────────────────
 if (!params.sample_sheet) { error "Please provide --sample_sheet" }
@@ -72,6 +75,7 @@ include { REPEAT_MASK   } from './modules/repeatMask.nf'
 include { BRAKER } from './modules/braker.nf'
 include { DOWNLOAD_BUSCO_DB } from './modules/download_busco_db.nf'
 include { BUSCO } from './modules/busco.nf'
+include { DOWNLOAD_OMARK_DB } from './modules/download_omark_db.nf'
 
 /*
 ========================================================================================
@@ -96,6 +100,9 @@ workflow {
     // ── Step 0: BUSCO (runs once) ─────────────────────────────
     DOWNLOAD_BUSCO_DB(params.busco_lineage)
     ch_busco_db = DOWNLOAD_BUSCO_DB.out.db
+
+    // ── Step 0: OMArk (runs once) ─────────────────────────────
+    DOWNLOAD_OMARK_DB()
 
     /*
     ========================================================================================
@@ -138,6 +145,12 @@ workflow {
             //ch_augustus_config.collect())
 
     // ── Step 6: Run BUSCO on protein predictions (per genome) ─────────────
+    BUSCO(
+        BRAKER.out.braker_proteins,
+        DOWNLOAD_OMARK_DB.out.omamer_db,
+        DOWNLOAD_OMARK_DB.out.taxa_db)
+
+    // ── Step 7: Run OMArk on protein predictions (per genome) ─────────────
     BUSCO(
         BRAKER.out.braker_proteins,
         DOWNLOAD_BUSCO_DB.out.db)
