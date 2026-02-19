@@ -76,6 +76,7 @@ include { BRAKER } from './modules/braker.nf'
 include { DOWNLOAD_BUSCO_DB } from './modules/download_busco_db.nf'
 include { BUSCO } from './modules/busco.nf'
 include { DOWNLOAD_OMARK_DB } from './modules/download_omark_db.nf'
+include { OMARK } from './modules/omark.nf'
 
 /*
 ========================================================================================
@@ -147,13 +148,13 @@ workflow {
     // ── Step 6: Run BUSCO on protein predictions (per genome) ─────────────
     BUSCO(
         BRAKER.out.braker_proteins,
-        DOWNLOAD_OMARK_DB.out.omamer_db,
-        DOWNLOAD_OMARK_DB.out.taxa_db)
+        DOWNLOAD_BUSCO_DB.out.db)
 
     // ── Step 7: Run OMArk on protein predictions (per genome) ─────────────
-    BUSCO(
+    OMARK(
         BRAKER.out.braker_proteins,
-        DOWNLOAD_BUSCO_DB.out.db)
+        DOWNLOAD_OMARK_DB.out.omamer_db,
+        DOWNLOAD_OMARK_DB.out.taxa_db)
 
 }
 
