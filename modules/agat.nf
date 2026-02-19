@@ -16,7 +16,7 @@ process AGAT {
     
     output:
     tuple val(assembly_id), path("${assembly_id}_annotation_stats"), emit: annotation_stats
-    tuple val(assembly_id), path("${assembly_id}_annotation_stats_distribution_plots"), emit: annotation_plots
+    tuple val(assembly_id), path("annotation_stats_distribution_plots/${assembly_id}"), emit: annotation_plots
     
     script:
     """
@@ -26,11 +26,13 @@ process AGAT {
         -d \
         --yaml \
         --output ${assembly_id}_annotation_stats
+    mkdir -p annotation_stats_distribution_plots
+    mv ${assembly_id}_annotation_stats_distribution_plots annotation_stats_distribution_plots/${assembly_id}
     """
     
     stub:
     """
     touch ${assembly_id}_annotation_stats
-    mkdir ${assembly_id}_annotation_stats_distribution_plots
+    mkdir -p annotation_stats_distribution_plots/${assembly_id}
     """
 }
