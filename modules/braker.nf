@@ -26,7 +26,7 @@ process BRAKER {
     input:
     tuple val(assembly_id), path(masked_assembly)
     path protein_database
-    path augustus_config
+    //path augustus_config
 
     output:
     tuple val(assembly_id), path("${assembly_id}_braker.gff3"),            emit: braker_gff3
@@ -37,15 +37,18 @@ process BRAKER {
     def prot_arg       = protein_database.name != 'NO_PROT_DB' ? "--prot_seq=${protein_database}" : ''
     def ab_initio_arg  = params.braker_ab_initio ? '--AUGUSTUS_ab_initio' : ''
     def rounds         = params.braker_rounds ?: 5
-    def species        = params.braker_species ?: assembly_id
+    //def species        = params.braker_species ?: assembly_id
     """
+    # Copy AUGUSTUS config from container to writable scratch location
+    cp -r /opt/Augustus/config augustus_config
+
     braker.pl \
         --threads=${task.cpus} \
         --genome=${masked_assembly} \
         ${prot_arg} \
-        --species=${species} \
+        --species=${assembly_id} \
         --gff3 \
-        --AUGUSTUS_CONFIG_PATH=${augustus_config} \
+        --AUGUSTUS_CONFIG_PATH=augustus_config \
         --rounds=${rounds} \
         ${ab_initio_arg} \
         --verbosity=3

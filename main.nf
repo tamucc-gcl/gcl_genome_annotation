@@ -41,8 +41,8 @@ params.job_speed = 's'            // null, 's', 'q', 'qq'
 params.braker_rounds     = 5
 params.braker_ab_initio  = false
 params.protein_database  = null   // path to OrthoDB proteins
-params.augustus_config    = null   // path to augustus config dir
-params.braker_species    = null   // e.g. 'Spratelloides_delicatulus' use to make persistent augustus trained params. Don't include and it will be assigned assemblyID
+//params.augustus_config    = null   // path to augustus config dir
+//params.braker_species    = null   // e.g. 'Spratelloides_delicatulus' use to make persistent augustus trained params. Don't include and it will be assigned assemblyID
 
 // ── Parameter validation ─────────────────────────────────────────────────────
 if (!params.sample_sheet) { error "Please provide --sample_sheet" }
@@ -116,11 +116,11 @@ workflow {
     ch_prot_db = params.protein_database
         ? Channel.fromPath(params.protein_database, checkIfExists: true)
         : Channel.fromPath("${projectDir}/assets/NO_PROT_DB")
-    ch_augustus_config = Channel.fromPath(params.augustus_config, checkIfExists: true)
+    //ch_augustus_config = Channel.fromPath(params.augustus_config, checkIfExists: true)
 
     BRAKER(REPEAT_MASK.out.masked_fasta, 
-            ch_prot_db.collect(), 
-            ch_augustus_config.collect())
+            ch_prot_db.collect()) 
+            //ch_augustus_config.collect())
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────
