@@ -52,7 +52,7 @@ process BRAKER {
         ${prot_arg} \
         --species=${assembly_id} \
         --gff3 \
-        --AUGUSTUS_CONFIG_PATH=augustus_config \
+        --AUGUSTUS_CONFIG_PATH=\${PWD}/augustus_config \
         --rounds=${rounds} \
         ${ab_initio_arg} \
         --verbosity=3
