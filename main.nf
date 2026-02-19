@@ -45,7 +45,7 @@ params.protein_database  = null   // path to OrthoDB proteins
 // Structural QC
 params.busco_lineage = 'actinopterygii_odb10'
 params.busco_downloads = '/work/birdlab/databases/busco_datasets' 
-params.oma_db_name = 'LUCA'   
+params.oma_db_name = 'LUCA'   //https://omabrowser.org/oma/current/ see here for names
 params.omark_downloads = '/work/birdlab/databases/omark_datasets' 
 params.ncbi_speciesID = null
 
@@ -73,6 +73,7 @@ include { CLASSIFY_REPEATS } from './modules/classifyRepeats.nf'
 include { CURATE_DFAM   } from './modules/curateDfam.nf'
 include { REPEAT_MASK   } from './modules/repeatMask.nf'
 include { BRAKER } from './modules/braker.nf'
+include { AGAT } from './modules/agat.nf'
 include { DOWNLOAD_BUSCO_DB } from './modules/download_busco_db.nf'
 include { BUSCO } from './modules/busco.nf'
 include { DOWNLOAD_OMARK_DB } from './modules/download_omark_db.nf'
@@ -145,12 +146,19 @@ workflow {
             ch_prot_db.collect()) 
             //ch_augustus_config.collect())
 
-    // ── Step 6: Run BUSCO on protein predictions (per genome) ─────────────
+    // ── Step 6: Get descriptive stats for annotations (per genome) ─────────────
+    ch_agat_inputs = ch_assemblies
+        .join(BRAKER.out.braker_gff3, by: 0)
+        .map { id, assembly_path, gff_path -> tuple(id, assembly_path, gff_path) }
+
+    AGAT(ch_agat_inputs)
+
+    // ── Step 7: Run BUSCO on protein predictions (per genome) ─────────────
     BUSCO(
         BRAKER.out.braker_proteins,
         DOWNLOAD_BUSCO_DB.out.db)
 
-    // ── Step 7: Run OMArk on protein predictions (per genome) ─────────────
+    // ── Step 8: Run OMArk on protein predictions (per genome) ─────────────
     OMARK(
         BRAKER.out.braker_proteins,
         DOWNLOAD_OMARK_DB.out.omamer_db,

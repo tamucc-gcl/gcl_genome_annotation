@@ -24,16 +24,16 @@ process OMARK {
     script:
     """
     omamer search \
-        --nthreads ${task.cpus} \
-        --db ${omamer_db} \
-        --query ${protein_fasta} \
+        --nthreads ${task.cpus} \\
+        --db ${omamer_db} \\
+        --query ${protein_fasta} \\
         --out ${assembly_id}.omamer
 
     omark \
-        --file ${assembly_id}.omamer \
-        --database ${omamer_db} \
-        --ete_ncbi_db ${taxa_db} \
-        --taxid ${params.ncbi_speciesID} \
+        --file ${assembly_id}.omamer \\
+        --database ${omamer_db} \\
+        --ete_ncbi_db ${taxa_db} \\
+        --taxid ${params.ncbi_speciesID} \\
         --og_fasta ${protein_fasta}
     
     mv omark_output/${assembly_id}.png ${assembly_id}.png
