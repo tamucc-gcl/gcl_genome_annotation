@@ -18,8 +18,8 @@ process OMARK {
     
     output:
     tuple val(assembly_id), path("${assembly_id}.png"), emit: omark_plot
-    tuple val(assembly_id), path("${assembly_id}_detailed_summary.txt"), emit: omark_detailed
-    tuple val(assembly_id), path("${assembly_id}.sum"), emit: omark_summary
+    tuple val(assembly_id), path("${assembly_id}_detailed.txt"), emit: omark_detailed
+    tuple val(assembly_id), path("${assembly_id}.summary.txt"), emit: omark_summary
     
     script:
     """
@@ -37,8 +37,8 @@ process OMARK {
         --og_fasta ${protein_fasta}
     
     mv omark_output/${assembly_id}.png ${assembly_id}.png
-    mv omark_output/${assembly_id}_detailed_summary.txt ${assembly_id}_detailed_summary.txt
-    mv omark_output/${assembly_id}.sum ${assembly_id}.sum
+    mv omark_output/${assembly_id}_detailed_summary.txt ${assembly_id}_detailed.txt
+    mv omark_output/${assembly_id}.sum ${assembly_id}.summary.txt
     """
     
     stub:

@@ -1,0 +1,13 @@
+name: agat
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - agat
+  - perl-statistics-r
+  - r-base
+  - r-ggplot2
+  - r-data.table
+  - r-optparse
+  - r-stringr
