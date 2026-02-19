@@ -44,6 +44,10 @@ params.protein_database  = null   // path to OrthoDB proteins
 //params.augustus_config    = null   // path to augustus config dir
 //params.braker_species    = null   // e.g. 'Spratelloides_delicatulus' use to make persistent augustus trained params. Don't include and it will be assigned assemblyID
 
+// Structural QC
+params.busco_lineage = 'actinopterygii_odb10'
+params.busco_downloads = '/work/birdlab/databases/busco_datasets'    
+
 // ── Parameter validation ─────────────────────────────────────────────────────
 if (!params.sample_sheet) { error "Please provide --sample_sheet" }
 if (!params.dfam_dir)     { error "Please provide --dfam_dir" }
@@ -68,6 +72,7 @@ include { CLASSIFY_REPEATS } from './modules/classifyRepeats.nf'
 include { CURATE_DFAM   } from './modules/curateDfam.nf'
 include { REPEAT_MASK   } from './modules/repeatMask.nf'
 include { BRAKER } from './modules/braker.nf'
+include { DOWNLOAD_BUSCO_DB } from './modules/download_busco_db.nf'
 
 /*
 ========================================================================================
@@ -81,12 +86,23 @@ workflow {
 
     /*
     ========================================================================================
-        Repeat Annotation
+        Database Downloads
     ========================================================================================
     */
+
     // ── Step 0: Extract Dfam library (runs once) ─────────────────────────────
     ch_dfam_dir = Channel.fromPath(params.dfam_dir, checkIfExists: true)
     CURATE_DFAM(ch_dfam_dir, params.taxa_name)
+
+    // ── Step 0: BUSCO (runs once) ─────────────────────────────
+    DOWNLOAD_BUSCO_DB(params.busco_lineage)
+    ch_busco_db = DOWNLOAD_BUSCO_DB.out.db
+
+    /*
+    ========================================================================================
+        Repeat Annotation
+    ========================================================================================
+    */
 
     // ── Step 1: De novo repeat modeling (per genome) ─────────────────────────
     REPEAT_MODEL(ch_assemblies)
@@ -121,6 +137,12 @@ workflow {
     BRAKER(REPEAT_MASK.out.masked_fasta, 
             ch_prot_db.collect()) 
             //ch_augustus_config.collect())
+
+    // ── Step 6: Run BUSCO on protein predictions (per genome) ─────────────
+    BUSCO(
+        BRAKER.out.braker_proteins,
+        DOWNLOAD_BUSCO_DB.out.db)
+        
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────
