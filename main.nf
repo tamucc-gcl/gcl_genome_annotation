@@ -41,8 +41,6 @@ params.job_speed = 's'            // null, 's', 'q', 'qq'
 params.braker_rounds     = 5
 params.braker_ab_initio  = false
 params.protein_database  = null   // path to OrthoDB proteins
-//params.augustus_config    = null   // path to augustus config dir
-//params.braker_species    = null   // e.g. 'Spratelloides_delicatulus' use to make persistent augustus trained params. Don't include and it will be assigned assemblyID
 
 // Structural QC
 params.busco_lineage = 'actinopterygii_odb10'
@@ -73,6 +71,7 @@ include { CURATE_DFAM   } from './modules/curateDfam.nf'
 include { REPEAT_MASK   } from './modules/repeatMask.nf'
 include { BRAKER } from './modules/braker.nf'
 include { DOWNLOAD_BUSCO_DB } from './modules/download_busco_db.nf'
+include { BUSCO } from './modules/busco.nf'
 
 /*
 ========================================================================================
@@ -142,7 +141,7 @@ workflow {
     BUSCO(
         BRAKER.out.braker_proteins,
         DOWNLOAD_BUSCO_DB.out.db)
-        
+
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────
