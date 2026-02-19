@@ -38,11 +38,11 @@ params.cluster_pct       = 0.95   // set to 0 or null to skip clustering
 params.job_speed = 's'            // null, 's', 'q', 'qq'
 
 // Breaker Params
-params.braker_species    = null   // e.g. 'Spratelloides_delicatulus'
 params.braker_rounds     = 5
 params.braker_ab_initio  = false
 params.protein_database  = null   // path to OrthoDB proteins
 params.augustus_config    = null   // path to augustus config dir
+params.braker_species    = null   // e.g. 'Spratelloides_delicatulus' use to make persistent augustus trained params. Don't include and it will be assigned assemblyID
 
 // ── Parameter validation ─────────────────────────────────────────────────────
 if (!params.sample_sheet) { error "Please provide --sample_sheet" }
