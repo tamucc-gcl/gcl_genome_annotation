@@ -17,7 +17,7 @@ process BUSCO {
     path(busco_db)
     
     output:
-    tuple val(haplotype_id), path("${assembly_id}_busco.txt"), emit: busco
+    tuple val(assembly_id), path("${assembly_id}_busco.txt"), emit: busco
     
     script:
     def lineage = params.busco_lineage ?: "auto"
