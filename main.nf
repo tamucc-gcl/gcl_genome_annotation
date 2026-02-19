@@ -37,8 +37,12 @@ params.cluster_pct       = 0.95   // set to 0 or null to skip clustering
 // RepeatMasker
 params.job_speed = 's'            // null, 's', 'q', 'qq'
 
-// Containers
-params.repeatmodeler_container = null  // e.g. '/path/to/repeatmodeler.sif'
+// Breaker Params
+params.braker_species    = null   // e.g. 'Spratelloides_delicatulus'
+params.braker_rounds     = 5
+params.braker_ab_initio  = false
+params.protein_database  = null   // path to OrthoDB proteins
+params.augustus_config    = null   // path to augustus config dir
 
 // ── Parameter validation ─────────────────────────────────────────────────────
 if (!params.sample_sheet) { error "Please provide --sample_sheet" }
@@ -63,6 +67,7 @@ include { CURATE_REPEATS } from './modules/curateRepeats.nf'
 include { CLASSIFY_REPEATS } from './modules/classifyRepeats.nf'
 include { CURATE_DFAM   } from './modules/curateDfam.nf'
 include { REPEAT_MASK   } from './modules/repeatMask.nf'
+include { BRAKER } from './modules/braker.nf'
 
 /*
 ========================================================================================
@@ -74,6 +79,11 @@ workflow {
     // Parse sample sheet → channel of [assembly_id, assembly_path]
     ch_assemblies = parseSampleSheet(params.sample_sheet)
 
+    /*
+    ========================================================================================
+        Repeat Annotation
+    ========================================================================================
+    */
     // ── Step 0: Extract Dfam library (runs once) ─────────────────────────────
     ch_dfam_dir = Channel.fromPath(params.dfam_dir, checkIfExists: true)
     CURATE_DFAM(ch_dfam_dir, params.taxa_name)
@@ -95,6 +105,22 @@ workflow {
 
     REPEAT_MASK(ch_mask_input, 
                 CURATE_DFAM.out.dfam_lib.collect())
+
+    /*
+    ========================================================================================
+        Gene Structural Annotation
+    ========================================================================================
+    */
+
+    // ── Step 5: Run Breaker on SoftMasked genome (per genome) ─────────────
+    ch_prot_db = params.protein_database
+        ? Channel.fromPath(params.protein_database, checkIfExists: true)
+        : Channel.fromPath("${projectDir}/assets/NO_PROT_DB")
+    ch_augustus_config = Channel.fromPath(params.augustus_config, checkIfExists: true)
+
+    BRAKER(REPEAT_MASK.out.masked_fasta, 
+            ch_prot_db.collect(), 
+            ch_augustus_config.collect())
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────
