@@ -40,10 +40,11 @@ process BRAKER {
     //def species        = params.braker_species ?: assembly_id
     """
     # Copy AUGUSTUS config from container to writable scratch location
-    mkdir augustus_config
-    cp -r /opt/Augustus/config augustus_config
+    mkdir -p augustus_config
+    cp -a /opt/Augustus/config/. augustus_config/
+    chmod -R u+rwX augustus_config
     ls -a
-    ls augustus_config
+    ls -a augustus_config
 
     braker.pl \
         --threads=${task.cpus} \
