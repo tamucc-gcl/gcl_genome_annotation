@@ -86,31 +86,44 @@ process MERGE_INTERPROSCAN {
 */
 
 process DOWNLOAD_INTERPROSCAN_DB {
-  tag "${interproscan_version}"
-  label 'interproscan_download'
-  storeDir "${params.interproscan_downloads}"
+    tag "${interproscan_version}"
+    label 'interproscan_download'
 
-  input:
-  val interproscan_version
+    storeDir "${params.interproscan_downloads}"
 
-  output:
-  path("interproscan-data-${interproscan_version}/data"), emit: db
+    input:
+    val interproscan_version
 
-  script:
-  """
-  set -euo pipefail
+    output:
+    path("interproscan-data-${interproscan_version}/data"), emit: db
 
-  url="https://ftp.ebi.ac.uk/pub/software/unix/iprscan/5/${interproscan_version}/alt/interproscan-data-${interproscan_version}.tar.gz"
-  tarball="interproscan-data-${interproscan_version}.tar.gz"
+    script:
+    """
+    set -euo pipefail
 
-  curl -fL --retry 5 --retry-delay 10 -o "\$tarball" "\$url"
+    url="https://ftp.ebi.ac.uk/pub/software/unix/iprscan/5/${interproscan_version}/alt/interproscan-data-${interproscan_version}.tar.gz"
+    tarball="interproscan-data-${interproscan_version}.tar.gz"
 
-  # figure out top-level dir inside tarball, extract, then normalize name
-  topdir=\$(tar -tzf "\$tarball" | head -1 | cut -d/ -f1)
-  tar -xzf "\$tarball"
+    # download (quiet progress meter; retries; resume if partial exists)
+    curl -fL -C - \\
+      --retry 10 --retry-delay 10 --retry-all-errors \\
+      --connect-timeout 30 --max-time 0 \\
+      --silent --show-error \\
+      -o "\$tarball" "\$url"
 
-  mv "\$topdir" "interproscan-data-${interproscan_version}"
+    # validate archive is readable
+    tar -tzf "\$tarball" >/dev/null
 
-  test -d "interproscan-data-${interproscan_version}/data"
-  """
+    # extract to scratch
+    tar -xzf "\$tarball"
+
+    # normalize top-level folder name deterministically without SIGPIPE
+    # (avoid `tar -t | head` under pipefail)
+    topdir=\$(tar -tzf "\$tarball" | awk -F/ 'NF{print \$1; exit}')
+    test -n "\$topdir"
+    mv "\$topdir" "interproscan-data-${interproscan_version}"
+
+    # sanity check matches declared Nextflow output
+    test -d "interproscan-data-${interproscan_version}/data"
+    """
 }
