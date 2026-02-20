@@ -27,7 +27,7 @@ process DOWNLOAD_INTERPROSCAN_DB {
 
     url="http://ftp.ebi.ac.uk/pub/software/unix/iprscan/5/${interproscan_version}/alt/interproscan-data-${interproscan_version}.tar.gz"
 
-    curl -fL -O "$url"
+    curl -fL -O "\$url"
     tar -pxzf "interproscan-data-${interproscan_version}.tar.gz"
 
     # sanity check
