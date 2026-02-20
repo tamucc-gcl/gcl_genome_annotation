@@ -50,7 +50,7 @@ params.omark_downloads = '/work/birdlab/databases/omark_datasets'
 params.ncbi_speciesID = null
 
 // Functional Annotations
-params.n_chunks = 16 // number of chunks to split proteins into for parallel processing in InterProScan, Diamond, eggNOG. Adjust based on size of proteome and available resources.
+params.n_chunks = 2 // number of chunks to split proteins into for parallel processing in InterProScan, Diamond, eggNOG. Adjust based on size of proteome and available resources.
 params.interproscan_downloads = null //'/work/birdlab/databases/interproscan_datasets'
 params.interproscan_version = null //'5.77-108.0'
 params.interproscan_total_cpus = 64
