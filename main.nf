@@ -203,12 +203,19 @@ workflow {
 
     // ch_chunks: (assembly_id, chunk_id, chunk_file)
     ch_chunks = CHUNK_PROTEINS.out.chunks
-        .map { assembly_id, f ->
-            def m = (f.name =~ /part_(\d+)/)
-            def chunk_id = m ? "part_${m[0][1]}" : f.baseName
-            tuple(assembly_id, chunk_id, f)
-        }
+    .flatMap { assembly_id, f_or_list ->
 
+        // Normalize: if it's already a list/collection, use it; otherwise wrap it
+        def files = (f_or_list instanceof Collection) ? f_or_list : [f_or_list]
+
+        files
+            .sort { it.name }
+            .collect { f ->
+                def m = (f.name =~ /part_(\d+)/)
+                def chunk_id = m ? "part_${m[0][1]}" : f.baseName
+                tuple(assembly_id, chunk_id, f)
+            }
+    }
     // ── Step 10: Run InterProScan on protein chunks ─────────────
     INTERPROSCAN(
         ch_chunks,
