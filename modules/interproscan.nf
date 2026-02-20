@@ -87,7 +87,7 @@ process MERGE_INTERPROSCAN {
 
 process DOWNLOAD_INTERPROSCAN_DB {
     tag "${interproscan_version}"
-    label 'interproscan_download'
+    label 'download_db'
 
     storeDir "${params.interproscan_downloads}"
 
@@ -114,13 +114,14 @@ process DOWNLOAD_INTERPROSCAN_DB {
     # validate archive is readable
     tar -tzf "\$tarball" >/dev/null
 
-    # extract to scratch
+    # extract
     tar -xzf "\$tarball"
 
-    # normalize top-level folder name deterministically without SIGPIPE
-    # (avoid `tar -t | head` under pipefail)
-    topdir=\$(tar -tzf "\$tarball" | awk -F/ 'NF{print \$1; exit}')
+    # find the extracted top-level dir WITHOUT using a pipe (no SIGPIPE possible)
+    topdir=\$(find . -mindepth 1 -maxdepth 1 -type d -printf '%f\\n' -quit)
     test -n "\$topdir"
+
+    # normalize folder name so Nextflow output path is deterministic
     mv "\$topdir" "interproscan-data-${interproscan_version}"
 
     # sanity check matches declared Nextflow output
