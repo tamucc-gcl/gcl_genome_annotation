@@ -21,7 +21,7 @@
 process BRAKER {
     tag "${assembly_id}"
     label 'braker'
-    publishDir "${params.outdir}/braker", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/structural_annotation", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), path(masked_assembly)

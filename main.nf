@@ -74,9 +74,6 @@ include { parseSampleSheet } from './functions/parse_sample_sheet.nf'
 
 // ── Database ─────────────────────────────
 include { CURATE_DFAM   } from './modules/curateDfam.nf'
-include { DOWNLOAD_BUSCO_DB } from './modules/download_busco_db.nf'
-include { DOWNLOAD_OMARK_DB } from './modules/download_omark_db.nf'
-include { DOWNLOAD_INTERPROSCAN_DB } from './modules/download_interproscan_db.nf'
 
 // ── Repeat annotation ─────────────────────────────
 include { REPEAT_MODEL  } from './modules/repeatModel.nf'
@@ -87,12 +84,12 @@ include { REPEAT_MASK   } from './modules/repeatMask.nf'
 // ── Structural annotation ─────────────────────────────
 include { BRAKER } from './modules/braker.nf'
 include { AGAT } from './modules/agat.nf'
-include { BUSCO } from './modules/busco.nf'
-include { OMARK } from './modules/omark.nf'
+include { BUSCO; DOWNLOAD_BUSCO_DB } from './modules/busco.nf'
+include { OMARK; DOWNLOAD_OMARK_DB } from './modules/omark.nf'
 
 // ── Functional annotation ─────────────────────────────
 include { CHUNK_PROTEINS } from './modules/chunk_proteins.nf'
-include { INTERPROSCAN; MERGE_INTERPROSCAN } from './modules/interproscan.nf'
+include { INTERPROSCAN; MERGE_INTERPROSCAN; DOWNLOAD_INTERPROSCAN_DB } from './modules/interproscan.nf'
 
 
 /*
