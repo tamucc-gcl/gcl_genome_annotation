@@ -22,7 +22,7 @@ process INTERPROSCAN {
     """
     awk '
     /^>/ {print; next}
-    {gsub(/\*/, "", $0); print}
+    {gsub(/\*/, "", \$0); print}
     ' "${protein_fasta}" > "clean.nostop.fa"
     
 
