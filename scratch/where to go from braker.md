@@ -8,8 +8,6 @@ Questions
 
 
 QC Structure
-1. Busco on proteins
-2. OMArk - gene repertoire consistency/contamination
 3. Gene model descriptive stats - AGAT 
     - Gene length, CDS length, exon count per transcript, exon length, intron length
     - Fraction of single-exon genes

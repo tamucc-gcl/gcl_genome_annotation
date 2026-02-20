@@ -10,21 +10,22 @@
 */
 
 process DOWNLOAD_OMARK_DB {
-    tag "${lineage}"
+    tag "${oma_db_name}"
     label 'omark_download'
     
     storeDir "${params.omark_downloads}"
     
     input:
-    
+    val oma_db_name
+
     output:
-    path("${params.oma_db_name}.h5"), emit: omamer_db
+    path("${oma_db_name}.h5"), emit: omamer_db
     path("taxa.sqlite"), emit: taxa_db
     
     script:
     """
     #Download oma LUCA database
-    wget https://omabrowser.org/All/${params.oma_db_name}.h5
+    wget https://omabrowser.org/All/${oma_db_name}.h5
 
     #Download proper format NCBI taxonomy
     python - <<PY

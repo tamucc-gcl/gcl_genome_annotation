@@ -49,6 +49,11 @@ params.oma_db_name = 'LUCA'   //https://omabrowser.org/oma/current/ see here for
 params.omark_downloads = '/work/birdlab/databases/omark_datasets' 
 params.ncbi_speciesID = null
 
+// Functional Annotations
+params.interproscan_downloads = '/work/birdlab/databases/interproscan_datasets'
+params.interproscan_version = '5.77-108.0'
+params.n_chunks = 10 // number of chunks to split proteins into for parallel processing in InterProScan, Diamond, eggNOG. Adjust based on size of proteome and available resources.
+
 // ── Parameter validation ─────────────────────────────────────────────────────
 if (!params.sample_sheet) { error "Please provide --sample_sheet" }
 if (!params.dfam_dir)     { error "Please provide --dfam_dir" }
@@ -67,17 +72,28 @@ include { parseSampleSheet } from './functions/parse_sample_sheet.nf'
 ========================================================================================
 */
 
+// ── Database ─────────────────────────────
+include { CURATE_DFAM   } from './modules/curateDfam.nf'
+include { DOWNLOAD_BUSCO_DB } from './modules/download_busco_db.nf'
+include { DOWNLOAD_OMARK_DB } from './modules/download_omark_db.nf'
+include { DOWNLOAD_INTERPROSCAN_DB } from './modules/download_interproscan_db.nf'
+
+// ── Repeat annotation ─────────────────────────────
 include { REPEAT_MODEL  } from './modules/repeatModel.nf'
 include { CURATE_REPEATS } from './modules/curateRepeats.nf'
 include { CLASSIFY_REPEATS } from './modules/classifyRepeats.nf'
-include { CURATE_DFAM   } from './modules/curateDfam.nf'
 include { REPEAT_MASK   } from './modules/repeatMask.nf'
+
+// ── Structural annotation ─────────────────────────────
 include { BRAKER } from './modules/braker.nf'
 include { AGAT } from './modules/agat.nf'
-include { DOWNLOAD_BUSCO_DB } from './modules/download_busco_db.nf'
 include { BUSCO } from './modules/busco.nf'
-include { DOWNLOAD_OMARK_DB } from './modules/download_omark_db.nf'
 include { OMARK } from './modules/omark.nf'
+
+// ── Functional annotation ─────────────────────────────
+include { CHUNK_PROTEINS } from './modules/chunk_proteins.nf'
+include { INTERPROSCAN, MERGE_INTERPROSCAN } from './modules/interproscan.nf'
+
 
 /*
 ========================================================================================
@@ -104,7 +120,10 @@ workflow {
     ch_busco_db = DOWNLOAD_BUSCO_DB.out.db
 
     // ── Step 0: OMArk (runs once) ─────────────────────────────
-    DOWNLOAD_OMARK_DB()
+    DOWNLOAD_OMARK_DB(params.oma_db_name)
+
+    // ── Step 0: InterProScan (runs once) ─────────────────────────────
+    DOWNLOAD_INTERPROSCAN_DB(params.interproscan_version)
 
     /*
     ========================================================================================
@@ -170,6 +189,43 @@ workflow {
     ========================================================================================
     */
 
+    // ── Step 9: SPlit proteins into chunks ─────────────
+    CHUNK_PROTEINS(
+        BRAKER.out.braker_proteins)
+
+    // ch_chunks: (assembly_id, chunk_id, chunk_faa)
+    ch_chunks = CHUNK_PROTEINS.out.manifest
+    .map { assembly_id, manifest ->
+        tuple(assembly_id, manifest)
+    }
+    .flatMap { assembly_id, manifest ->
+        manifest
+            .readLines()
+            .findAll { it?.trim() }
+            .sort()
+            .withIndex()
+            .collect { pathStr, i ->
+                def chunk_id = sprintf("chunk_%04d", i)
+                tuple(assembly_id, chunk_id, file(pathStr))
+            }
+    }
+
+    // ── Step 10: Run InterProScan on protein chunks ─────────────
+    INTERPROSCAN(
+        ch_chunks,
+        DOWNLOAD_INTERPROSCAN_DB.out.db)
+
+    // group per assembly
+    ch_ipr_tsv_grouped = INTERPROSCAN.out.interproscan_tsv
+    .map { assembly_id, chunk_id, tsv -> tuple(assembly_id, tsv) }
+    .groupTuple()
+    // -> (assembly_id, [tsv1, tsv2, ...])
+
+    MERGE_INTERPROSCAN_TSV(ch_ipr_tsv_grouped)
+
+    // ── Step 11: Run eggNOG on protein chunks ─────────────
+
+    // ── Step 12: Run Diamond on protein chunks ─────────────
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────
