@@ -58,8 +58,7 @@ process MERGE_EGGNOG {
     publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
 
     input:
-    val assembly_id
-    path annot_files
+    tuple val(assembly_id), path(annot_files)
 
     output:
     path("${assembly_id}.eggnog.emapper.annotations"), emit: merged
