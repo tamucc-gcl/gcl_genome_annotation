@@ -86,34 +86,31 @@ process MERGE_INTERPROSCAN {
 */
 
 process DOWNLOAD_INTERPROSCAN_DB {
-    tag "${interproscan_version}"
-    label 'interproscan_download'
+  tag "${interproscan_version}"
+  label 'interproscan_download'
+  storeDir "${params.interproscan_downloads}"
 
-    storeDir "${params.interproscan_downloads}"
+  input:
+  val interproscan_version
 
-    input:
-    val interproscan_version
+  output:
+  path("interproscan-data-${interproscan_version}/data"), emit: db
 
-    output:
-    path("interproscan-data-${interproscan_version}/data"), emit: db
+  script:
+  """
+  set -euo pipefail
 
-    script:
-    """
-    set -euo pipefail
+  url="https://ftp.ebi.ac.uk/pub/software/unix/iprscan/5/${interproscan_version}/alt/interproscan-data-${interproscan_version}.tar.gz"
+  tarball="interproscan-data-${interproscan_version}.tar.gz"
 
-    url="http://ftp.ebi.ac.uk/pub/software/unix/iprscan/5/${interproscan_version}/alt/interproscan-data-${interproscan_version}.tar.gz"
+  curl -fL --retry 5 --retry-delay 10 -o "\$tarball" "\$url"
 
-    curl -fL -O "\$url"
-    tar -pxzf "interproscan-data-${interproscan_version}.tar.gz"
+  # figure out top-level dir inside tarball, extract, then normalize name
+  topdir=\$(tar -tzf "\$tarball" | head -1 | cut -d/ -f1)
+  tar -xzf "\$tarball"
 
-    # sanity check
-    test -d "interproscan-data-${interproscan_version}/data"
+  mv "\$topdir" "interproscan-data-${interproscan_version}"
 
-    echo "Successfully downloaded InterProScan data to interproscan-data-${interproscan_version}/data"
-    """
-
-    stub:
-    """
-    mkdir -p interproscan-data-${interproscan_version}/data
-    """
+  test -d "interproscan-data-${interproscan_version}/data"
+  """
 }
