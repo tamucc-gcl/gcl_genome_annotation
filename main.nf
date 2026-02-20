@@ -50,9 +50,19 @@ params.omark_downloads = '/work/birdlab/databases/omark_datasets'
 params.ncbi_speciesID = null
 
 // Functional Annotations
+params.n_chunks = 16 // number of chunks to split proteins into for parallel processing in InterProScan, Diamond, eggNOG. Adjust based on size of proteome and available resources.
 params.interproscan_downloads = null //'/work/birdlab/databases/interproscan_datasets'
 params.interproscan_version = null //'5.77-108.0'
-params.n_chunks = 10 // number of chunks to split proteins into for parallel processing in InterProScan, Diamond, eggNOG. Adjust based on size of proteome and available resources.
+params.interproscan_total_cpus = 64
+params.interproscan_min_cpus = 4
+params.interproscan_gb_per_cpu = 5
+params.eggnog_downloads = null //'/work/birdlab/databases/eggnog_datasets'
+params.eggnog_version = null //'5.0.2'
+params.eggnog_evalue = 0.001
+params.eggnog_sensemode = sensitive //{fast,mid-sensitive,sensitive,more-sensitive,very-sensitive,ultra-sensitive}
+params.eggnog_taxid = null
+params.eggnog_target_orthologs = all
+params.eggnog_goEvidence = "non-electronic"
 
 // ── Parameter validation ─────────────────────────────────────────────────────
 if (!params.sample_sheet) { error "Please provide --sample_sheet" }
@@ -90,6 +100,7 @@ include { OMARK; DOWNLOAD_OMARK_DB } from './modules/omark.nf'
 // ── Functional annotation ─────────────────────────────
 include { CHUNK_PROTEINS } from './modules/chunk_proteins.nf'
 include { INTERPROSCAN; MERGE_INTERPROSCAN; DOWNLOAD_INTERPROSCAN_DB } from './modules/interproscan.nf'
+include { EGGNOG; MERGE_EGGNOG; DOWNLOAD_EGGNOG_DB } from './modules/eggnog.nf'
 
 
 /*
@@ -119,8 +130,11 @@ workflow {
     // ── Step 0: OMArk (runs once) ─────────────────────────────
     DOWNLOAD_OMARK_DB(params.oma_db_name)
 
-    // ── Step 0: InterProScan (runs once) ─────────────────────────────
+    // ── Step 0: Download InterProScan database (runs once) ─────────────────────────────
     DOWNLOAD_INTERPROSCAN_DB(params.interproscan_version)
+
+    // ── Step 0: Download EggNOG database (runs once) ─────────────────────────────
+    DOWNLOAD_EGGNOG_DB(params.eggnog_version)
 
     /*
     ========================================================================================
@@ -186,26 +200,17 @@ workflow {
     ========================================================================================
     */
 
-    // ── Step 9: SPlit proteins into chunks ─────────────
+    // ── Step 9: Split proteins into chunks ─────────────
     CHUNK_PROTEINS(
         BRAKER.out.braker_proteins)
 
-    // ch_chunks: (assembly_id, chunk_id, chunk_faa)
-    ch_chunks = CHUNK_PROTEINS.out.manifest
-    .map { assembly_id, manifest ->
-        tuple(assembly_id, manifest)
-    }
-    .flatMap { assembly_id, manifest ->
-        manifest
-            .readLines()
-            .findAll { it?.trim() }
-            .sort()
-            .withIndex()
-            .collect { pathStr, i ->
-                def chunk_id = sprintf("chunk_%04d", i)
-                tuple(assembly_id, chunk_id, file(pathStr))
-            }
-    }
+    // ch_chunks: (assembly_id, chunk_id, chunk_file)
+    ch_chunks = CHUNK_PROTEINS.out.chunks
+        .map { assembly_id, f ->
+            def m = (f.name =~ /part_(\d+)/)
+            def chunk_id = m ? "part_${m[0][1]}" : f.baseName
+            tuple(assembly_id, chunk_id, f)
+        }
 
     // ── Step 10: Run InterProScan on protein chunks ─────────────
     INTERPROSCAN(
@@ -214,13 +219,22 @@ workflow {
 
     // group per assembly
     ch_ipr_tsv_grouped = INTERPROSCAN.out.interproscan_tsv
-    .map { assembly_id, chunk_id, tsv -> tuple(assembly_id, tsv) }
-    .groupTuple()
-    // -> (assembly_id, [tsv1, tsv2, ...])
+        .map { assembly_id, chunk_id, tsv -> tuple(assembly_id, tsv) }
+        .groupTuple()
 
     MERGE_INTERPROSCAN(ch_ipr_tsv_grouped)
 
     // ── Step 11: Run eggNOG on protein chunks ─────────────
+    EGGNOG(
+        ch_chunks,
+        DOWNLOAD_EGGNOG_DB.out.db)
+
+    // group per assembly
+    ch_eggnog_annotations_grouped = EGGNOG.out.eggnog_annotations
+        .map { assembly_id, chunk_id, tsv -> tuple(assembly_id, tsv) }
+        .groupTuple()
+
+    MERGE_EGGNOG(ch_eggnog_annotations_grouped)
 
     // ── Step 12: Run Diamond on protein chunks ─────────────
 }
