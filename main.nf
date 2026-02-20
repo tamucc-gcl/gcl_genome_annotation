@@ -53,15 +53,12 @@ params.ncbi_speciesID = null
 params.n_chunks = 2 // number of chunks to split proteins into for parallel processing in InterProScan, Diamond, eggNOG. Adjust based on size of proteome and available resources.
 params.interproscan_downloads = null //'/work/birdlab/databases/interproscan_datasets'
 params.interproscan_version = null //'5.77-108.0'
-params.interproscan_total_cpus = 64
-params.interproscan_min_cpus = 4
-params.interproscan_gb_per_cpu = 5
 params.eggnog_downloads = null //'/work/birdlab/databases/eggnog_datasets'
 params.eggnog_version = null //'5.0.2'
 params.eggnog_evalue = 0.001
-params.eggnog_sensemode = sensitive //{fast,mid-sensitive,sensitive,more-sensitive,very-sensitive,ultra-sensitive}
+params.eggnog_sensemode = 'sensitive' //{fast,mid-sensitive,sensitive,more-sensitive,very-sensitive,ultra-sensitive}
 params.eggnog_taxid = null
-params.eggnog_target_orthologs = all
+params.eggnog_target_orthologs = 'all'
 params.eggnog_goEvidence = "non-electronic"
 
 // ── Parameter validation ─────────────────────────────────────────────────────
