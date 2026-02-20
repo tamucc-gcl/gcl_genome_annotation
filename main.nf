@@ -221,7 +221,7 @@ workflow {
     .groupTuple()
     // -> (assembly_id, [tsv1, tsv2, ...])
 
-    MERGE_INTERPROSCAN_TSV(ch_ipr_tsv_grouped)
+    MERGE_INTERPROSCAN(ch_ipr_tsv_grouped)
 
     // ── Step 11: Run eggNOG on protein chunks ─────────────
 
