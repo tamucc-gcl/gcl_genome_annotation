@@ -113,7 +113,9 @@ process DOWNLOAD_EGGNOG_DB {
   """
   set -euo pipefail
 
-  # Download directly into storeDir (i.e. this directory)
+  mkdir -p eggnog_db
+  cd eggnog_db
+
   wget --tries=10 --timeout=30 -c -O eggnog.db.gz            http://eggnog5.embl.de/download/emapperdb-${eggnog_version}/eggnog.db.gz
   wget --tries=10 --timeout=30 -c -O eggnog.taxa.tar.gz      http://eggnog5.embl.de/download/emapperdb-${eggnog_version}/eggnog.taxa.tar.gz
   wget --tries=10 --timeout=30 -c -O eggnog_proteins.dmnd.gz http://eggnog5.embl.de/download/emapperdb-${eggnog_version}/eggnog_proteins.dmnd.gz
@@ -121,9 +123,5 @@ process DOWNLOAD_EGGNOG_DB {
   gunzip -f eggnog.db.gz
   tar -xzf eggnog.taxa.tar.gz && rm -f eggnog.taxa.tar.gz
   gunzip -f eggnog_proteins.dmnd.gz
-
-  # Emit a named directory path without creating a subdirectory:
-  # eggnog_db is a symlink pointing to "this dir"
-  ln -sfn . eggnog_db
   """
 }
