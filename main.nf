@@ -231,7 +231,7 @@ workflow {
     // ── Step 11: Run eggNOG on protein chunks ─────────────
     EGGNOG(
         ch_chunks,
-        DOWNLOAD_EGGNOG_DB.out.eggnog_data_dir)
+        DOWNLOAD_EGGNOG_DB.out.eggnog_db_dir)
 
     // group per assembly
     ch_eggnog_annotations_grouped = EGGNOG.out.eggnog_annotations
