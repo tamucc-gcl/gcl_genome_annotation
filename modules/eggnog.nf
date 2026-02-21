@@ -9,7 +9,7 @@
 process EGGNOG {
   tag "${assembly_id}:${chunk_id}"
   label 'eggnog'
-  publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+  //publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
 
   input:
   tuple val(assembly_id), val(chunk_id), path(protein_fasta)
@@ -63,7 +63,7 @@ process MERGE_EGGNOG {
     tuple val(assembly_id), path(annot_files)
 
     output:
-    path("${assembly_id}.eggnog.emapper.annotations"), emit: merged
+    path("${assembly_id}.eggnog.annotations"), emit: merged
 
     script:
     """
@@ -75,15 +75,15 @@ process MERGE_EGGNOG {
     first=\$(head -n 1 annot.list)
 
     # Write header + first chunk's data
-    cat "\$first" > ${assembly_id}.eggnog.emapper.annotations
+    cat "\$first" > ${assembly_id}.eggnog.annotations
 
     # Append ONLY data rows (skip all lines beginning with '#') from the remaining chunks
     tail -n +2 annot.list | while read -r f; do
-        awk 'BEGIN{FS="\\t"} !/^#/' "\$f" >> ${assembly_id}.eggnog.emapper.annotations
+        awk 'BEGIN{FS="\\t"} !/^#/' "\$f" >> ${assembly_id}.eggnog.annotations
     done
 
     # Optional sanity: remove any accidental blank lines
-    sed -i '/^\\s*\$/d' ${assembly_id}.eggnog.emapper.annotations
+    sed -i '/^\\s*\$/d' ${assembly_id}.eggnog.annotations
     """
 }
 
@@ -113,9 +113,7 @@ process DOWNLOAD_EGGNOG_DB {
   """
   set -euo pipefail
 
-  mkdir -p eggnog_db
-  cd eggnog_db
-
+  # Download directly into storeDir (i.e. this directory)
   wget --tries=10 --timeout=30 -c -O eggnog.db.gz            http://eggnog5.embl.de/download/emapperdb-${eggnog_version}/eggnog.db.gz
   wget --tries=10 --timeout=30 -c -O eggnog.taxa.tar.gz      http://eggnog5.embl.de/download/emapperdb-${eggnog_version}/eggnog.taxa.tar.gz
   wget --tries=10 --timeout=30 -c -O eggnog_proteins.dmnd.gz http://eggnog5.embl.de/download/emapperdb-${eggnog_version}/eggnog_proteins.dmnd.gz
@@ -123,5 +121,9 @@ process DOWNLOAD_EGGNOG_DB {
   gunzip -f eggnog.db.gz
   tar -xzf eggnog.taxa.tar.gz && rm -f eggnog.taxa.tar.gz
   gunzip -f eggnog_proteins.dmnd.gz
+
+  # Emit a named directory path without creating a subdirectory:
+  # eggnog_db is a symlink pointing to "this dir"
+  ln -sfn . eggnog_db
   """
 }

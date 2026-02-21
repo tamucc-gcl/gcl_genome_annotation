@@ -116,9 +116,9 @@ workflow {
     ========================================================================================
     */
 
-    // ── Step 0: Extract Dfam library (runs once) ─────────────────────────────
-    ch_dfam_dir = Channel.fromPath(params.dfam_dir, checkIfExists: true)
-    CURATE_DFAM(ch_dfam_dir, params.taxa_name)
+    // ── Step 0: DFam (runs once) ─────────────────────────────
+    //DOWNLOAD_DFAM_DB(params.busco_lineage)
+    //ch_dfam_db = DOWNLOAD_DFAM_DB.out.dfam_db_dir
 
     // ── Step 0: BUSCO (runs once) ─────────────────────────────
     DOWNLOAD_BUSCO_DB(params.busco_lineage)
@@ -138,6 +138,10 @@ workflow {
         Repeat Annotation
     ========================================================================================
     */
+
+    // ── Step 0: Extract Dfam library (runs once) ─────────────────────────────
+    ch_dfam_dir = Channel.fromPath(params.dfam_dir, checkIfExists: true)
+    CURATE_DFAM(ch_dfam_dir, params.taxa_name)
 
     // ── Step 1: De novo repeat modeling (per genome) ─────────────────────────
     REPEAT_MODEL(ch_assemblies)
