@@ -57,7 +57,7 @@ params.eggnog_downloads = null //'/work/birdlab/databases/eggnog_datasets'
 params.eggnog_version = null //'5.0.2'
 params.eggnog_evalue = 0.001
 params.eggnog_sensemode = 'sensitive' //{fast,mid-sensitive,sensitive,more-sensitive,very-sensitive,ultra-sensitive}
-params.eggnog_taxid = null
+params.eggnog_taxid = 'none' // set to specific NCBI taxid (e.g. 7898 for Actinopterygii) to restrict to that lineage, or 'none' for no restriction
 params.eggnog_target_orthologs = 'all'
 params.eggnog_goEvidence = "non-electronic"
 
@@ -231,7 +231,7 @@ workflow {
     // ── Step 11: Run eggNOG on protein chunks ─────────────
     EGGNOG(
         ch_chunks,
-        DOWNLOAD_EGGNOG_DB.out.db)
+        DOWNLOAD_EGGNOG_DB.out.eggnog_data_dir)
 
     // group per assembly
     ch_eggnog_annotations_grouped = EGGNOG.out.eggnog_annotations

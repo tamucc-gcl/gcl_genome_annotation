@@ -6,26 +6,15 @@ Questions
 3. Package outputs for reproducibility and submission: standardize GFF3, export FASTA/TSV/JSON deliverables, generate browser tracks, and record provenance (RO-Crate + explicit DB versions)
 
 
-
-QC Structure
-3. Gene model descriptive stats - AGAT 
-    - Gene length, CDS length, exon count per transcript, exon length, intron length
-    - Fraction of single-exon genes
-    - Start/stop codon completeness (if tracked)
-    - Repeat overlap statistics (CDS and gene span)
-    - `agat_sp_statistics.pl --gff annotation.gff3 --output agat_stats`
-
 Functional Annotation
-1. InterProScan
-    - genome scale functional classification
-2. eggNOG-mapper
-    - go/kegg terms
 3. diamond
     - gene names
 4. ncRNA
     - tRNAscan-SE
     - Infernal
     - Rfam
+
+QC Functional Annotations
 
 
 

@@ -13,10 +13,10 @@ process EGGNOG {
 
     input:
     tuple val(assembly_id), val(chunk_id), path(protein_fasta)
-    path(eggnog_db)
+    path(eggnog_db_dir)
 
     output:
-    tuple val(assembly_id), val(chunk_id), path("${assembly_id}.${chunk_id}.eggnog.emapper.annotations"), emit: eggnog_annotations
+    tuple val(assembly_id), val(chunk_id), path("${assembly_id}_chunk_${chunk_id}_eggnog.emapper.annotations"), emit: eggnog_annotations
 
     script:
     """
@@ -25,7 +25,7 @@ process EGGNOG {
         --itype proteins \
         -o "${assembly_id}_chunk_${chunk_id}_eggnog" \
         --cpu ${task.cpus} \
-        --data_dir "${eggnog_db}" \
+        --data_dir "${eggnog_db_dir}" \
         -m diamond \
         --evalue "${params.eggnog_evalue}" \
         --sensmode "${params.eggnog_sensemode}" \
@@ -39,9 +39,7 @@ process EGGNOG {
 
     stub:
     """
-    touch ${assembly_id}.${chunk_id}.eggnog.emapper.annotations
-    #touch ${assembly_id}.${chunk_id}.eggnog.emapper.hits
-    #touch ${assembly_id}.${chunk_id}.eggnog.emapper.seed_orthologs
+    ${assembly_id}_chunk_${chunk_id}_eggnog.emapper.annotations
     """
 }
 
