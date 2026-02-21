@@ -7,40 +7,44 @@
 */
 
 process EGGNOG {
-    tag "${assembly_id}:${chunk_id}"
-    label 'eggnog'
-    publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+  tag "${assembly_id}:${chunk_id}"
+  label 'eggnog'
+  publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
 
-    input:
-    tuple val(assembly_id), val(chunk_id), path(protein_fasta)
-    path(eggnog_db_dir)
+  input:
+  tuple val(assembly_id), val(chunk_id), path(protein_fasta)
+  path eggnog_db_dir
 
-    output:
-    tuple val(assembly_id), val(chunk_id), path("${assembly_id}_chunk_${chunk_id}_eggnog.emapper.annotations"), emit: eggnog_annotations
+  output:
+  tuple val(assembly_id), val(chunk_id),
+    path("${assembly_id}_chunk_${chunk_id}_eggnog.emapper.annotations"),
+    emit: eggnog_annotations
 
-    script:
-    """
-    emapper.py \
-        -i "${protein_fasta}" \
-        --itype proteins \
-        -o "${assembly_id}_chunk_${chunk_id}_eggnog" \
-        --cpu ${task.cpus} \
-        --data_dir "${eggnog_db_dir}" \
-        -m diamond \
-        --evalue "${params.eggnog_evalue}" \
-        --sensmode "${params.eggnog_sensemode}" \
-        --dmnd_iterate yes \
-        --dmnd_algo auto \
-        --pfam_realign none \
-        --tax_scope "${params.eggnog_taxid}" \
-        --target_orthologs "${params.eggnog_target_orthologs}" \
-        --go_evidence "${params.eggnog_goEvidence}"
-    """
+  script:
+  """
+  set -euo pipefail
 
-    stub:
-    """
-    ${assembly_id}_chunk_${chunk_id}_eggnog.emapper.annotations
-    """
+  emapper.py \
+    -i "${protein_fasta}" \\
+    --itype proteins \\
+    -o "${assembly_id}_chunk_${chunk_id}_eggnog" \\
+    --cpu ${task.cpus} \\
+    --data_dir "${eggnog_db_dir}" \\
+    -m diamond \\
+    --evalue "${params.eggnog_evalue}" \\
+    --sensmode "${params.eggnog_sensemode}" \\
+    --dmnd_iterate yes \\
+    --dmnd_algo auto \\
+    --pfam_realign none \\
+    --tax_scope "${params.eggnog_taxid}" \\
+    --target_orthologs "${params.eggnog_target_orthologs}" \\
+    --go_evidence "${params.eggnog_goEvidence}"
+  """
+
+  stub:
+  """
+  touch ${assembly_id}_chunk_${chunk_id}_eggnog.emapper.annotations
+  """
 }
 
 /*
@@ -103,23 +107,21 @@ process DOWNLOAD_EGGNOG_DB {
   val eggnog_version
 
   output:
-  path("."), emit: eggnog_data_dir
-  path("eggnog.db"), emit: db
-  path("eggnog.taxa.db.traverse.pkl"), emit: traverse_db
-  path("eggnog_proteins.dmnd"), emit: protein_db
-  path("eggnog.taxa.db"), emit: taxa_db
+  path("eggnog_db"), emit: eggnog_db_dir
 
   script:
   """
-    set -euo pipefail
-    wget --tries=10 --timeout=30 -c -O eggnog.db.gz            http://eggnog5.embl.de/download/emapperdb-${eggnog_version}/eggnog.db.gz
-    wget --tries=10 --timeout=30 -c -O eggnog.taxa.tar.gz      http://eggnog5.embl.de/download/emapperdb-${eggnog_version}/eggnog.taxa.tar.gz
-    wget --tries=10 --timeout=30 -c -O eggnog_proteins.dmnd.gz http://eggnog5.embl.de/download/emapperdb-${eggnog_version}/eggnog_proteins.dmnd.gz
+  set -euo pipefail
 
+  mkdir -p eggnog_db
+  cd eggnog_db
 
-    # unpack
-    gunzip -f eggnog.db.gz
-    tar -xzf eggnog.taxa.tar.gz && rm -f eggnog.taxa.tar.gz
-    gunzip -f eggnog_proteins.dmnd.gz
+  wget --tries=10 --timeout=30 -c -O eggnog.db.gz            http://eggnog5.embl.de/download/emapperdb-${eggnog_version}/eggnog.db.gz
+  wget --tries=10 --timeout=30 -c -O eggnog.taxa.tar.gz      http://eggnog5.embl.de/download/emapperdb-${eggnog_version}/eggnog.taxa.tar.gz
+  wget --tries=10 --timeout=30 -c -O eggnog_proteins.dmnd.gz http://eggnog5.embl.de/download/emapperdb-${eggnog_version}/eggnog_proteins.dmnd.gz
+
+  gunzip -f eggnog.db.gz
+  tar -xzf eggnog.taxa.tar.gz && rm -f eggnog.taxa.tar.gz
+  gunzip -f eggnog_proteins.dmnd.gz
   """
 }
