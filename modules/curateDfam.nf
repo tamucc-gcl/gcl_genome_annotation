@@ -40,3 +40,32 @@ process CURATE_DFAM {
     touch dfam_subset.lib
     """
 }
+
+/*
+========================================================================================
+    DOWNLOAD DFam DATABASE MODULE
+========================================================================================
+*/
+
+process DOWNLOAD_DFAM_DB {
+  tag "${dfam_version}"
+  label 'download_db'
+  storeDir "${params.dfam_downloads}"
+
+  input:
+  val dfam_version
+
+  output:
+  path("dfam_db"), emit: dfam_db_dir
+
+  script:
+  """
+  set -euo pipefail
+  mkdir -p dfam_db
+  cd dfam_db
+  wget -r -np -nH --cut-dirs=4 -A "dfam${dfam_version}_full.*.h5.gz,dfam${dfam_version}_full.*.h5.gz.md5,README.txt" \
+    https://www.dfam.org/releases/current/families/FamDB/
+
+  gunzip dfam${dfam_version}_full.*.h5.gz
+  """
+}

@@ -24,6 +24,7 @@ params.outdir         = "${launchDir}/results"
 params.publish_dir_mode = 'link'
 
 // Dfam
+params.dfam_version = '39'
 params.dfam_dir       = null
 params.taxa_name      = null
 
@@ -50,7 +51,7 @@ params.omark_downloads = '/work/birdlab/databases/omark_datasets'
 params.ncbi_speciesID = null
 
 // Functional Annotations
-params.n_chunks = 2 // number of chunks to split proteins into for parallel processing in InterProScan, Diamond, eggNOG. Adjust based on size of proteome and available resources.
+params.n_chunks = 8 // number of chunks to split proteins into for parallel processing in InterProScan, Diamond, eggNOG. Adjust based on size of proteome and available resources.
 params.interproscan_downloads = null //'/work/birdlab/databases/interproscan_datasets'
 params.interproscan_version = null //'5.77-108.0'
 params.eggnog_downloads = null //'/work/birdlab/databases/eggnog_datasets'
@@ -60,6 +61,11 @@ params.eggnog_sensemode = 'sensitive' //{fast,mid-sensitive,sensitive,more-sensi
 params.eggnog_taxid = 'none' // set to specific NCBI taxid (e.g. 7898 for Actinopterygii) to restrict to that lineage, or 'none' for no restriction
 params.eggnog_target_orthologs = 'all'
 params.eggnog_goEvidence = "non-electronic"
+params.diamond_sensitivity = 'sensitive' // {fast, sensitive, more-sensitive, very-sensitive, ultra-sensitive}
+params.diamond_maxHits = 1
+params.diamond.evalue = 1e-5
+params.diamond.qcov = 70
+
 
 // ── Parameter validation ─────────────────────────────────────────────────────
 if (!params.sample_sheet) { error "Please provide --sample_sheet" }
@@ -80,7 +86,7 @@ include { parseSampleSheet } from './functions/parse_sample_sheet.nf'
 */
 
 // ── Database ─────────────────────────────
-include { CURATE_DFAM   } from './modules/curateDfam.nf'
+include { CURATE_DFAM; DOWNLOAD_DFAM_DB } from './modules/curateDfam.nf'
 
 // ── Repeat annotation ─────────────────────────────
 include { REPEAT_MODEL  } from './modules/repeatModel.nf'
@@ -117,8 +123,7 @@ workflow {
     */
 
     // ── Step 0: DFam (runs once) ─────────────────────────────
-    //DOWNLOAD_DFAM_DB(params.busco_lineage)
-    //ch_dfam_db = DOWNLOAD_DFAM_DB.out.dfam_db_dir
+    DOWNLOAD_DFAM_DB(params.dfam_version)
 
     // ── Step 0: BUSCO (runs once) ─────────────────────────────
     DOWNLOAD_BUSCO_DB(params.busco_lineage)
@@ -140,8 +145,8 @@ workflow {
     */
 
     // ── Step 0: Extract Dfam library (runs once) ─────────────────────────────
-    ch_dfam_dir = Channel.fromPath(params.dfam_dir, checkIfExists: true)
-    CURATE_DFAM(ch_dfam_dir, params.taxa_name)
+    CURATE_DFAM(DOWNLOAD_DFAM_DB.out.dfam_db_dir, 
+                params.taxa_name)
 
     // ── Step 1: De novo repeat modeling (per genome) ─────────────────────────
     REPEAT_MODEL(ch_assemblies)
