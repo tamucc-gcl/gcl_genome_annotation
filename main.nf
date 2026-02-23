@@ -63,13 +63,13 @@ params.eggnog_target_orthologs = 'all'
 params.eggnog_goEvidence = "non-electronic"
 params.diamond_sensitivity = 'sensitive' // {fast, sensitive, more-sensitive, very-sensitive, ultra-sensitive}
 params.diamond_maxHits = 1
-params.diamond.evalue = 1e-5
-params.diamond.qcov = 70
+params.diamond_evalue = 1e-5
+params.diamond_qcov = 70
 
 
 // ── Parameter validation ─────────────────────────────────────────────────────
 if (!params.sample_sheet) { error "Please provide --sample_sheet" }
-if (!params.dfam_dir)     { error "Please provide --dfam_dir" }
+if (!params.dfam_database) { error "Please provide --dfam_database" }
 if (!params.taxa_name)    { error "Please provide --taxa_name" }
 
 /*
