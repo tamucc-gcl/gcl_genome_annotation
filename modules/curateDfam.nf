@@ -67,7 +67,7 @@ process DOWNLOAD_DFAM_DB {
     wget -q -O - https://www.dfam.org/releases/current/families/FamDB/ \
         | grep -oP "dfam${dfam_version}_full\\..*?\\.h5\\.gz" \
         | sort -u \
-        | awk '{print "https://www.dfam.org/releases/current/families/FamDB/" $0}' \
+        | awk '{print "https://www.dfam.org/releases/current/families/FamDB/" \$0}' \
         > files.txt
 
     cpus=${task.cpus}
