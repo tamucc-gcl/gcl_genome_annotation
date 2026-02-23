@@ -65,8 +65,10 @@ process DOWNLOAD_DFAM_DB {
     cd dfam_db
 
     wget -q -O - https://www.dfam.org/releases/current/families/FamDB/ \
-    | grep -oP "dfam${dfam_version}_full\\..*?\\.h5\\.gz" \
-    | sort -u > files.txt
+        | grep -oP "dfam${dfam_version}_full\\..*?\\.h5\\.gz" \
+        | sort -u \
+        | awk '{print "https://www.dfam.org/releases/current/families/FamDB/" $0}' \
+        > files.txt
 
     cpus=${task.cpus}
 
@@ -81,8 +83,7 @@ process DOWNLOAD_DFAM_DB {
         -j \${parallel_files} \
         -x \${connections_per_file} \
         -s \${connections_per_file} \
-        -i files.txt \
-        --base-uri=https://www.dfam.org/releases/current/families/FamDB/
+        -i files.txt
 
     pigz -p ${task.cpus} -d "dfam${dfam_version}_full."*.h5.gz
     """
