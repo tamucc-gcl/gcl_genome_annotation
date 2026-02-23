@@ -101,7 +101,7 @@ process MERGE_EGGNOG {
 process DOWNLOAD_EGGNOG_DB {
   tag "${eggnog_version}"
   label 'download_db'
-  storeDir "${params.eggnog_downloads}"
+  storeDir "${params.eggnog_database}"
 
   input:
   val eggnog_version

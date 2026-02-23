@@ -50,7 +50,7 @@ process CURATE_DFAM {
 process DOWNLOAD_DFAM_DB {
   tag "${dfam_version}"
   label 'download_db'
-  storeDir "${params.dfam_downloads}"
+  storeDir "${params.dfam_database}"
 
   input:
   val dfam_version

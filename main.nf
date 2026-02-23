@@ -45,17 +45,17 @@ params.protein_database  = null   // path to OrthoDB proteins
 
 // Structural QC
 params.busco_lineage = 'actinopterygii_odb10'
-params.busco_downloads = '/work/birdlab/databases/busco_datasets' 
+params.busco_database = '/work/birdlab/databases/busco_datasets' 
 params.oma_db_name = 'LUCA'   //https://omabrowser.org/oma/current/ see here for names
-params.omark_downloads = '/work/birdlab/databases/omark_datasets' 
+params.omark_database = '/work/birdlab/databases/omark_datasets' 
 params.ncbi_speciesID = null
 
 // Functional Annotations
 params.n_chunks = 8 // number of chunks to split proteins into for parallel processing in InterProScan, Diamond, eggNOG. Adjust based on size of proteome and available resources.
-params.interproscan_downloads = null //'/work/birdlab/databases/interproscan_datasets'
-params.interproscan_version = null //'5.77-108.0'
-params.eggnog_downloads = null //'/work/birdlab/databases/eggnog_datasets'
-params.eggnog_version = null //'5.0.2'
+params.interproscan_database = null //'/work/birdlab/databases/interproscan_datasets'
+params.interproscan_version = '5.77-108.0' //'5.77-108.0'
+params.eggnog_database = null //'/work/birdlab/databases/eggnog_datasets'
+params.eggnog_version = '5.0.2' //'5.0.2'
 params.eggnog_evalue = 0.001
 params.eggnog_sensemode = 'sensitive' //{fast,mid-sensitive,sensitive,more-sensitive,very-sensitive,ultra-sensitive}
 params.eggnog_taxid = 'none' // set to specific NCBI taxid (e.g. 7898 for Actinopterygii) to restrict to that lineage, or 'none' for no restriction

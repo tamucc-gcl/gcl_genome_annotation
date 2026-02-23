@@ -89,7 +89,7 @@ process DOWNLOAD_INTERPROSCAN_DB {
     tag "${interproscan_version}"
     label 'download_db'
 
-    storeDir "${params.interproscan_downloads}"
+    storeDir "${params.interproscan_database}"
 
     input:
     val interproscan_version

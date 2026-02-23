@@ -29,7 +29,7 @@ process BUSCO {
         --lineage_dataset ${lineage} \\
         --cpu ${task.cpus} \\
         --offline \\
-        --download_path ${params.busco_downloads ?: '/path/to/busco_downloads'}
+        --download_path ${params.busco_database ?: '/path/to/busco_downloads'}
     mv ${assembly_id}_busco/short_summary.specific.${lineage}.${assembly_id}_busco.txt ${assembly_id}_busco.txt 
     """
     
@@ -55,7 +55,7 @@ process DOWNLOAD_BUSCO_DB {
     tag "${lineage}"
     label 'busco_download'
     
-    storeDir "${params.busco_downloads}"
+    storeDir "${params.busco_database}"
     
     input:
     val(lineage)

@@ -64,7 +64,7 @@ process DOWNLOAD_OMARK_DB {
     tag "${oma_db_name}"
     label 'omark_download'
     
-    storeDir "${params.omark_downloads}"
+    storeDir "${params.omark_database}"
     
     input:
     val oma_db_name
