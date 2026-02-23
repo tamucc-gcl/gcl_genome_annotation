@@ -25,7 +25,7 @@ params.publish_dir_mode = 'link'
 
 // Dfam
 params.dfam_version = '39'
-params.dfam_dir       = null
+params.dfam_database  = null
 params.taxa_name      = null
 
 // Repeat modeller
