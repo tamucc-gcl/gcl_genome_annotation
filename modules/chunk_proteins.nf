@@ -10,6 +10,8 @@ process CHUNK_PROTEINS {
   tag "${assembly_id}"
   label 'chunk_proteins'
 
+  publishDir "${params.outdir}/protein_chunks", mode: params.publish_dir_mode
+
   input:
   tuple val(assembly_id), path(protein_fasta)
 
