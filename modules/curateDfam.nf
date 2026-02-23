@@ -71,7 +71,7 @@ process DOWNLOAD_DFAM_DB {
     cpus=${task.cpus}
 
     # Conservative split
-    parallel_files=$(( cpus / 8 ))
+    parallel_files=\$(( cpus / 8 ))
     if [ \${parallel_files} -lt 1 ]; then
         parallel_files=1
     fi
