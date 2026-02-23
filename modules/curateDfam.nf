@@ -65,17 +65,17 @@ process DOWNLOAD_DFAM_DB {
     cd dfam_db
 
     wget -q -O - https://www.dfam.org/releases/current/families/FamDB/ \
-    | grep -oP 'dfam'"${dfam_version}"'_full\..*?\.h5\.gz' \
+    | grep -oP "dfam${dfam_version}_full\\..*?\\.h5\\.gz" \
     | sort -u > files.txt
 
     cpus=${task.cpus}
 
     # Conservative split
-    parallel_files=$(( cpus / 4 ))
+    parallel_files=$(( cpus / 8 ))
     if [ \${parallel_files} -lt 1 ]; then
         parallel_files=1
     fi
-    connections_per_file=4
+    connections_per_file=8
 
     aria2c \
         -j \${parallel_files} \
@@ -84,6 +84,6 @@ process DOWNLOAD_DFAM_DB {
         -i files.txt \
         --base-uri=https://www.dfam.org/releases/current/families/FamDB/
 
-    pigz -p ${task.cpus} -d dfam${dfam_version}_full.*.h5.gz
+    pigz -p ${task.cpus} -d "dfam${dfam_version}_full."*.h5.gz
     """
 }
