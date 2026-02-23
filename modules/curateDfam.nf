@@ -48,24 +48,42 @@ process CURATE_DFAM {
 */
 
 process DOWNLOAD_DFAM_DB {
-  tag "${dfam_version}"
-  label 'download_db'
-  storeDir "${params.dfam_database}"
+    tag "${dfam_version}"
+    label 'download_dfam_db'
+    storeDir "${params.dfam_database}"
 
-  input:
-  val dfam_version
+    input:
+    val dfam_version
 
-  output:
-  path("dfam_db"), emit: dfam_db_dir
+    output:
+    path("dfam_db"), emit: dfam_db_dir
 
-  script:
-  """
-  set -euo pipefail
-  mkdir -p dfam_db
-  cd dfam_db
-  wget -r -np -nH --cut-dirs=4 -A "dfam${dfam_version}_full.*.h5.gz,dfam${dfam_version}_full.*.h5.gz.md5,README.txt" \
-    https://www.dfam.org/releases/current/families/FamDB/
+    script:
+    """
+    set -euo pipefail
+    mkdir -p dfam_db
+    cd dfam_db
 
-  gunzip dfam${dfam_version}_full.*.h5.gz
-  """
+    wget -q -O - https://www.dfam.org/releases/current/families/FamDB/ \
+    | grep -oP 'dfam'"${dfam_version}"'_full\..*?\.h5\.gz' \
+    | sort -u > files.txt
+
+    cpus=${task.cpus}
+
+    # Conservative split
+    parallel_files=$(( cpus / 4 ))
+    if [ \${parallel_files} -lt 1 ]; then
+        parallel_files=1
+    fi
+    connections_per_file=4
+
+    aria2c \
+        -j \${parallel_files} \
+        -x \${connections_per_file} \
+        -s \${connections_per_file} \
+        -i files.txt \
+        --base-uri=https://www.dfam.org/releases/current/families/FamDB/
+
+    pigz -p ${task.cpus} -d dfam${dfam_version}_full.*.h5.gz
+    """
 }
