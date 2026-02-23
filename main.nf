@@ -155,7 +155,8 @@ workflow {
                 params.taxa_name)
 
     // ── Step 1: De novo repeat modeling (per genome) ─────────────────────────
-    REPEAT_MODEL(ch_assemblies)
+    REPEAT_MODEL(ch_assemblies,
+                CURATE_DFAM.out.dfam_lib.collect())
 
     // ── Step 2: Curate de novo repeats (per genome) ──────────────────────────
     CURATE_REPEATS(REPEAT_MODEL.out.families_fa)

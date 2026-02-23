@@ -24,6 +24,7 @@ process REPEAT_MODEL {
 
     input:
     tuple val(assembly_id), path(assembly_path)
+    path dfam_dir
 
     output:
     tuple val(assembly_id), path("${assembly_id}-families.fa"),  emit: families_fa
