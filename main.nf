@@ -61,6 +61,8 @@ params.eggnog_sensemode = 'sensitive' //{fast,mid-sensitive,sensitive,more-sensi
 params.eggnog_taxid = 'none' // set to specific NCBI taxid (e.g. 7898 for Actinopterygii) to restrict to that lineage, or 'none' for no restriction
 params.eggnog_target_orthologs = 'all'
 params.eggnog_goEvidence = "non-electronic"
+params.diamond_database = null // path to diamond database (e.g. nr or custom db)
+params.diamond_version = 'swissprot' //only swissprot download enabled. Will get most recent version available at time of pipeline run. To use custom diamond database, set --diamond_database to path of database and set --diamond_version to custom
 params.diamond_sensitivity = 'sensitive' // {fast, sensitive, more-sensitive, very-sensitive, ultra-sensitive}
 params.diamond_maxHits = 1
 params.diamond_evalue = 1e-5
@@ -104,6 +106,7 @@ include { OMARK; DOWNLOAD_OMARK_DB } from './modules/omark.nf'
 include { CHUNK_PROTEINS } from './modules/chunk_proteins.nf'
 include { INTERPROSCAN; MERGE_INTERPROSCAN; DOWNLOAD_INTERPROSCAN_DB } from './modules/interproscan.nf'
 include { EGGNOG; MERGE_EGGNOG; DOWNLOAD_EGGNOG_DB } from './modules/eggnog.nf'
+include { DIAMOND; MERGE_DIAMOND; DOWNLOAD_DIAMOND_DB } from './modules/diamond.nf'
 
 
 /*
@@ -137,6 +140,9 @@ workflow {
 
     // ── Step 0: Download EggNOG database (runs once) ─────────────────────────────
     DOWNLOAD_EGGNOG_DB(params.eggnog_version)
+
+    // ── Step 0: Download Diamond database (runs once) ─────────────────────────────
+    DOWNLOAD_DIAMOND_DB(params.diamond_version)
 
     /*
     ========================================================================================
@@ -250,6 +256,16 @@ workflow {
     MERGE_EGGNOG(ch_eggnog_annotations_grouped)
 
     // ── Step 12: Run Diamond on protein chunks ─────────────
+    DIAMOND(
+        ch_chunks,
+        DOWNLOAD_DIAMOND_DB.out.diamond_db)
+
+    // group per assembly
+    ch_diamond_annotations_grouped = DIAMOND.out.diamond_annotations
+        .map { assembly_id, chunk_id, tsv -> tuple(assembly_id, tsv) }
+        .groupTuple()
+
+    MERGE_DIAMOND(ch_diamond_annotations_grouped)
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────
