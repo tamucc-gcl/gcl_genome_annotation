@@ -37,6 +37,7 @@ params.cluster_pct       = 0.95   // set to 0 or null to skip clustering
 
 // RepeatMasker
 params.job_speed = 's'            // null, 's', 'q', 'qq'
+params.n_rm_chunks = 10          // number of chunks to split genome into for parallel RepeatMasker runs. Adjust based on genome size and available resources.
 
 // Breaker Params
 params.braker_rounds     = 5
@@ -94,7 +95,8 @@ include { CURATE_DFAM; DOWNLOAD_DFAM_DB } from './modules/curateDfam.nf'
 include { REPEAT_MODEL  } from './modules/repeatModel.nf'
 include { CURATE_REPEATS } from './modules/curateRepeats.nf'
 include { CLASSIFY_REPEATS } from './modules/classifyRepeats.nf'
-include { REPEAT_MASK   } from './modules/repeatMask.nf'
+//include { REPEAT_MASK   } from './modules/repeatMask.nf'
+include { REPEAT_MASK_PARALLEL as REPEAT_MASK } from './subworkflows/repeatMaskParallel.nf'
 
 // ── Structural annotation ─────────────────────────────
 include { BRAKER } from './modules/braker.nf'
