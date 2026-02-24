@@ -37,7 +37,7 @@ params.cluster_pct       = 0.95   // set to 0 or null to skip clustering
 
 // RepeatMasker
 params.job_speed = 's'            // null, 's', 'q', 'qq'
-params.n_rm_chunks = 10          // number of chunks to split genome into for parallel RepeatMasker runs. Adjust based on genome size and available resources.
+params.n_rm_chunks = 8          // number of chunks to split genome into for parallel RepeatMasker runs. Adjust based on genome size and available resources.
 
 // Breaker Params
 params.braker_rounds     = 5
