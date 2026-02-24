@@ -240,7 +240,7 @@ workflow {
     // group per assembly
     ch_ipr_tsv_grouped = INTERPROSCAN.out.interproscan_tsv
         .map { assembly_id, chunk_id, tsv -> tuple(assembly_id, tsv) }
-        .groupTuple()
+        .groupTuple(size: params.n_chunks)
 
     MERGE_INTERPROSCAN(ch_ipr_tsv_grouped)
 
@@ -252,7 +252,7 @@ workflow {
     // group per assembly
     ch_eggnog_annotations_grouped = EGGNOG.out.eggnog_annotations
         .map { assembly_id, chunk_id, tsv -> tuple(assembly_id, tsv) }
-        .groupTuple()
+        .groupTuple(size: params.n_chunks)
 
     MERGE_EGGNOG(ch_eggnog_annotations_grouped)
 
@@ -264,7 +264,7 @@ workflow {
     // group per assembly
     ch_diamond_annotations_grouped = DIAMOND.out.diamond_annotations
         .map { assembly_id, chunk_id, tsv -> tuple(assembly_id, tsv) }
-        .groupTuple()
+        .groupTuple(size: params.n_chunks)
 
     MERGE_DIAMOND(ch_diamond_annotations_grouped)
 }
