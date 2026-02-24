@@ -40,7 +40,7 @@ process PREP_RM_BATCHES {
     output:
     tuple val(assembly_id), path("batches/batch_*.fa"),  emit: batches
     tuple val(assembly_id), path("beds/batch_*.bed"),    emit: beds
-    tuple val(assembly_id), path("seq_lengths.tsv"),     emit: seq_lengths
+    tuple val(assembly_id), path("${assembly_id}_seq_lengths.tsv"),     emit: seq_lengths
 
     script:
     """
@@ -49,7 +49,7 @@ process PREP_RM_BATCHES {
     mkdir -p batches beds
 
     # ── 1. Get scaffold names and lengths ─────────────────────────────────────
-    seqkit fx2tab -n -l "${assembly_path}" > seq_lengths.tsv
+    seqkit fx2tab -n -l "${assembly_path}" > ${assembly_id}_seq_lengths.tsv
 
     # ── 2. Generate per-chunk BED files ───────────────────────────────────────
     #   Walk scaffolds in input order, filling each chunk to ~target_size bp.
@@ -106,7 +106,7 @@ process PREP_RM_BATCHES {
             }
         }
     }
-    ' seq_lengths.tsv
+    ' ${assembly_id}_seq_lengths.tsv
 
     # ── 3. Extract batch FASTAs ───────────────────────────────────────────────
     for bed in beds/batch_*.bed; do
@@ -118,6 +118,7 @@ process PREP_RM_BATCHES {
     stub:
     """
     mkdir -p batches beds
+    touch ${assembly_id}_seq_lengths.tsv
     for i in \$(seq 0 \$((${n_chunks} - 1))); do
         printf -v pad "%04d" "\$i"
         touch "batches/batch_\${pad}.fa"
