@@ -65,20 +65,10 @@ process MERGE_DIAMOND {
     """
     set -euo pipefail
     # Ensure deterministic order (part_001, part_002, ...)
-    ls -1 ${annot_files} | sort -V > annot.list
-
-    first=\$(head -n 1 annot.list)
-
-    # Write header + first chunk's data
-    cat "\$first" > ${assembly_id}.diamond.tsv
-
-    # Append ONLY data rows (skip all lines beginning with '#') from the remaining chunks
-    tail -n +2 annot.list | while read -r f; do
-        awk 'BEGIN{FS="\\t"} !/^#/' "\$f" >> ${assembly_id}.diamond.tsv
+    echo -e "qseqid\tsseqid\tstitle\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\tsstart\tsend\tevalue\tbitscore" > ${assembly_id}.diamond.tsv
+    ls -1 ${annot_files} | sort -V | while read -r f; do
+        cat "$f" >> ${assembly_id}.diamond.tsv
     done
-
-    # Optional sanity: remove any accidental blank lines
-    sed -i '/^\\s*\$/d' ${assembly_id}.diamond.tsv
     """
 }
 
