@@ -64,10 +64,9 @@ process MERGE_DIAMOND {
     script:
     """
     set -euo pipefail
-    # Ensure deterministic order (part_001, part_002, ...)
     echo -e "qseqid\tsseqid\tstitle\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\tsstart\tsend\tevalue\tbitscore" > ${assembly_id}.diamond.tsv
     ls -1 ${annot_files} | sort -V | while read -r f; do
-        cat "$f" >> ${assembly_id}.diamond.tsv
+        cat "\$f" >> ${assembly_id}.diamond.tsv
     done
     """
 }
