@@ -46,9 +46,9 @@ params.protein_database  = null   // path to OrthoDB proteins
 
 // Structural QC
 params.busco_lineage = 'actinopterygii_odb10'
-params.busco_database = '/work/birdlab/databases/busco_datasets' 
+params.busco_database = '/work/birdlab/databases/busco' 
 params.oma_db_name = 'LUCA'   //https://omabrowser.org/oma/current/ see here for names
-params.omark_database = '/work/birdlab/databases/omark_datasets' 
+params.omark_database = '/work/birdlab/databases/omark' 
 params.ncbi_speciesID = null
 
 // Functional Annotations
