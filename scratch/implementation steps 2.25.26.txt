@@ -5,7 +5,7 @@ EXISTING PIPELINE (unchanged)
 ├─ AGAT (Step 6)                          ← no changes
 │
 ├─ NEW: ncRNA Annotation (parallel with BRAKER or after repeats)
-│   ├─ tRNAscan-SE(masked_fasta)          → tRNA GFF3 + stats
+│   ├─ tRNAscan-SE(masked_fasta)          → tRNA GFF3 + stats - DONE
 │   ├─ DOWNLOAD_RFAM_DB()                 → Rfam CMs
 │   └─ INFERNAL(masked_fasta, rfam_db)    → ncRNA GFF3 + tblout
 │
@@ -23,8 +23,8 @@ EXISTING PIPELINE (unchanged)
 │   ├─ DOWNLOAD_KOFAM_DB()               → KOfam profiles + ko_list
 │   ├─ KOFAMSCAN(ch_chunks, kofam_db)    → per-chunk KO assignments
 │   ├─ MERGE_KOFAMSCAN()                 → merged KO TSV per assembly
-│   ├─ SIGNALP(ch_chunks)               → per-chunk signal peptide predictions
-│   ├─ MERGE_SIGNALP()                  → merged SignalP TSV per assembly
+│   ├─ SIGNALP(ch_chunks)               → per-chunk signal peptide predictions  - DONE
+│   ├─ MERGE_SIGNALP()                  → merged SignalP TSV per assembly  - DONE
 │   ├─ TMHMM(ch_chunks)                 → per-chunk TM predictions
 │   └─ MERGE_TMHMM()                    → merged TMHMM TSV per assembly
 │
