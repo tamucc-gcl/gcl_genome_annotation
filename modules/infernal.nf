@@ -22,7 +22,7 @@ process INFERNAL {
     script:
     """
     cmscan \
-        --cpu ${SLURM_CPUS_PER_TASK} \
+        --cpu ${task.cpus} \
         --cut_ga \
         --rfam \
         --nohmmonly \
