@@ -6,8 +6,8 @@ EXISTING PIPELINE (unchanged)
 │
 ├─ NEW: ncRNA Annotation (parallel with BRAKER or after repeats)
 │   ├─ tRNAscan-SE(masked_fasta)          → tRNA GFF3 + stats - DONE
-│   ├─ DOWNLOAD_RFAM_DB()                 → Rfam CMs
-│   └─ INFERNAL(masked_fasta, rfam_db)    → ncRNA GFF3 + tblout
+│   ├─ DOWNLOAD_RFAM_DB()                 → Rfam CMs - DONE
+│   └─ INFERNAL(masked_fasta, rfam_db)    → ncRNA GFF3 + tblout - DONE
 │
 ├─ BUSCO (Step 7)                         ← no changes
 ├─ OMArk (Step 8)                         ← no changes

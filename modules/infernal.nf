@@ -16,25 +16,27 @@ process INFERNAL {
     path rfam_database
 
     output:
-    tuple val(assembly_id), path("${assembly_id}_rfam.tbl"),            emit: infernal_rfam_tbl
+    tuple val(assembly_id), path("${assembly_id}_rfam.tblout"),            emit: infernal_tblout
+    tuple val(assembly_id), path("${assembly_id}_rfam.cmscan"),            emit: infernal_cmscan
 
     script:
     """
     cmscan \
-        --cpu ${task.cpus} \
+        --cpu ${SLURM_CPUS_PER_TASK} \
         --cut_ga \
         --rfam \
         --nohmmonly \
-        --tblout ${assembly_id}_rfam.tbl \
+        --tblout ${assembly_id}_rfam.tblout \
         --fmt 2 \
-        --clanin ${rfam_db}/Rfam.clanin \
-        ${rfam_db}/Rfam.cm \
-        ${assembly_fasta} > ${assembly_id}_rfam.out
+        --clanin ${rfam_database}/Rfam.clanin \
+        ${rfam_database}/Rfam.cm \
+        ${assembly_fasta} > ${assembly_id}_rfam.cmscan
     """
 
     stub:
     """
-    touch ${assembly_id}_rfam.tbl
+    touch ${assembly_id}_rfam.tblout
+    touch ${assembly_id}_rfam.cmscan
     """
 }
 /*
