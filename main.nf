@@ -104,6 +104,9 @@ include { AGAT } from './modules/agat.nf'
 include { BUSCO; DOWNLOAD_BUSCO_DB } from './modules/busco.nf'
 include { OMARK; DOWNLOAD_OMARK_DB } from './modules/omark.nf'
 
+// ── ncRNA annotation ─────────────────────────────
+include { tRNASCAN } from './modules/trna-scan.nf'
+
 // ── Functional annotation ─────────────────────────────
 include { CHUNK_PROTEINS } from './modules/chunk_proteins.nf'
 include { INTERPROSCAN; MERGE_INTERPROSCAN; DOWNLOAD_INTERPROSCAN_DB } from './modules/interproscan.nf'
@@ -177,11 +180,22 @@ workflow {
 
     /*
     ========================================================================================
+        ncRNA Annotation
+    ========================================================================================
+    */
+
+    // ── Step 5: Run tRNA-Scan-SE on SoftMasked genome (per genome) ─────────────
+    tRNASCAN(REPEAT_MASK.out.masked_fasta)
+
+    // ─ Step 6: Run Infernal on SoftMasked genome (per genome) ─────────────
+
+    /*
+    ========================================================================================
         Structural Annotation
     ========================================================================================
     */
 
-    // ── Step 5: Run Breaker on SoftMasked genome (per genome) ─────────────
+    // ── Step 6: Run Breaker on SoftMasked genome (per genome) ─────────────
     ch_prot_db = params.protein_database
         ? Channel.fromPath(params.protein_database, checkIfExists: true)
         : Channel.fromPath("${projectDir}/assets/NO_PROT_DB")
@@ -191,19 +205,19 @@ workflow {
             ch_prot_db.collect()) 
             //ch_augustus_config.collect())
 
-    // ── Step 6: Get descriptive stats for annotations (per genome) ─────────────
+    // ── Step 7: Get descriptive stats for annotations (per genome) ─────────────
     ch_agat_inputs = ch_assemblies
         .join(BRAKER.out.braker_gff3, by: 0)
         .map { id, assembly_path, gff_path -> tuple(id, assembly_path, gff_path) }
 
     AGAT(ch_agat_inputs)
 
-    // ── Step 7: Run BUSCO on protein predictions (per genome) ─────────────
+    // ── Step 8: Run BUSCO on protein predictions (per genome) ─────────────
     BUSCO(
         BRAKER.out.braker_proteins,
         DOWNLOAD_BUSCO_DB.out.db)
 
-    // ── Step 8: Run OMArk on protein predictions (per genome) ─────────────
+    // ── Step 9: Run OMArk on protein predictions (per genome) ─────────────
     OMARK(
         BRAKER.out.braker_proteins,
         DOWNLOAD_OMARK_DB.out.omamer_db,
@@ -215,7 +229,7 @@ workflow {
     ========================================================================================
     */
 
-    // ── Step 9: Split proteins into chunks ─────────────
+    // ── Step 10: Split proteins into chunks ─────────────
     CHUNK_PROTEINS(
         BRAKER.out.braker_proteins)
 
@@ -234,7 +248,7 @@ workflow {
                 tuple(assembly_id, chunk_id, f)
             }
     }
-    // ── Step 10: Run InterProScan on protein chunks ─────────────
+    // ── Step 11: Run InterProScan on protein chunks ─────────────
     INTERPROSCAN(
         ch_chunks,
         DOWNLOAD_INTERPROSCAN_DB.out.db)
@@ -246,7 +260,7 @@ workflow {
 
     MERGE_INTERPROSCAN(ch_ipr_tsv_grouped)
 
-    // ── Step 11: Run eggNOG on protein chunks ─────────────
+    // ── Step 12: Run eggNOG on protein chunks ─────────────
     EGGNOG(
         ch_chunks,
         DOWNLOAD_EGGNOG_DB.out.eggnog_db_dir)
@@ -258,7 +272,7 @@ workflow {
 
     MERGE_EGGNOG(ch_eggnog_annotations_grouped)
 
-    // ── Step 12: Run Diamond on protein chunks ─────────────
+    // ── Step 13: Run Diamond on protein chunks ─────────────
     DIAMOND(
         ch_chunks,
         DOWNLOAD_DIAMOND_DB.out.diamond_db)
