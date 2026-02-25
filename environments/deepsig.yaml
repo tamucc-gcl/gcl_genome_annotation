@@ -5,5 +5,4 @@ channels:
   - defaults
 dependencies:
   - deepsig
-  - keras
-  - theano
+  - protobuf >=3.20,<4
