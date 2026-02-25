@@ -30,7 +30,7 @@ process INFERNAL {
         --fmt 2 \
         --clanin ${rfam_database}/Rfam.clanin \
         ${rfam_database}/Rfam.cm \
-        ${assembly_fasta} > ${assembly_id}_rfam.cmscan
+        ${masked_assembly} > ${assembly_id}_rfam.cmscan
     """
 
     stub:
