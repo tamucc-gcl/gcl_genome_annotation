@@ -20,6 +20,7 @@ process INFERNAL {
     output:
     tuple val(assembly_id), val(chunk_id), path("${assembly_id}.${chunk_id}_rfam.tblout"), emit: infernal_tblout
     tuple val(assembly_id), val(chunk_id), path("${assembly_id}.${chunk_id}_rfam.cmscan"),  emit: infernal_cmscan
+    tuple val(assembly_id), val(chunk_id), path("${assembly_id}.${chunk_id}_rfam.gff3"),  emit: infernal_gff3
 
     script:
     """
@@ -33,12 +34,17 @@ process INFERNAL {
         --clanin ${rfam_database}/Rfam.clanin \
         ${rfam_database}/Rfam.cm \
         ${masked_chunk} > ${assembly_id}.${chunk_id}_rfam.cmscan
+
+    perl ${projectDir}/perl_scripts/infernal-tblout2gff.pl \
+        --fmt2 \
+        --cmscan ${assembly_id}.${chunk_id}_rfam.tblout > ${assembly_id}.${chunk_id}_rfam.gff3
     """
 
     stub:
     """
     touch ${assembly_id}.${chunk_id}_rfam.tblout
     touch ${assembly_id}.${chunk_id}_rfam.cmscan
+    touch ${assembly_id}.${chunk_id}_rfam.gff3
     """
 }
 
@@ -51,6 +57,8 @@ process INFERNAL {
     tblout: Header lines start with '#'. Keep header from first file,
             concatenate data lines from all files.
     cmscan: Plain text alignment output — simple concatenation.
+    gff3:   Header lines start with '#'. Keep header from first file,
+            concatenate data lines from all files.
 ========================================================================================
 */
 
@@ -60,11 +68,12 @@ process MERGE_INFERNAL {
     publishDir "${params.outdir}/ncRNA", mode: params.publish_dir_mode
 
     input:
-    tuple val(assembly_id), path(tblout_files), path(cmscan_files)
+    tuple val(assembly_id), path(tblout_files), path(cmscan_files), path(gff3_files)
 
     output:
     tuple val(assembly_id), path("${assembly_id}_rfam.tblout"), emit: infernal_tblout
     tuple val(assembly_id), path("${assembly_id}_rfam.cmscan"),  emit: infernal_cmscan
+    tuple val(assembly_id), path("${assembly_id}_rfam.gff3"),    emit: infernal_gff3
 
     script:
     """
@@ -83,14 +92,24 @@ process MERGE_INFERNAL {
     ls -1 ${cmscan_files} | sort -V | while read -r f; do
         cat "\$f" >> ${assembly_id}_rfam.cmscan
     done
+
+    # ── Merge GFF3 files ─────────────────────────────────────────────────────
+    first_gff=\$(ls -1 ${gff3_files} | sort -V | head -1)
+    grep '^#' "\$first_gff" > ${assembly_id}_rfam.gff3 || true
+
+    ls -1 ${gff3_files} | sort -V | while read -r f; do
+        grep -v '^#' "\$f" >> ${assembly_id}_rfam.gff3 || true
+    done
     """
 
     stub:
     """
     touch ${assembly_id}_rfam.tblout
     touch ${assembly_id}_rfam.cmscan
+    touch ${assembly_id}_rfam.gff3
     """
 }
+
 
 /*
 ========================================================================================

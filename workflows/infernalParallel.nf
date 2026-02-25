@@ -58,12 +58,19 @@ workflow INFERNAL_PARALLEL {
         .map { assembly_id, chunk_id, cmscan -> tuple(assembly_id, cmscan) }
         .groupTuple(size: params.n_infernal_chunks)
 
+    ch_gff3 = INFERNAL.out.infernal_gff3
+        .map { assembly_id, chunk_id, gff3 -> tuple(assembly_id, gff3) }
+        .groupTuple(size: params.n_infernal_chunks)
+
     ch_merge = ch_tblout
         .join(ch_cmscan, by: 0)
+        .join(ch_gff3, by: 0)
+        // tuple(assembly_id, [tblout_files], [cmscan_files], [gff3_files])
 
     MERGE_INFERNAL(ch_merge)
 
     emit:
     infernal_tblout = MERGE_INFERNAL.out.infernal_tblout
     infernal_cmscan = MERGE_INFERNAL.out.infernal_cmscan
+    infernal_gff3   = MERGE_INFERNAL.out.infernal_gff3
 }
