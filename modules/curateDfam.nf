@@ -15,6 +15,7 @@
 */
 
 process CURATE_DFAM {
+    tag "${taxa_name}"
     label 'dfam'
     //publishDir "${params.outdir}/dfam", mode: params.publish_dir_mode
 
