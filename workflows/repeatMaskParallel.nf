@@ -5,8 +5,6 @@
     Drop-in replacement for the REPEAT_MASK module that splits the genome into
     chunks, runs RepeatMasker in parallel, then merges and adjusts results.
 
-    Interface matches the original REPEAT_MASK module:
-
     Inputs:
         - ch_mask_input:  tuple val(assembly_id), path(assembly_path), path(curated_repeats)
         - dfam_lib:       path (Dfam taxon-specific repeat library)
@@ -63,11 +61,13 @@ workflow REPEAT_MASK_PARALLEL {
     ch_batch_inputs = ch_batches.join(ch_beds, by: [0, 1])
 
     // ── Step 4: Run RepeatMasker per batch + adjust coordinates ──────────────
-    REPEAT_MASK_BATCH(
-        ch_batch_inputs,
-        COMBINE_REPEAT_LIBS.out.combined_lib.map { id, lib -> lib }.collect(),
-        PREP_RM_BATCHES.out.seq_lengths.map { id, f -> f }.collect()
-    )
+    //   combine(by: 0) pairs every batch with its assembly's lib/seq_lengths (many:1).
+    ch_batch_full = ch_batch_inputs
+        .combine(COMBINE_REPEAT_LIBS.out.combined_lib, by: 0)
+        .combine(PREP_RM_BATCHES.out.seq_lengths, by: 0)
+        // tuple(assembly_id, batch_id, fa, bed, combined_lib, seq_lengths)
+
+    REPEAT_MASK_BATCH(ch_batch_full)
 
     // ── Step 5: Group by assembly and merge ──────────────────────────────────
     ch_merge = REPEAT_MASK_BATCH.out.batch_results

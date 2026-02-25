@@ -20,12 +20,11 @@
         - batch_id:         Batch identifier (e.g. "batch_0000")
         - batch_fasta:      FASTA file for this batch
         - batch_bed:        BED file with original genomic coordinates
-        - combined_lib:     Combined repeat library (de novo + Dfam)
-        - seq_lengths:      TSV of scaffold names and full lengths
+        - combined_lib:     Combined repeat library for THIS assembly
+        - seq_lengths:      Scaffold lengths TSV for THIS assembly
 
     Outputs:
-        - adjusted_out:     .out file with global coordinates and original names
-        - adjusted_fasta:   Masked FASTA with original scaffold names + coordinates
+        - adjusted .out and .fa files with global coordinates
 
     Tools: RepeatMasker (dfam/tetools container)
 ========================================================================================
@@ -36,9 +35,8 @@ process REPEAT_MASK_BATCH {
     label 'repeat_mask_batch'
 
     input:
-    tuple val(assembly_id), val(batch_id), path(batch_fasta), path(batch_bed)
-    path combined_lib
-    path seq_lengths
+    tuple val(assembly_id), val(batch_id), path(batch_fasta), path(batch_bed),
+          path(combined_lib), path(seq_lengths)
 
     output:
     tuple val(assembly_id), val(batch_id),
@@ -64,12 +62,6 @@ process REPEAT_MASK_BATCH {
         ${batch_fasta}
 
     # ── 2. Adjust .out coordinates to global ──────────────────────────────────
-    #   .out columns (space-delimited, first 3 lines are header):
-    #     col5  = sequence name
-    #     col6  = begin (1-based)
-    #     col7  = end
-    #     col8  = (left) — remaining bases, recalculated from full scaffold length
-
     awk '
     # First pass: load full scaffold lengths
     NR == FNR {
@@ -112,9 +104,6 @@ process REPEAT_MASK_BATCH {
     ' ${seq_lengths} ${batch_fasta}.out > ${assembly_id}.${batch_id}.adjusted.out
 
     # ── 3. Adjust masked FASTA headers ────────────────────────────────────────
-    #   Replace encoded names with: >original_name__start__end
-    #   for ordered reassembly in the merge step.
-
     awk '
     /^>/ {
         header = substr(\$0, 2)
