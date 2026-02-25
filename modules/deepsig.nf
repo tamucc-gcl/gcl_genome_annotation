@@ -47,6 +47,7 @@ process DEEPSIG {
 
 process MERGE_DEEPSIG {
     tag "${assembly_id}"
+    label 'mergeFiles'
     publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
 
     input:
