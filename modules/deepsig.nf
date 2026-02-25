@@ -23,11 +23,11 @@ process DEEPSIG {
     """
     set -euo pipefail
 
-    deepsig \
-        --fasta ${protein_fasta} \
-        --outf ${assembly_id}_chunk_${chunk_id}_deepsig_annotation.gff3 \
-        --organism euk \
-        --outfmt gff3 \
+    deepsig \\
+        --fasta ${protein_fasta} \\
+        --outf ${assembly_id}_chunk_${chunk_id}_deepsig_annotation.gff3 \\
+        --organism euk \\
+        --outfmt gff3 \\
         --threads ${task.cpus}
     """
 
