@@ -20,9 +20,9 @@ EXISTING PIPELINE (unchanged)
 │   └─ DIAMOND → MERGE_DIAMOND
 │
 ├─ NEW: Additional Functional Annotation (parallel with Steps 10-12)
-│   ├─ DOWNLOAD_KOFAM_DB()               → KOfam profiles + ko_list
-│   ├─ KOFAMSCAN(ch_chunks, kofam_db)    → per-chunk KO assignments
-│   ├─ MERGE_KOFAMSCAN()                 → merged KO TSV per assembly
+│   ├─ DOWNLOAD_KOFAM_DB()               → KOfam profiles + ko_list - DONE
+│   ├─ KOFAMSCAN(ch_chunks, kofam_db)    → per-chunk KO assignments - DONE
+│   ├─ MERGE_KOFAMSCAN()                 → merged KO TSV per assembly - DONE
 │   ├─ SIGNALP(ch_chunks)               → per-chunk signal peptide predictions  - DONE
 │   ├─ MERGE_SIGNALP()                  → merged SignalP TSV per assembly  - DONE
 │   ├─ TMHMM(ch_chunks)                 → per-chunk TM predictions

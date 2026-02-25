@@ -39,7 +39,11 @@ params.cluster_pct       = 0.95   // set to 0 or null to skip clustering
 params.job_speed = 's'            // null, 's', 'q', 'qq'
 params.n_rm_chunks = 8          // number of chunks to split genome into for parallel RepeatMasker runs. Adjust based on genome size and available resources.
 
-// Breaker Params
+// Infernal
+params.rfam_database = null // path to Rfam database directory (contains Rfam.cm and Rfam.clanin files)
+params.rfam_version = 'CURRENT' // only one version
+
+// Braker Params
 params.braker_rounds     = 5
 params.braker_ab_initio  = false
 params.protein_database  = null   // path to OrthoDB proteins
@@ -111,6 +115,7 @@ include { OMARK; DOWNLOAD_OMARK_DB } from './modules/omark.nf'
 
 // ── ncRNA annotation ─────────────────────────────
 include { tRNASCAN } from './modules/trna-scan.nf'
+include { INFERNAL; DOWNLOAD_RFAM_DB } from './modules/infernal.nf'
 
 // ── Functional annotation ─────────────────────────────
 include { CHUNK_PROTEINS } from './modules/chunk_proteins.nf'
@@ -139,6 +144,9 @@ workflow {
 
     // ── Step 0: DFam (runs once) ─────────────────────────────
     DOWNLOAD_DFAM_DB(params.dfam_version)
+
+    // ── Step 0: RFam (runs once) ─────────────────────────────
+    DOWNLOAD_RFAM_DB(params.rfam_version)
 
     // ── Step 0: BUSCO (runs once) ─────────────────────────────
     DOWNLOAD_BUSCO_DB(params.busco_lineage)
@@ -198,6 +206,8 @@ workflow {
     tRNASCAN(REPEAT_MASK.out.masked_fasta)
 
     // ─ Step 6: Run Infernal on SoftMasked genome (per genome) ─────────────
+    INFERNAL(REPEAT_MASK.out.masked_fasta, 
+            DOWNLOAD_RFAM_DB.out.rfam_db_dir)
 
     /*
     ========================================================================================
