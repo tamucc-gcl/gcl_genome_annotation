@@ -40,6 +40,7 @@ params.job_speed = 's'            // null, 's', 'q', 'qq'
 params.n_rm_chunks = 8          // number of chunks to split genome into for parallel RepeatMasker runs. Adjust based on genome size and available resources.
 
 // Infernal
+params.n_infernal_chunks = 8 // number of chunks to split genome into for parallel Infernal runs. Adjust based on genome size and available resources.
 params.rfam_database = null // path to Rfam database directory (contains Rfam.cm and Rfam.clanin files)
 params.rfam_version = 'CURRENT' // only one version
 
@@ -109,7 +110,10 @@ include { REPEAT_MASK_PARALLEL as REPEAT_MASK } from './workflows/repeatMaskPara
 
 // ── ncRNA annotation ─────────────────────────────
 include { tRNASCAN } from './modules/trna-scan.nf'
-include { INFERNAL; DOWNLOAD_RFAM_DB } from './modules/infernal.nf'
+//include { INFERNAL; DOWNLOAD_RFAM_DB } from './modules/infernal.nf'
+include { DOWNLOAD_RFAM_DB } from './modules/infernal.nf'
+include { INFERNAL_PARALLEL as INFERNAL } from './workflows/infernalParallel.nf'
+
 
 // ── Structural annotation ─────────────────────────────
 include { BRAKER } from './modules/braker.nf'
