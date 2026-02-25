@@ -9,7 +9,7 @@
 process DEEPSIG {
     tag "${assembly_id}:${chunk_id}"
     label 'deepsig'
-    //publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), val(chunk_id), path(protein_fasta)
@@ -59,15 +59,15 @@ process MERGE_DEEPSIG {
     script:
     """
     set -euo pipefail
-    
+
     ls -1 ${gff_files} | sort -V > gff.list
 
     first=\$(head -n 1 gff.list)
 
-    # Write header lines from first chunk
-    grep '^#' "\$first" > ${assembly_id}.deepsig.gff3
+    # Write header lines from first chunk (may be absent)
+    grep '^#' "\$first" > ${assembly_id}.deepsig.gff3 || true
 
-    # Append data lines (skip comment/header lines) from ALL chunks including first
+    # Append data lines from all chunks
     while read -r f; do
         grep -v '^#' "\$f" >> ${assembly_id}.deepsig.gff3 || true
     done < gff.list
