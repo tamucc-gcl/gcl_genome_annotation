@@ -1,0 +1,9 @@
+name: deepsig
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - deepsig
+  - keras
+  - theano
