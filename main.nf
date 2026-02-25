@@ -53,8 +53,10 @@ params.ncbi_speciesID = null
 
 // Functional Annotations
 params.n_chunks = 8 // number of chunks to split proteins into for parallel processing in InterProScan, Diamond, eggNOG. Adjust based on size of proteome and available resources.
+
 params.interproscan_database = null //'/work/birdlab/databases/interproscan_datasets'
 params.interproscan_version = '5.77-108.0' //'5.77-108.0'
+
 params.eggnog_database = null //'/work/birdlab/databases/eggnog_datasets'
 params.eggnog_version = '5.0.2' //'5.0.2'
 params.eggnog_evalue = 0.001
@@ -62,6 +64,7 @@ params.eggnog_sensemode = 'sensitive' //{fast,mid-sensitive,sensitive,more-sensi
 params.eggnog_taxid = 'none' // set to specific NCBI taxid (e.g. 7898 for Actinopterygii) to restrict to that lineage, or 'none' for no restriction
 params.eggnog_target_orthologs = 'all'
 params.eggnog_goEvidence = "non-electronic"
+
 params.diamond_database = null // path to diamond database (e.g. nr or custom db)
 params.diamond_version = 'swissprot' //only swissprot download enabled. Will get most recent version available at time of pipeline run. To use custom diamond database, set --diamond_database to path of database and set --diamond_version to custom
 params.diamond_sensitivity = 'sensitive' // {fast, sensitive, more-sensitive, very-sensitive, ultra-sensitive}
@@ -69,6 +72,8 @@ params.diamond_maxHits = 1
 params.diamond_evalue = 1e-5
 params.diamond_qcov = 70
 
+params.kofamscan_database = null // path to kofamscan database directory (contains profiles and ko_list)
+params.kofamscan_version = 'latest' // only one version
 
 // ── Parameter validation ─────────────────────────────────────────────────────
 if (!params.sample_sheet) { error "Please provide --sample_sheet" }
@@ -112,6 +117,8 @@ include { CHUNK_PROTEINS } from './modules/chunk_proteins.nf'
 include { INTERPROSCAN; MERGE_INTERPROSCAN; DOWNLOAD_INTERPROSCAN_DB } from './modules/interproscan.nf'
 include { EGGNOG; MERGE_EGGNOG; DOWNLOAD_EGGNOG_DB } from './modules/eggnog.nf'
 include { DIAMOND; MERGE_DIAMOND; DOWNLOAD_DIAMOND_DB } from './modules/diamond.nf'
+include { KOFAMSCAN; MERGE_KOFAMSCAN; DOWNLOAD_KOFAMSCAN_DB } from './modules/kofamscan.nf'
+include { DEEPSIG; MERGE_DEEPSIG } from './modules/deepsig.nf'
 
 
 /*
@@ -148,6 +155,9 @@ workflow {
 
     // ── Step 0: Download Diamond database (runs once) ─────────────────────────────
     DOWNLOAD_DIAMOND_DB(params.diamond_version)
+
+    // ── Step 0: Download KoFamScan database (runs once) ─────────────────────────────
+    DOWNLOAD_KOFAMSCAN_DB(params.kofamscan_version)
 
     /*
     ========================================================================================
@@ -283,6 +293,26 @@ workflow {
         .groupTuple(size: params.n_chunks)
 
     MERGE_DIAMOND(ch_diamond_annotations_grouped)
+
+    // ── Step 14: Run KoFamScan on protein chunks ─────────────
+    KOFAMSCAN(
+        ch_chunks,
+        DOWNLOAD_KOFAMSCAN_DB.out.kofamscan_db_dir)
+
+    ch_kofamscan_grouped = KOFAMSCAN.out.kofamscan_annotations
+        .map { assembly_id, chunk_id, tsv -> tuple(assembly_id, tsv) }
+        .groupTuple(size: params.n_chunks)
+
+    MERGE_KOFAMSCAN(ch_kofamscan_grouped)
+
+    // ── Step 15: Run DeepSIG on protein chunks ─────────────
+    DEEPSIG(ch_chunks)
+
+    ch_deepsig_grouped = DEEPSIG.out.deepsig_annotations
+        .map { assembly_id, chunk_id, gff -> tuple(assembly_id, gff) }
+        .groupTuple(size: params.n_chunks)
+
+    MERGE_DEEPSIG(ch_deepsig_grouped)
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────

@@ -7,8 +7,6 @@ Questions
 
 
 Functional Annotation
-3. diamond
-    - gene names
 4. ncRNA
     - tRNAscan-SE
     - Infernal
@@ -26,3 +24,45 @@ Other??
     - Annotation GFF3 (genes/transcripts/CDS)
     - Repeat annotation track (RepeatMasker output converted to BED/GFF3)
     - Protein-to-genome alignments (miniprot GFF3)
+
+
+
+Repeat landscape/divergence plots
+- need to output .align file
+- calcDivergenceFromAlign.pl createRepeatLandscape.pl
+
+UTR Annotation?
+- can I do this with only proteins?
+- 
+
+post-prediction filtering
+- no functional annotations?
+- 
+
+GFF validation/standardization
+
+merge interpo, eggnog, diamond outputs
+
+integrate functional annotations with gff3
+- funannotate annotate
+
+KEGG pathway mapping
+- kofamscan/kofamkoala/blastkoala
+
+signalP & TMHMM
+- signal peptide/transmembrane prediction
+
+compile qc outputs together
+
+annotation completeness qc
+- % braker proteins which got at least one functional hit
+
+final annotation folder
+- functionally annotated gff3
+- protein fasta
+- cds fasta
+- transcript fasta
+- summary stats
+- tabix-indexed gff3
+- samtools indexed fasta
+

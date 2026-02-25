@@ -1,0 +1,54 @@
+EXISTING PIPELINE (unchanged)
+│
+├─ Repeat Annotation (Steps 0-4)          ← no changes
+├─ BRAKER (Step 5)                        ← no changes
+├─ AGAT (Step 6)                          ← no changes
+│
+├─ NEW: ncRNA Annotation (parallel with BRAKER or after repeats)
+│   ├─ tRNAscan-SE(masked_fasta)          → tRNA GFF3 + stats
+│   ├─ DOWNLOAD_RFAM_DB()                 → Rfam CMs
+│   └─ INFERNAL(masked_fasta, rfam_db)    → ncRNA GFF3 + tblout
+│
+├─ BUSCO (Step 7)                         ← no changes
+├─ OMArk (Step 8)                         ← no changes
+│
+├─ CHUNK_PROTEINS (Step 9)                ← no changes
+│
+├─ Functional Annotation (Steps 10-12)    ← existing, unchanged
+│   ├─ InterProScan → MERGE_INTERPROSCAN
+│   ├─ eggNOG → MERGE_EGGNOG
+│   └─ DIAMOND → MERGE_DIAMOND
+│
+├─ NEW: Additional Functional Annotation (parallel with Steps 10-12)
+│   ├─ DOWNLOAD_KOFAM_DB()               → KOfam profiles + ko_list
+│   ├─ KOFAMSCAN(ch_chunks, kofam_db)    → per-chunk KO assignments
+│   ├─ MERGE_KOFAMSCAN()                 → merged KO TSV per assembly
+│   ├─ SIGNALP(ch_chunks)               → per-chunk signal peptide predictions
+│   ├─ MERGE_SIGNALP()                  → merged SignalP TSV per assembly
+│   ├─ TMHMM(ch_chunks)                 → per-chunk TM predictions
+│   └─ MERGE_TMHMM()                    → merged TMHMM TSV per assembly
+│
+├─ NEW: Annotation Consolidation (after ALL functional tools complete)
+│   ├─ MERGE_FUNCTIONAL_ANNOTATIONS()
+│   │   inputs: merged InterProScan, eggNOG, DIAMOND, KofamScan,
+│   │           SignalP, TMHMM (all per assembly)
+│   │   output: single unified TSV per assembly
+│   │
+│   ├─ ANNOTATE_GFF3()
+│   │   inputs: BRAKER GFF3, tRNAscan GFF3, Infernal GFF3,
+│   │           merged functional table
+│   │   output: final annotated GFF3 with functional attributes +
+│   │           product names integrated
+│   │
+│   └─ EXTRACT_SEQUENCES()
+│       inputs: annotated GFF3, genome FASTA
+│       output: transcript FASTA, protein FASTA, CDS FASTA
+│       tool: gffread
+│
+└─ NEW: QC Summary (final step, after everything)
+    └─ ANNOTATION_REPORT()
+        inputs: AGAT stats, BUSCO results, OMArk results,
+                merged functional table, repeat .tbl,
+                tRNAscan stats, Infernal results
+        output: consolidated summary TSV/report per assembly
+                + cross-assembly comparison if multiple samples
