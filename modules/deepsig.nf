@@ -9,7 +9,7 @@
 process DEEPSIG {
     tag "${assembly_id}:${chunk_id}"
     label 'deepsig'
-    publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+    //publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), val(chunk_id), path(protein_fasta)
