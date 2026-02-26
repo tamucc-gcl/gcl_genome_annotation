@@ -32,7 +32,7 @@
 process ANNOTATE_GFF3 {
     tag "${assembly_id}"
     label 'mergeFiles'
-    publishDir "${params.outdir}/final_annotation", mode: params.publish_dir_mode
+    publishDir "${params.outdir}", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id),
