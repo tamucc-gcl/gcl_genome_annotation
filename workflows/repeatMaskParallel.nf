@@ -62,10 +62,17 @@ workflow REPEAT_MASK_PARALLEL {
 
     // ── Step 4: Run RepeatMasker per batch + adjust coordinates ──────────────
     //   combine(by: 0) pairs every batch with its assembly's lib/seq_lengths (many:1).
+    /*
     ch_batch_full = ch_batch_inputs
         .combine(COMBINE_REPEAT_LIBS.out.combined_lib, by: 0)
         .combine(PREP_RM_BATCHES.out.seq_lengths, by: 0)
         // tuple(assembly_id, batch_id, fa, bed, combined_lib, seq_lengths)
+    */
+
+    //temp for debugging - skip combine and just pull from PREP_RM_BATCHES outputs directly
+    ch_batch_full = ch_batch_inputs
+        .combine(ch_curated, by: 0)
+        .combine(PREP_RM_BATCHES.out.seq_lengths, by: 0)
 
     REPEAT_MASK_BATCH(ch_batch_full)
 
