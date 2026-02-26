@@ -108,18 +108,17 @@ include { CLASSIFY_REPEATS } from './modules/classifyRepeats.nf'
 //include { REPEAT_MASK   } from './modules/repeatMask.nf'
 include { REPEAT_MASK_PARALLEL as REPEAT_MASK } from './workflows/repeatMaskParallel.nf'
 
-// ── ncRNA annotation ─────────────────────────────
-include { tRNASCAN } from './modules/trna-scan.nf'
-//include { INFERNAL; DOWNLOAD_RFAM_DB } from './modules/infernal.nf'
-include { DOWNLOAD_RFAM_DB } from './modules/infernal.nf'
-include { INFERNAL_PARALLEL as INFERNAL } from './workflows/infernalParallel.nf'
-
-
 // ── Structural annotation ─────────────────────────────
 include { BRAKER } from './modules/braker.nf'
 include { AGAT } from './modules/agat.nf'
 include { BUSCO; DOWNLOAD_BUSCO_DB } from './modules/busco.nf'
 include { OMARK; DOWNLOAD_OMARK_DB } from './modules/omark.nf'
+
+// ── ncRNA annotation ─────────────────────────────
+include { tRNASCAN } from './modules/trna-scan.nf'
+//include { INFERNAL; DOWNLOAD_RFAM_DB } from './modules/infernal.nf'
+include { DOWNLOAD_RFAM_DB } from './modules/infernal.nf'
+include { INFERNAL_PARALLEL as INFERNAL } from './workflows/infernalParallel.nf'
 
 // ── Functional annotation ─────────────────────────────
 include { CHUNK_PROTEINS } from './modules/chunk_proteins.nf'
@@ -202,24 +201,11 @@ workflow {
 
     /*
     ========================================================================================
-        ncRNA Annotation
-    ========================================================================================
-    */
-
-    // ── Step 5: Run tRNA-Scan-SE on SoftMasked genome (per genome) ─────────────
-    tRNASCAN(REPEAT_MASK.out.masked_fasta)
-
-    // ─ Step 6: Run Infernal on SoftMasked genome (per genome) ─────────────
-    INFERNAL(REPEAT_MASK.out.masked_fasta, 
-            DOWNLOAD_RFAM_DB.out.rfam_db_dir)
-
-    /*
-    ========================================================================================
         Structural Annotation
     ========================================================================================
     */
 
-    // ── Step 7: Run Breaker on SoftMasked genome (per genome) ─────────────
+    // ── Step 5: Run Breaker on SoftMasked genome (per genome) ─────────────
     ch_prot_db = params.protein_database
         ? Channel.fromPath(params.protein_database, checkIfExists: true)
         : Channel.fromPath("${projectDir}/assets/NO_PROT_DB")
@@ -229,23 +215,36 @@ workflow {
             ch_prot_db.collect()) 
             //ch_augustus_config.collect())
 
-    // ── Step 8: Get descriptive stats for annotations (per genome) ─────────────
+    // ── Step 6: Get descriptive stats for annotations (per genome) ─────────────
     ch_agat_inputs = ch_assemblies
         .join(BRAKER.out.braker_gff3, by: 0)
         .map { id, assembly_path, gff_path -> tuple(id, assembly_path, gff_path) }
 
     AGAT(ch_agat_inputs)
 
-    // ── Step 9: Run BUSCO on protein predictions (per genome) ─────────────
+    // ── Step 7: Run BUSCO on protein predictions (per genome) ─────────────
     BUSCO(
         BRAKER.out.braker_proteins,
         DOWNLOAD_BUSCO_DB.out.db)
 
-    // ── Step 10: Run OMArk on protein predictions (per genome) ─────────────
+    // ── Step 8: Run OMArk on protein predictions (per genome) ─────────────
     OMARK(
         BRAKER.out.braker_proteins,
         DOWNLOAD_OMARK_DB.out.omamer_db,
         DOWNLOAD_OMARK_DB.out.taxa_db)
+
+    /*
+    ========================================================================================
+        ncRNA Annotation
+    ========================================================================================
+    */
+
+    // ── Step 9: Run tRNA-Scan-SE on SoftMasked genome (per genome) ─────────────
+    tRNASCAN(REPEAT_MASK.out.masked_fasta)
+
+    // ─ Step 10: Run Infernal on SoftMasked genome (per genome) ─────────────
+    INFERNAL(REPEAT_MASK.out.masked_fasta, 
+            DOWNLOAD_RFAM_DB.out.rfam_db_dir)
 
     /*
     ========================================================================================
