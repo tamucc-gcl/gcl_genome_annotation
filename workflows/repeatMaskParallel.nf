@@ -47,8 +47,14 @@ workflow REPEAT_MASK_PARALLEL {
     ch_batch_inputs = ch_batches.join(ch_beds, by: [0, 1])
 
     // ── Step 4: Run RepeatMasker per batch + adjust coordinates ──────────────
+    //skip real repeat library for testing
+    /*
     ch_batch_full = ch_batch_inputs
         .combine(COMBINE_REPEAT_LIBS.out.combined_lib, by: 0)
+        .combine(PREP_RM_BATCHES.out.seq_lengths, by: 0)
+    */
+    ch_batch_full = ch_batch_inputs
+        .combine(ch_curated, by: 0)
         .combine(PREP_RM_BATCHES.out.seq_lengths, by: 0)
 
     REPEAT_MASK_BATCH(ch_batch_full)
