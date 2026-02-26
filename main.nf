@@ -130,7 +130,10 @@ include { EGGNOG; MERGE_EGGNOG; DOWNLOAD_EGGNOG_DB } from './modules/eggnog.nf'
 include { DIAMOND; MERGE_DIAMOND; DOWNLOAD_DIAMOND_DB } from './modules/diamond.nf'
 include { KOFAMSCAN; MERGE_KOFAMSCAN; DOWNLOAD_KOFAMSCAN_DB } from './modules/kofamscan.nf'
 include { DEEPSIG; MERGE_DEEPSIG } from './modules/deepsig.nf'
+
+// ── Annotation merging ─────────────────────────────
 include { MERGE_FUNCTIONAL_ANNOTATIONS } from './modules/merge_functional_annotations.nf'
+include { ANNOTATE_GFF3 } from './modules/annotate_gff3.nf'
 
 /*
 ========================================================================================
@@ -340,6 +343,11 @@ workflow {
 
     MERGE_DEEPSIG(ch_deepsig_grouped)
 
+    /*
+    ========================================================================================
+        Annotation Merging
+    ========================================================================================
+    */
     // ── Step 17: Merge all functional annotations into single file per genome ─────────────
     ch_func_merged = MERGE_INTERPROSCAN.out.merged_tsv
         .join(MERGE_EGGNOG.out.merged)
@@ -349,6 +357,15 @@ workflow {
         // produces: [assembly_id, ipr_tsv, eggnog_tsv, diamond_tsv, kofam_tsv, deepsig_gff3]
 
     MERGE_FUNCTIONAL_ANNOTATIONS(ch_func_merged)
+
+    // ── Step 18: Merge all GFF3s and decorate with functional annotations ───────
+    ch_annotate_input = BRAKER.out.braker_gff3
+        .join(tRNASCAN.out.trnascan_gff3)
+        .join(INFERNAL.out.infernal_gff3)
+        .join(MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv)
+        // produces: [assembly_id, braker_gff3, trnascan_gff3, infernal_gff3, func_tsv]
+
+    ANNOTATE_GFF3(ch_annotate_input)
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────

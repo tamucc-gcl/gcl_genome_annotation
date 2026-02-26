@@ -54,7 +54,7 @@ EXISTING PIPELINE (unchanged)
                 + cross-assembly comparison if multiple samples
 
 
-Somewhere else
+Somewhere else - DONE
 Repeat landscape/divergence plots
 - need to output .align file from repeatMasker
 - calcDivergenceFromAlign.pl createRepeatLandscape.pl
