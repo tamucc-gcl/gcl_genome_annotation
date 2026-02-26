@@ -9,11 +9,16 @@
         scaffold_1_84087028-93430037:.
     which encodes: {original_name}_{1-based_start}-{end}:.
 
-    After RepeatMasker completes, this module:
-      1. Parses encoded names to extract original scaffold name and offset
-      2. Adds the offset to begin/end positions in the .out file
-      3. Recalculates the (left) column using full scaffold lengths
-      4. Restores original scaffold names in both .out and masked FASTA
+    RepeatMasker enforces a 50-character limit on FASTA identifiers.
+    Because the encoded names can exceed this, we:
+      0. Rename sequences to short temp IDs (seq_0000, seq_0001, ...)
+         and keep a mapping file for restoration
+      1. Run RepeatMasker on the short-named FASTA
+      2. Restore original names in .out and .masked files
+      3. Parse encoded names to extract original scaffold name and offset
+      4. Add the offset to begin/end positions in the .out file
+      5. Recalculate the (left) column using full scaffold lengths
+      6. Restore original scaffold names in both .out and masked FASTA
 
     Inputs:
         - assembly_id:      Sample identifier
@@ -50,6 +55,21 @@ process REPEAT_MASK_BATCH {
     """
     set -euo pipefail
 
+    # ── 0. Rename sequences to short IDs (RepeatMasker max ID = 50 chars) ─────
+    awk '
+    /^>/ {
+        orig = substr(\$0, 2)
+        short = sprintf("seq_%04d", n++)
+        map[short] = orig
+        print ">" short
+        next
+    }
+    { print }
+    END {
+        for (s in map) print s "\\t" map[s] > "id_map.tsv"
+    }
+    ' ${batch_fasta} > short_ids.fa
+
     # ── 1. Run RepeatMasker ───────────────────────────────────────────────────
     RepeatMasker \\
         -parallel ${rm_threads} \\
@@ -59,27 +79,36 @@ process REPEAT_MASK_BATCH {
         -lib ${combined_lib} \\
         -xsmall -small \\
         -gff \\
-        ${batch_fasta}
+        short_ids.fa
 
-    # ── 2. Adjust .out coordinates to global ──────────────────────────────────
+    # ── 2. Restore original names in .out, then adjust to global coords ───────
     awk '
-    # First pass: load full scaffold lengths
+    # First pass: load short→original ID mapping
+    NR == FNR && FILENAME == "id_map.tsv" {
+        id_map[\$1] = \$2
+        next
+    }
+
+    # Second pass: load full scaffold lengths
     NR == FNR {
         scaff_len[\$1] = int(\$2)
         next
     }
 
-    # Second pass: process the .out file
+    # Third pass: process the .out file
     FNR <= 3 { print; next }
 
     {
+        # Restore original long name from short ID
+        if (\$5 in id_map) \$5 = id_map[\$5]
+
         seqname = \$5
 
         # Parse: last _DIGITS-DIGITS:. is the coordinate suffix
         n = split(seqname, parts, "_")
         tail = parts[n]
 
-        # Reconstruct original name from all parts except the last
+        # Reconstruct original scaffold name from all parts except the last
         orig_name = parts[1]
         for (i = 2; i < n; i++) {
             orig_name = orig_name "_" parts[i]
@@ -101,12 +130,14 @@ process REPEAT_MASK_BATCH {
 
         print
     }
-    ' ${seq_lengths} ${batch_fasta}.out > ${assembly_id}.${batch_id}.adjusted.out
+    ' id_map.tsv ${seq_lengths} short_ids.fa.out > ${assembly_id}.${batch_id}.adjusted.out
 
-    # ── 3. Adjust masked FASTA headers ────────────────────────────────────────
+    # ── 3. Restore original names in masked FASTA, then adjust headers ────────
     awk '
+    NR == FNR { id_map[\$1] = \$2; next }
     /^>/ {
-        header = substr(\$0, 2)
+        short = substr(\$1, 2)
+        header = (short in id_map) ? id_map[short] : short
         gsub(/:\\.\$/, "", header)
 
         n = split(header, parts, "_")
@@ -122,7 +153,7 @@ process REPEAT_MASK_BATCH {
         next
     }
     { print }
-    ' ${batch_fasta}.masked > ${assembly_id}.${batch_id}.adjusted.fa
+    ' id_map.tsv short_ids.fa.masked > ${assembly_id}.${batch_id}.adjusted.fa
     """
 
     stub:
