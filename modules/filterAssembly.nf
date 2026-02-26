@@ -25,7 +25,6 @@ process FILTER_ASSEMBLY {
 
     input:
     tuple val(assembly_id), path(assembly_path)
-    val min_contig_length
 
     output:
     tuple val(assembly_id), path("${assembly_id}.filtered.fasta"), emit: filtered_assembly
@@ -36,13 +35,13 @@ process FILTER_ASSEMBLY {
     set -euo pipefail
 
     # ── 1. Filter contigs by minimum length ───────────────────────────────────
-    seqkit seq -m ${min_contig_length} -g "${assembly_path}" > ${assembly_id}.filtered.fasta
+    seqkit seq -m ${params.min_contig_length} -g "${assembly_path}" > ${assembly_id}.filtered.fasta
 
     # ── 2. Count removed contigs for logging ──────────────────────────────────
     total_before=\$(grep -c '^>' "${assembly_path}")
     total_after=\$(grep -c '^>' ${assembly_id}.filtered.fasta)
     removed=\$((total_before - total_after))
-    echo "Filtered ${assembly_id}: kept \${total_after}/\${total_before} contigs (removed \${removed} < ${min_contig_length} bp)" >&2
+    echo "Filtered ${assembly_id}: kept \${total_after}/\${total_before} contigs (removed \${removed} < ${params.min_contig_length} bp)" >&2
 
     # ── 3. Generate assembly stats ────────────────────────────────────────────
     assembly-stats -t ${assembly_id}.filtered.fasta > ${assembly_id}.assembly_stats.tsv

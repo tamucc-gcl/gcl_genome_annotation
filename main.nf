@@ -179,7 +179,7 @@ workflow {
     ========================================================================================
     */
 
-    FILTER_ASSEMBLY(ch_assemblies, params.min_contig_length)
+    FILTER_ASSEMBLY(ch_assemblies)
 
     ch_assemblies_filtered = FILTER_ASSEMBLY.out.filtered_assembly
 
