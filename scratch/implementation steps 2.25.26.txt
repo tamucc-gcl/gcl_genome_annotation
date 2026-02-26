@@ -58,3 +58,12 @@ Somewhere else
 Repeat landscape/divergence plots
 - need to output .align file from repeatMasker
 - calcDivergenceFromAlign.pl createRepeatLandscape.pl
+
+
+The consolidation steps are sequential by necessity. MERGE_FUNCTIONAL_ANNOTATIONS needs all functional tools to finish. ANNOTATE_GFF3 needs both the merged functional table and the ncRNA GFF3s. ANNOTATION_REPORT needs everything. These form a natural funnel at the end of the pipeline.
+GFF3 merging strategy: When combining BRAKER's protein-coding GFF3 with tRNAscan and Infernal ncRNA GFF3s, you'll want AGAT's agat_sp_merge_annotations.pl or a custom script that handles ID namespace conflicts (BRAKER gene IDs vs. tRNAscan gene IDs). Decide on a naming convention upfront — e.g., {assembly_id}_g{N} for protein-coding, {assembly_id}_tRNA{N} for tRNAs, {assembly_id}_ncRNA{N} for Infernal hits.
+
+Merged functional annotation table — This is the single most impactful output improvement. One TSV per assembly with gene_id as the key, pulling best DIAMOND hit, InterPro domains/descriptions, GO terms (from both InterPro and eggNOG), eggNOG orthogroup, KEGG KO/pathway, SignalP prediction, and TMHMM topology. This becomes the go-to file for any downstream analysis.
+Functional GFF3 — Adding Dbxref, product names, GO terms, and Note attributes to the GFF3 mRNA/gene features. This makes the GFF3 self-contained for genome browsers and submission. The merge logic needs a clear hierarchy for product naming (e.g., prefer SwissProt DIAMOND hit description > eggNOG description > "hypothetical protein").
+QC Consolidation
+Annotation completeness — Beyond BUSCO/OMArk (which assess gene content completeness), you want functional coverage metrics: what % of predicted proteins got hits from each source, what % have at least one functional annotation from any source, what % remain completely unannotated (candidates for filtering or flagging). This is straightforward to compute from the merged functional table.

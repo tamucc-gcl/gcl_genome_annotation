@@ -12,6 +12,7 @@
 process INFERNAL {
     tag "${assembly_id}:${chunk_id}"
     label 'infernal'
+    //publishDir "${params.outdir}/ncRNA/chunks", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), val(chunk_id), path(masked_chunk)
