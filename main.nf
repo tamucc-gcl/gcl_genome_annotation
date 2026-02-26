@@ -22,6 +22,7 @@ nextflow.enable.dsl = 2
 params.sample_sheet   = null
 params.outdir         = "${launchDir}/results"
 params.publish_dir_mode = 'link'
+params.min_contig_length = 50000
 
 // Dfam
 params.dfam_version = '39'
