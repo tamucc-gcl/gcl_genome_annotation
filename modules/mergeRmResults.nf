@@ -11,11 +11,13 @@
       3. Generate GFF from merged .out
       4. Generate standard RM-format summary .tbl from the .out file
       5. Generate detailed by-family .tbl using buildSummary.pl
+      6. Merge .align files, compute divergence, generate repeat landscape
 
     Inputs:
         - assembly_id:     Sample identifier
         - out_files:       Collection of adjusted .out files
         - fasta_files:     Collection of adjusted masked FASTA files
+        - align_files:     Collection of adjusted .align files
 
     Outputs:
         - masked_fasta:    Soft-masked genome
@@ -23,8 +25,12 @@
         - repeat_tbl:      Standard RM-format summary table
         - repeat_out:      Merged RepeatMasker .out annotation file
         - repeat_tbl_full: Detailed by-family table (buildSummary.pl)
+        - repeat_align:    Merged .align file
+        - repeat_divsum:   Divergence summary from calcDivergenceFromAlign.pl
+        - repeat_landscape: Repeat landscape HTML plot
 
-    Tools: RepeatMasker utilities (buildSummary.pl, rmOutToGFF3.pl)
+    Tools: RepeatMasker utilities (buildSummary.pl, rmOutToGFF3.pl,
+           calcDivergenceFromAlign.pl, createRepeatLandscape.pl)
            from tetools container
 ========================================================================================
 */
@@ -35,7 +41,7 @@ process MERGE_RM_RESULTS {
     publishDir "${params.outdir}/repeats", mode: params.publish_dir_mode
 
     input:
-    tuple val(assembly_id), path(out_files), path(fasta_files)
+    tuple val(assembly_id), path(out_files), path(fasta_files), path(align_files)
 
     output:
     tuple val(assembly_id), path("${assembly_id}.masked.fasta"),         emit: masked_fasta
@@ -43,6 +49,9 @@ process MERGE_RM_RESULTS {
     tuple val(assembly_id), path("${assembly_id}.tbl"),                  emit: repeat_tbl
     tuple val(assembly_id), path("${assembly_id}.out"),                  emit: repeat_out
     tuple val(assembly_id), path("${assembly_id}.buildSummary.tbl"),     emit: repeat_tbl_full
+    tuple val(assembly_id), path("${assembly_id}.align"),                emit: repeat_align
+    tuple val(assembly_id), path("${assembly_id}.divsum"),               emit: repeat_divsum
+    tuple val(assembly_id), path("${assembly_id}.repeat_landscape.html"), emit: repeat_landscape
 
     script:
     """
@@ -108,12 +117,9 @@ process MERGE_RM_RESULTS {
     perl /opt/RepeatMasker/util/rmOutToGFF3.pl ${assembly_id}.out > ${assembly_id}.gff
 
     # ── 4. Generate standard RM-format .tbl from .out ────────────────────────
-    #   Use Perl (available in tetools) to avoid mawk compatibility issues.
-
     perl -e '
     use strict; use warnings;
 
-    # Read genome stats
     my (\$total_len, \$n_excl, \$n_seqs, \$gc_count, \$bases_masked) = (0,0,0,0,0);
     open my \$fa, "<", "\$ARGV[0]" or die;
     while (<\$fa>) {
@@ -134,7 +140,6 @@ process MERGE_RM_RESULTS {
     my \$gc_pct = \$n_excl > 0 ? (\$gc_count/\$n_excl)*100 : 0;
     my \$mask_pct = \$total_len > 0 ? (\$bases_masked/\$total_len)*100 : 0;
 
-    # Parse .out file
     my (%main_count, %main_bp, %sub_count, %sub_bp);
     my (\$interspersed_n, \$interspersed_bp) = (0, 0);
 
@@ -167,7 +172,6 @@ process MERGE_RM_RESULTS {
     }
     close \$out;
 
-    # Print summary
     my \$pct = sub { \$total_len > 0 ? (\$_[0]/\$total_len)*100 : 0 };
 
     printf "==================================================\\n";
@@ -232,6 +236,23 @@ process MERGE_RM_RESULTS {
     perl /opt/RepeatMasker/util/buildSummary.pl \\
         -genome ${assembly_id}.genome.tsv \\
         ${assembly_id}.out > ${assembly_id}.buildSummary.tbl
+
+    # ── 6. Merge .align files and generate repeat landscape ───────────────────
+    cat \$(ls -1 ${align_files} | sort -V) > ${assembly_id}.align
+
+    # Calculate Kimura 2-parameter divergence
+    perl /opt/RepeatMasker/util/calcDivergenceFromAlign.pl \\
+        -s ${assembly_id}.divsum \\
+        -a ${assembly_id}.align_with_div \\
+        ${assembly_id}.align
+
+    # Generate repeat landscape HTML
+    genome_size=\$(awk '!/^>/{total += length(\$0)} END{print total}' ${assembly_id}.masked.fasta)
+
+    perl /opt/RepeatMasker/util/createRepeatLandscape.pl \\
+        -div ${assembly_id}.divsum \\
+        -g \${genome_size} \\
+        > ${assembly_id}.repeat_landscape.html
     """
 
     stub:
@@ -241,5 +262,8 @@ process MERGE_RM_RESULTS {
     touch ${assembly_id}.tbl
     touch ${assembly_id}.out
     touch ${assembly_id}.buildSummary.tbl
+    touch ${assembly_id}.align
+    touch ${assembly_id}.divsum
+    touch ${assembly_id}.repeat_landscape.html
     """
 }

@@ -47,6 +47,7 @@ process REPEAT_MASK_BATCH {
     tuple val(assembly_id), val(batch_id),
         path("${assembly_id}.${batch_id}.adjusted.out"),
         path("${assembly_id}.${batch_id}.adjusted.fa"),
+        path("${assembly_id}.${batch_id}.adjusted.align"),
         emit: batch_results
 
     script:
@@ -98,6 +99,7 @@ process REPEAT_MASK_BATCH {
         -cutoff 225 \\
         -lib ${combined_lib} \\
         -xsmall -small \\
+        -a \\
         -gff \\
         short_ids.fa
 
@@ -158,9 +160,50 @@ process REPEAT_MASK_BATCH {
     ' short_ids.fa.masked > ${assembly_id}.${batch_id}.adjusted.fa
     """
 
+    # ── 5. Adjust .align file ─────────────────────────────────────────────────
+    #   .align has summary lines that mirror .out format with scaffold names
+    #   and coordinates. We replace short IDs and adjust coordinates on lines
+    #   that start with a score (numeric first field) similar to .out format.
+    #   Other lines (alignments, blank lines, headers) pass through unchanged.
+    awk '
+    BEGIN {
+        while ((getline < "coord_map.tsv") > 0) {
+            split(\$0, a, "\\t")
+            map_scaff[a[1]]  = a[2]
+            map_offset[a[1]] = int(a[3]) - 1
+            map_slen[a[1]]   = int(a[5])
+        }
+        close("coord_map.tsv")
+    }
+
+    # Summary/annotation lines start with a number (SW score)
+    /^[[:space:]]*[0-9]/ && NF >= 14 {
+        sid = \$5
+        if (sid in map_scaff) {
+            \$5 = map_scaff[sid]
+            offset = map_offset[sid]
+            slen   = map_slen[sid]
+
+            \$6 = \$6 + offset
+            \$7 = \$7 + offset
+
+            if (slen > 0) {
+                \$8 = "(" slen - \$7 ")"
+            }
+        }
+        print
+        next
+    }
+
+    # All other lines pass through unchanged
+    { print }
+    ' short_ids.fa.align > ${assembly_id}.${batch_id}.adjusted.align
+    """
+
     stub:
     """
     touch ${assembly_id}.${batch_id}.adjusted.out
     touch ${assembly_id}.${batch_id}.adjusted.fa
+    touch ${assembly_id}.${batch_id}.adjusted.align
     """
 }
