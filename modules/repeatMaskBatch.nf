@@ -37,7 +37,7 @@
 process REPEAT_MASK_BATCH {
     tag "${assembly_id}:${batch_id}"
     label 'repeat_mask_batch'
-    publishDir "${params.outdir}/repeats/chunks", mode: params.publish_dir_mode
+    //publishDir "${params.outdir}/repeats/chunks", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), val(batch_id), path(batch_fasta), path(batch_bed),
