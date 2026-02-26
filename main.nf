@@ -98,6 +98,8 @@ include { parseSampleSheet } from './functions/parse_sample_sheet.nf'
 ========================================================================================
 */
 
+include { FILTER_ASSEMBLY } from './modules/filterAssembly.nf'
+
 // ── Database ─────────────────────────────
 include { CURATE_DFAM; DOWNLOAD_DFAM_DB } from './modules/curateDfam.nf'
 
@@ -172,6 +174,16 @@ workflow {
 
     /*
     ========================================================================================
+        Assembly Filtering and Stats
+    ========================================================================================
+    */
+
+    FILTER_ASSEMBLY(ch_assemblies, params.min_contig_length)
+
+    ch_assemblies_filtered = FILTER_ASSEMBLY.out.filtered_assembly
+
+    /*
+    ========================================================================================
         Repeat Annotation
     ========================================================================================
     */
@@ -181,7 +193,7 @@ workflow {
                 params.taxa_name)
 
     // ── Step 1: De novo repeat modeling (per genome) ─────────────────────────
-    REPEAT_MODEL(ch_assemblies,
+    REPEAT_MODEL(ch_assemblies_filtered, 
                 CURATE_DFAM.out.dfam_lib.collect())
 
     // ── Step 2: Curate de novo repeats (per genome) ──────────────────────────
@@ -192,7 +204,7 @@ workflow {
 
     // ── Step 4: Mask genome with combined libraries (per genome) ─────────────
     // Join assembly path back with curated repeats on assembly_id
-    ch_mask_input = ch_assemblies
+    ch_mask_input = ch_assemblies_filtered
         .join(CLASSIFY_REPEATS.out.curated_repeats)
         // produces: [assembly_id, assembly_path, curated_repeats]
 
@@ -216,7 +228,7 @@ workflow {
             //ch_augustus_config.collect())
 
     // ── Step 6: Get descriptive stats for annotations (per genome) ─────────────
-    ch_agat_inputs = ch_assemblies
+    ch_agat_inputs = ch_assemblies_filtered
         .join(BRAKER.out.braker_gff3, by: 0)
         .map { id, assembly_path, gff_path -> tuple(id, assembly_path, gff_path) }
 
