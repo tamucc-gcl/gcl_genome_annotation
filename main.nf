@@ -127,7 +127,7 @@ include { EGGNOG; MERGE_EGGNOG; DOWNLOAD_EGGNOG_DB } from './modules/eggnog.nf'
 include { DIAMOND; MERGE_DIAMOND; DOWNLOAD_DIAMOND_DB } from './modules/diamond.nf'
 include { KOFAMSCAN; MERGE_KOFAMSCAN; DOWNLOAD_KOFAMSCAN_DB } from './modules/kofamscan.nf'
 include { DEEPSIG; MERGE_DEEPSIG } from './modules/deepsig.nf'
-
+include { MERGE_FUNCTIONAL_ANNOTATIONS } from './modules/merge_functional_annotations.nf'
 
 /*
 ========================================================================================
@@ -326,6 +326,16 @@ workflow {
         .groupTuple(size: params.n_chunks)
 
     MERGE_DEEPSIG(ch_deepsig_grouped)
+
+    // ── Step 17: Merge all functional annotations into single file per genome ─────────────
+    ch_func_merged = MERGE_INTERPROSCAN.out.merged_tsv
+        .join(MERGE_EGGNOG.out.merged)
+        .join(MERGE_DIAMOND.out.merged)
+        .join(MERGE_KOFAMSCAN.out.merged)
+        .join(MERGE_DEEPSIG.out.merged_gff3)
+        // produces: [assembly_id, ipr_tsv, eggnog_tsv, diamond_tsv, kofam_tsv, deepsig_gff3]
+
+    MERGE_FUNCTIONAL_ANNOTATIONS(ch_func_merged)
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────

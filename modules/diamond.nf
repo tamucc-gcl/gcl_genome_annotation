@@ -59,7 +59,7 @@ process MERGE_DIAMOND {
     tuple val(assembly_id), path(annot_files)
 
     output:
-    path("${assembly_id}.diamond.tsv"), emit: merged
+    tuple val(assembly_id), path("${assembly_id}.diamond.tsv"), emit: merged
 
     script:
     """

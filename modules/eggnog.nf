@@ -63,7 +63,7 @@ process MERGE_EGGNOG {
     tuple val(assembly_id), path(annot_files)
 
     output:
-    path("${assembly_id}.eggnog.annotations"), emit: merged
+    tuple val(assembly_id), path("${assembly_id}.eggnog.annotations"), emit: merged
 
     script:
     """

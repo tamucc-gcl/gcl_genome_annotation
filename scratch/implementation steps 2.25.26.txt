@@ -25,8 +25,8 @@ EXISTING PIPELINE (unchanged)
 │   ├─ MERGE_KOFAMSCAN()                 → merged KO TSV per assembly - DONE
 │   ├─ SIGNALP(ch_chunks)               → per-chunk signal peptide predictions  - DONE
 │   ├─ MERGE_SIGNALP()                  → merged SignalP TSV per assembly  - DONE
-│   ├─ TMHMM(ch_chunks)                 → per-chunk TM predictions
-│   └─ MERGE_TMHMM()                    → merged TMHMM TSV per assembly
+│   ├─ TMHMM(ch_chunks)                 → per-chunk TM predictions - skip annoying licensing
+│   └─ MERGE_TMHMM()                    → merged TMHMM TSV per assembly - skip annoying licensing
 │
 ├─ NEW: Annotation Consolidation (after ALL functional tools complete)
 │   ├─ MERGE_FUNCTIONAL_ANNOTATIONS()
@@ -52,3 +52,9 @@ EXISTING PIPELINE (unchanged)
                 tRNAscan stats, Infernal results
         output: consolidated summary TSV/report per assembly
                 + cross-assembly comparison if multiple samples
+
+
+Somewhere else
+Repeat landscape/divergence plots
+- need to output .align file from repeatMasker
+- calcDivergenceFromAlign.pl createRepeatLandscape.pl

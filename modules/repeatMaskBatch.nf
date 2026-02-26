@@ -6,8 +6,9 @@
     global genomic positions.
 
     seqkit subseq --bed names sequences as:
-        scaffold_1_84087028-93430037:.
-    which encodes: {original_name}_{1-based_start}-{end}:.
+        scaffold_name:start-end
+    which encodes the original scaffold name, 1-based start, and end separated
+    by colons and dashes.
 
     RepeatMasker enforces a 50-character limit on FASTA identifiers.
     Because the encoded names can exceed this, we:
@@ -82,6 +83,13 @@ process REPEAT_MASK_BATCH {
         short_ids.fa
 
     # ── 2. Restore original names in .out, then adjust to global coords ───────
+    #
+    # seqkit subseq --bed produces headers like:
+    #   >scaffold_1_sliding:7785837-15571672:.
+    # The format is: {scaffold_name}:{1-based_start}-{end}:.
+    # We parse on the LAST colon-delimited fields to extract coordinates,
+    # and everything before the coordinate suffix is the original scaffold name.
+    #
     awk '
     # First pass: load short→original ID mapping
     NR == FNR && FILENAME == "id_map.tsv" {
@@ -104,19 +112,31 @@ process REPEAT_MASK_BATCH {
 
         seqname = \$5
 
-        # Parse: last _DIGITS-DIGITS:. is the coordinate suffix
-        n = split(seqname, parts, "_")
-        tail = parts[n]
+        # Strip trailing ":." if present (seqkit subseq suffix)
+        sub(/:\\.\$/, "", seqname)
 
-        # Reconstruct original scaffold name from all parts except the last
-        orig_name = parts[1]
-        for (i = 2; i < n; i++) {
-            orig_name = orig_name "_" parts[i]
+        # Parse: scaffold_name:start-end
+        # Split on ":" — last field contains "start-end", everything before is scaffold name
+        n_colons = split(seqname, colon_parts, ":")
+
+        if (n_colons >= 2) {
+            # Coordinates are in the last colon-separated field
+            coord_field = colon_parts[n_colons]
+
+            # Reconstruct original scaffold name from all parts except the last
+            orig_name = colon_parts[1]
+            for (i = 2; i < n_colons; i++) {
+                orig_name = orig_name ":" colon_parts[i]
+            }
+
+            # Parse start-end from coord_field
+            split(coord_field, se, "-")
+            offset = int(se[1]) - 1
+        } else {
+            # No colon found — no coordinate encoding, use as-is
+            orig_name = seqname
+            offset = 0
         }
-
-        # Parse start from tail: "84087028-93430037:."
-        split(tail, coords, "[-:]")
-        offset = int(coords[1]) - 1
 
         # Adjust begin/end coordinates
         \$5 = orig_name
@@ -133,23 +153,32 @@ process REPEAT_MASK_BATCH {
     ' id_map.tsv ${seq_lengths} short_ids.fa.out > ${assembly_id}.${batch_id}.adjusted.out
 
     # ── 3. Restore original names in masked FASTA, then adjust headers ────────
+    #
+    # Convert: >scaffold_name:start-end:.  →  >scaffold_name__start__end
+    #
     awk '
     NR == FNR { id_map[\$1] = \$2; next }
     /^>/ {
         short = substr(\$1, 2)
         header = (short in id_map) ? id_map[short] : short
-        gsub(/:\\.\$/, "", header)
 
-        n = split(header, parts, "_")
-        tail = parts[n]
+        # Strip trailing ":."
+        sub(/:\\.\$/, "", header)
 
-        orig_name = parts[1]
-        for (i = 2; i < n; i++) {
-            orig_name = orig_name "_" parts[i]
+        # Parse scaffold_name:start-end
+        n_colons = split(header, colon_parts, ":")
+
+        if (n_colons >= 2) {
+            coord_field = colon_parts[n_colons]
+            orig_name = colon_parts[1]
+            for (i = 2; i < n_colons; i++) {
+                orig_name = orig_name ":" colon_parts[i]
+            }
+            split(coord_field, se, "-")
+            print ">" orig_name "__" int(se[1]) "__" int(se[2])
+        } else {
+            print ">" header "__1__1"
         }
-
-        split(tail, coords, "-")
-        print ">" orig_name "__" int(coords[1]) "__" int(coords[2])
         next
     }
     { print }
