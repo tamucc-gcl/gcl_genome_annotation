@@ -158,7 +158,6 @@ process REPEAT_MASK_BATCH {
     }
     { print }
     ' short_ids.fa.masked > ${assembly_id}.${batch_id}.adjusted.fa
-    """
 
     # ── 5. Adjust .align file ─────────────────────────────────────────────────
     #   .align has summary lines that mirror .out format with scaffold names
