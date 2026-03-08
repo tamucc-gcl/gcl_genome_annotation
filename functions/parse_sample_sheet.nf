@@ -14,6 +14,10 @@
     This function creates independent channel items per sample using .fromList(),
     which ensures that adding new samples to the samplesheet will NOT invalidate
     the cache for existing samples when using -resume.
+    
+    PATH RESOLUTION:
+    Relative paths in the samplesheet are resolved against the samplesheet's
+    parent directory. Absolute paths (starting with "/") are used as-is.
 ========================================================================================
 */
 
@@ -24,6 +28,15 @@ def parseSampleSheet(sample_sheet_path) {
     
     if (!sample_sheet_file.exists()) {
         error "Sample sheet does not exist: ${sample_sheet_path}"
+    }
+    
+    // Resolve relative paths against the samplesheet's parent directory
+    def sheet_dir = sample_sheet_file.parent
+    log.info "Resolving samplesheet paths relative to: ${sheet_dir}"
+
+    def resolvePath = { String p ->
+        if (!p) return null
+        return p.startsWith('/') ? file(p) : file("${sheet_dir}/${p}")
     }
     
     def lines = sample_sheet_file.readLines()
@@ -58,11 +71,11 @@ def parseSampleSheet(sample_sheet_path) {
             return
         }
         
-        // Convert to file object and check existence
-        def assembly_file = file(assembly_path)
+        // Resolve relative to samplesheet directory
+        def assembly_file = resolvePath(assembly_path)
         
         if (!assembly_file.exists()) {
-            log.warn "Line ${idx + 1}: Skipping sample '${assembly_id}': assembly file does not exist: ${assembly_path}"
+            log.warn "Line ${idx + 1}: Skipping sample '${assembly_id}': assembly file does not exist: ${assembly_path} (resolved to: ${assembly_file})"
             return
         }
         
