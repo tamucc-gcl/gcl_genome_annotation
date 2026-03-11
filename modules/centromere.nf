@@ -35,7 +35,8 @@
 process CENTROMERE_ANNOTATION {
     tag "${assembly_id}"
     label 'centromere'
-    publishDir "${params.outdir}/centromere", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/centromere", mode: params.publish_dir_mode,
+        saveAs: { fn -> fn.endsWith('_centroanno') ? null : fn }
 
     input:
     tuple val(assembly_id), path(assembly)
