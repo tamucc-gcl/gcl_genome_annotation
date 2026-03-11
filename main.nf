@@ -40,6 +40,12 @@ params.cluster_pct       = 0.95   // set to 0 or null to skip clustering
 params.job_speed = 's'            // null, 's', 'q', 'qq'
 params.n_rm_chunks = 8          // number of chunks to split genome into for parallel RepeatMasker runs. Adjust based on genome size and available resources.
 
+// Telomere annotation
+params.telomere_motif       = 'TTAGGG'   // vertebrate canonical motif
+params.telomere_window      = 1000      // tidk window size (bp)
+params.telomere_min_count   = 2          // min repeat hits per window to call telomeric
+params.telomere_end_window  = 50000      // classify as terminal if within this distance of scaffold end
+
 // Infernal
 params.n_infernal_chunks = 7 // number of chunks to split genome into for parallel Infernal runs. Adjust based on genome size and available resources.
 params.rfam_database = null // path to Rfam database directory (contains Rfam.cm and Rfam.clanin files)
@@ -110,6 +116,12 @@ include { CURATE_REPEATS } from './modules/curateRepeats.nf'
 include { CLASSIFY_REPEATS } from './modules/classifyRepeats.nf'
 //include { REPEAT_MASK   } from './modules/repeatMask.nf'
 include { REPEAT_MASK_PARALLEL as REPEAT_MASK } from './workflows/repeatMaskParallel.nf'
+
+// ── Telomere annotation ─────────────────────────────
+include { TELOMERE_ANNOTATION } from './modules/telomere.nf'
+
+// ── Centromere annotation ─────────────────────────────
+include { CENTROMERE_ANNOTATION; CENTROMERE_TO_GFF3 } from './modules/centromere.nf'
 
 // ── Structural annotation ─────────────────────────────
 include { BRAKER } from './modules/braker.nf'
@@ -214,6 +226,34 @@ workflow {
 
     REPEAT_MASK(ch_mask_input, 
                 CURATE_DFAM.out.dfam_lib.collect())
+
+    /*
+    ========================================================================================
+        Telomere Annotation
+    ========================================================================================
+    */
+    TELOMERE_ANNOTATION(ch_assemblies)
+
+    /*
+    ========================================================================================
+        Centromere Annotation
+    ========================================================================================
+    */
+
+    // ── Step: De novo centromere detection with centroAnno ────────────────────
+    //   Runs on UNMASKED assembly — centromeric satellites are tandem repeats
+    //   that RepeatMasker soft-masks, so centroAnno must see the original
+    //   sequence to detect them via k-mer frequency analysis.
+    //   No dependency on repeat pipeline — starts immediately.
+    CENTROMERE_ANNOTATION(ch_assemblies)
+
+    // ── Step: Convert centroAnno output to GFF3 ──────────────────────────────
+    ch_centroanno_gff_input = CENTROMERE_ANNOTATION.out.monomer_csv
+        .join(CENTROMERE_ANNOTATION.out.hor_csv, by: 0)
+        // produces: [assembly_id, monomer_csv, hor_csv]
+
+    CENTROMERE_TO_GFF3(ch_centroanno_gff_input)
+
 
     /*
     ========================================================================================
@@ -362,8 +402,11 @@ workflow {
     ch_annotate_input = BRAKER.out.braker_gff3
         .join(tRNASCAN.out.trnascan_gff3)
         .join(INFERNAL.out.infernal_gff3)
+        .join(TELOMERE_ANNOTATION.out.telomere_gff3)
+        .join(CENTROMERE_TO_GFF3.out.centromere_gff3)
         .join(MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv)
-        // produces: [assembly_id, braker_gff3, trnascan_gff3, infernal_gff3, func_tsv]
+        // produces: [assembly_id, braker_gff3, trnascan_gff3, infernal_gff3,
+        //            telomere_gff3, func_tsv]
 
     ANNOTATE_GFF3(ch_annotate_input)
 }

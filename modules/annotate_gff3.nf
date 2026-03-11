@@ -39,6 +39,7 @@ process ANNOTATE_GFF3 {
           path(braker_gff3),
           path(trnascan_gff3),
           path(infernal_gff3),
+          path(telomere_gff3),
           path(functional_tsv)
 
     output:
@@ -247,6 +248,30 @@ process ANNOTATE_GFF3 {
             cols[2] = "ncRNA"  # normalize feature type
 
             ncrna_records.append(cols[:8] + [attrs])
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 3b. Parse telomere GFF3
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    telo_records = []
+    telo_counter = 0
+
+    with open("${telomere_gff3}") as fh:
+        for line in fh:
+            if line.startswith("#") or not line.strip():
+                continue
+            cols = line.rstrip("\\n").split("\\t")
+            if len(cols) < 9:
+                continue
+            attrs = parse_attributes(cols[8])
+            telo_counter += 1
+
+            # Renumber with assembly-prefixed IDs
+            new_id = f"{ASM}_telo{telo_counter}"
+            attrs["ID"] = new_id
+
+            # Source is "tidk", feature type is "telomeric_repeat" — keep both
+            telo_records.append(cols[:8] + [attrs])
 
     # ═══════════════════════════════════════════════════════════════════════════
     # 4. Load functional annotations
@@ -483,6 +508,12 @@ process ANNOTATE_GFF3 {
         cols8[1] = "Infernal"
         all_records.append(cols8 + [format_attributes(attrs)])
 
+    for entry in telo_records:
+        cols8 = list(entry[:8])
+        attrs = entry[8]
+        # Source already "tidk" from the module
+        all_records.append(cols8 + [format_attributes(attrs)])
+
     # Sort by seqid, then start position
     all_records.sort(key=lambda r: (r[0], int(r[3])))
 
@@ -493,6 +524,7 @@ process ANNOTATE_GFF3 {
         out.write(f"# Protein-coding genes: {braker_gene_counter}\\n")
         out.write(f"# tRNA genes: {trna_counter}\\n")
         out.write(f"# ncRNA features: {ncrna_counter}\\n")
+        out.write(f"# Telomeric regions: {telo_counter}\\n")
 
         current_seqid = None
         for rec in all_records:
@@ -520,7 +552,8 @@ process ANNOTATE_GFF3 {
     n_annotated = sum(1 for p in gene_products.values() if p != "hypothetical protein")
     n_hypo = braker_gene_counter - n_annotated
     print(f"Merged GFF3: {braker_gene_counter} protein-coding genes, "
-          f"{trna_counter} tRNAs, {ncrna_counter} ncRNAs", file=sys.stderr)
+          f"{trna_counter} tRNAs, {ncrna_counter} ncRNAs, "
+          f"{telo_counter} telomeric regions", file=sys.stderr)
     print(f"Functional annotation: {n_annotated} named, {n_hypo} hypothetical", file=sys.stderr)
     """
 
