@@ -128,8 +128,83 @@ process MERGE_RM_RESULTS {
     | fold -w 60 > tmp_wrapped.fa
     mv tmp_wrapped.fa ${assembly_id}.masked.fasta
 
-    # ── 3. Generate GFF ──────────────────────────────────────────────────────
-    perl /opt/RepeatMasker/util/rmOutToGFF3.pl ${assembly_id}.out > ${assembly_id}.gff
+    # ── 3. Generate GFF3 from .out with proper SO feature types ──────────────
+    python3 - ${assembly_id}.out ${assembly_id}.gff <<'PYEOF'
+import sys, re
+
+out_file, gff_file = sys.argv[1], sys.argv[2]
+
+# RepeatMasker class/family → Sequence Ontology feature type
+SO_MAP = {
+    "SINE":             "SINE_element",
+    "LINE":             "LINE_element",
+    "LTR":              "LTR_retrotransposon",
+    "DNA":              "DNA_transposon",
+    "RC":               "helitron",
+    "Retroposon":       "retroposon",
+    "Simple_repeat":    "simple_repeat",
+    "Low_complexity":   "low_complexity_region",
+    "Satellite":        "satellite_DNA",
+    "rRNA":             "rRNA",
+    "tRNA":             "tRNA",
+    "snRNA":            "snRNA",
+    "srpRNA":           "SRP_RNA",
+    "scRNA":            "scRNA",
+    "Unknown":          "repeat_region",
+}
+
+def classify(class_family):
+    """Map RM class/family string to SO term."""
+    main = class_family.split("/")[0]
+    return SO_MAP.get(main, "repeat_region")
+
+with open(out_file) as fin, open(gff_file, "w") as fout:
+    fout.write("##gff-version 3\n")
+    for i, line in enumerate(fin):
+        if i < 3:
+            continue
+        fields = line.split()
+        if len(fields) < 15:
+            continue
+
+        sw_score    = fields[0]
+        perc_div    = fields[1]
+        perc_del    = fields[2]
+        perc_ins    = fields[3]
+        scaffold    = fields[4]
+        qstart      = int(fields[5])
+        qend        = int(fields[6])
+        strand_raw  = fields[8]
+        repeat_name = fields[9]
+        class_fam   = fields[10]
+        hit_id      = fields[14]
+
+        strand = "-" if strand_raw == "C" else "+"
+        so_type = classify(class_fam)
+
+        # Target coordinates: always forward-orientation (start < end)
+        # + strand .out cols: repeat_begin(11) repeat_end(12) (repeat_left)(13)
+        # C strand .out cols: (repeat_left)(11) repeat_end(12) repeat_begin(13)
+        if strand == "+":
+            target_start = fields[11]
+            target_end   = fields[12]
+        else:
+            target_start = fields[13]
+            target_end   = fields[12]
+
+        attrs = (
+            f"ID=repeat_{hit_id};"
+            f"Name={repeat_name};"
+            f"class={class_fam};"
+            f"pctdiv={perc_div};"
+            f"pctdel={perc_del};"
+            f"pctins={perc_ins};"
+            f"Target={repeat_name} {target_start} {target_end} {strand}"
+        )
+
+        fout.write(f"{scaffold}\tRepeatMasker\t{so_type}\t{qstart}\t{qend}\t{sw_score}\t{strand}\t.\t{attrs}\n")
+
+PYEOF
 
     # ── 4. Generate standard RM-format .tbl from .out ────────────────────────
     perl -e '
