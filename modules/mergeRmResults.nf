@@ -154,12 +154,12 @@ SO_MAP = {
 }
 
 def classify(class_family):
-    """Map RM class/family string to SO term."""
+    # Map RM class/family string to SO term
     main = class_family.split("/")[0]
     return SO_MAP.get(main, "repeat_region")
 
 with open(out_file) as fin, open(gff_file, "w") as fout:
-    fout.write("##gff-version 3\n")
+    fout.write("##gff-version 3\\n")
     for i, line in enumerate(fin):
         if i < 3:
             continue
@@ -202,7 +202,7 @@ with open(out_file) as fin, open(gff_file, "w") as fout:
             f"Target={repeat_name} {target_start} {target_end} {strand}"
         )
 
-        fout.write(f"{scaffold}\tRepeatMasker\t{so_type}\t{qstart}\t{qend}\t{sw_score}\t{strand}\t.\t{attrs}\n")
+        fout.write(f"{scaffold}\\tRepeatMasker\\t{so_type}\\t{qstart}\\t{qend}\\t{sw_score}\\t{strand}\\t.\\t{attrs}\\n")
 
 PYEOF
 
