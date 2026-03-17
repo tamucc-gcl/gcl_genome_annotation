@@ -48,7 +48,7 @@ process MERGE_RM_RESULTS {
 
     output:
     tuple val(assembly_id), path("${assembly_id}.masked.fasta"),         emit: masked_fasta
-    tuple val(assembly_id), path("${assembly_id}.gff"),                  emit: repeat_gff
+    tuple val(assembly_id), path("${assembly_id}.repeat.gff3"),                  emit: repeat_gff
     tuple val(assembly_id), path("${assembly_id}.tbl"),                  emit: repeat_tbl
     tuple val(assembly_id), path("${assembly_id}.out"),                  emit: repeat_out
     tuple val(assembly_id), path("${assembly_id}.buildSummary.tbl"),     emit: repeat_tbl_full
@@ -129,7 +129,7 @@ process MERGE_RM_RESULTS {
     mv tmp_wrapped.fa ${assembly_id}.masked.fasta
 
     # ── 3. Generate GFF3 from .out with proper SO feature types ──────────────
-    python3 - ${assembly_id}.out ${assembly_id}.gff <<'PYEOF'
+    python3 - ${assembly_id}.out ${assembly_id}.repeat.gff3 <<'PYEOF'
 import sys, re
 
 out_file, gff_file = sys.argv[1], sys.argv[2]
@@ -338,7 +338,7 @@ PYEOF
     stub:
     """
     touch ${assembly_id}.masked.fasta
-    touch ${assembly_id}.gff
+    touch ${assembly_id}.repeat.gff3
     touch ${assembly_id}.tbl
     touch ${assembly_id}.out
     touch ${assembly_id}.buildSummary.tbl
