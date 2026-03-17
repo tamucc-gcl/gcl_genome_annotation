@@ -68,7 +68,7 @@ workflow REPEAT_MASK_PARALLEL {
         }
         .groupTuple(size: params.n_rm_chunks)
 
-    MERGE_RM_RESULTS(ch_merge)
+    MERGE_RM_RESULTS(ch_merge, PREP_RM_BATCHES.out.seq_lengths)
 
     emit:
     masked_fasta    = MERGE_RM_RESULTS.out.masked_fasta

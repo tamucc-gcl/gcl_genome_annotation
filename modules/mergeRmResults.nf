@@ -6,7 +6,8 @@
     that match the original REPEAT_MASK module interface.
 
     Steps:
-      1. Concatenate all adjusted .out files, renumber linkage IDs globally
+      1. Concatenate all adjusted .out files, renumber linkage IDs globally,
+         and recompute (left) column using authoritative scaffold lengths
       2. Reassemble masked FASTA — merge chunks back into full scaffolds in order
       3. Generate GFF from merged .out
       4. Generate standard RM-format summary .tbl from the .out file
@@ -18,6 +19,7 @@
         - out_files:       Collection of adjusted .out files
         - fasta_files:     Collection of adjusted masked FASTA files
         - align_files:     Collection of adjusted .align files
+        - seq_lengths:     Scaffold lengths TSV (from PREP_RM_BATCHES)
 
     Outputs:
         - masked_fasta:    Soft-masked genome
@@ -42,6 +44,7 @@ process MERGE_RM_RESULTS {
 
     input:
     tuple val(assembly_id), path(out_files), path(fasta_files), path(align_files)
+    tuple val(assembly_id), path(seq_lengths)
 
     output:
     tuple val(assembly_id), path("${assembly_id}.masked.fasta"),         emit: masked_fasta
@@ -64,11 +67,23 @@ process MERGE_RM_RESULTS {
         tail -n +4 "\$f" >> merged_raw.out
     done
 
-    awk '
+    # Renumber linkage IDs (column 15) and recompute (left) column (column 8)
+    # using authoritative scaffold lengths to eliminate cross-batch inconsistencies
+    awk -v lenfile="${seq_lengths}" '
+    BEGIN {
+        while ((getline line < lenfile) > 0) {
+            split(line, a, "\\t")
+            slen[a[1]] = int(a[2])
+        }
+        close(lenfile)
+    }
     NR <= 3 { print; next }
     {
-        id_col = NF
-        \$id_col = ++counter
+        sid = \$5
+        if (sid in slen) {
+            \$8 = "(" slen[sid] - \$7 ")"
+        }
+        \$15 = ++counter
         print
     }
     ' merged_raw.out > ${assembly_id}.out
@@ -220,38 +235,28 @@ process MERGE_RM_RESULTS {
     ' ${assembly_id}.masked.fasta ${assembly_id}.out > ${assembly_id}.tbl
 
     # ── 5. Generate detailed by-family table (buildSummary.pl) ────────────────
-    awk '
-    /^>/ {
-        if (name != "") print name "\\t" len
-        name = substr(\$1, 2)
-        len = 0
-        next
-    }
-    {
-        len += gsub(/[ACGTacgt]/, "&")
-    }
-    END { if (name != "") print name "\\t" len }
-    ' ${assembly_id}.masked.fasta > ${assembly_id}.genome.tsv
-
-    perl /opt/RepeatMasker/util/buildSummary.pl \\
-        -genome ${assembly_id}.genome.tsv \\
+    #   Use the authoritative seq_lengths (from seqkit fx2tab) directly as the
+    #   -genome parameter. This avoids ACGT-only counting from the masked FASTA
+    #   which excludes Ns and causes length mismatches with the .out file.
+    perl /opt/RepeatMasker/util/buildSummary.pl \
+        -genome ${seq_lengths} \
         ${assembly_id}.out > ${assembly_id}.buildSummary.tbl
 
     # ── 6. Merge .align files and generate repeat landscape ───────────────────
     cat \$(ls -1 ${align_files} | sort -V) > ${assembly_id}.align
 
     # Calculate Kimura 2-parameter divergence
-    perl /opt/RepeatMasker/util/calcDivergenceFromAlign.pl \\
-        -s ${assembly_id}.divsum \\
-        -a ${assembly_id}.align_with_div \\
+    perl /opt/RepeatMasker/util/calcDivergenceFromAlign.pl \
+        -s ${assembly_id}.divsum \
+        -a ${assembly_id}.align_with_div \
         ${assembly_id}.align
 
     # Generate repeat landscape HTML
     genome_size=\$(awk '!/^>/{total += length(\$0)} END{print total}' ${assembly_id}.masked.fasta)
 
-    perl /opt/RepeatMasker/util/createRepeatLandscape.pl \\
-        -div ${assembly_id}.divsum \\
-        -g \${genome_size} \\
+    perl /opt/RepeatMasker/util/createRepeatLandscape.pl \
+        -div ${assembly_id}.divsum \
+        -g \${genome_size} \
         > ${assembly_id}.repeat_landscape.html
     """
 
