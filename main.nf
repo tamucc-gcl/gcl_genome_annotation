@@ -426,37 +426,23 @@ workflow {
         Create Report
     ========================================================================================
     */
-    // ── Per-assembly annotation report ───────────────────────────────────────
-        ch_report_input = FILTER_ASSEMBLY.out.assembly_stats        // [id, stats]
-            .join(ANNOTATE_GFF3.out.annotated_gff3)                 // +gff3
-            .join(ANNOTATE_GFF3.out.gene_summary)                   // +summary
-            .join(MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv)      // +func
-            .join(REPEAT_MASK.out.repeat_tbl)                       // +tbl
-            .join(REPEAT_MASK.out.repeat_tbl_full)                  // +buildSummary
-            .join(BUSCO.out.busco)                                  // +busco
-            .join(OMARK.out.omark_summary)                          // +omark_sum
-            .join(OMARK.out.omark_detailed)                         // +omark_det
-            .join(AGAT.out.annotation_stats)                        // +agat
-            .join(tRNASCAN.out.trnascan_tsv)                        // +trna
-            .join(INFERNAL.out.infernal_tblout)                     // +infernal
-            .join(TELOMERE_ANNOTATION.out.telomere_gff3)            // +telo_gff3
-            .join(TELOMERE_ANNOTATION.out.telomere_tsv)             // +telo_tsv
-            .join(CENTROMERE_TO_GFF3.out.centromere_gff3)           // +centro
-            // Total: 1 val + 15 paths = 16 elements
-
-        ANNOTATION_REPORT(ch_report_input)
-        /*
-        // ── Cross-assembly comparison (runs ONCE) ────────────────────────────────
-        COMPARE_ANNOTATIONS(
-            FILTER_ASSEMBLY.out.assembly_stats.map { id, f -> f }.collect(),
-            ANNOTATE_GFF3.out.annotated_gff3.map { id, f -> f }.collect(),
-            ANNOTATE_GFF3.out.gene_summary.map { id, f -> f }.collect(),
-            MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv.map { id, f -> f }.collect(),
-            REPEAT_MASK.out.repeat_tbl.map { id, f -> f }.collect(),
-            BUSCO.out.busco.map { id, f -> f }.collect(),
-            OMARK.out.omark_summary.map { id, f -> f }.collect()
-        )
-        */
+    ANNOTATION_REPORT(
+        FILTER_ASSEMBLY.out.assembly_stats.map { id, f -> f }.collect(),
+        ANNOTATE_GFF3.out.annotated_gff3.map { id, f -> f }.collect(),
+        ANNOTATE_GFF3.out.gene_summary.map { id, f -> f }.collect(),
+        MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv.map { id, f -> f }.collect(),
+        REPEAT_MASK.out.repeat_tbl.map { id, f -> f }.collect(),
+        REPEAT_MASK.out.repeat_tbl_full.map { id, f -> f }.collect(),
+        BUSCO.out.busco.map { id, f -> f }.collect(),
+        OMARK.out.omark_summary.map { id, f -> f }.collect(),
+        OMARK.out.omark_detailed.map { id, f -> f }.collect(),
+        AGAT.out.annotation_stats.map { id, f -> f }.collect(),
+        tRNASCAN.out.trnascan_tsv.map { id, f -> f }.collect(),
+        INFERNAL.out.infernal_tblout.map { id, f -> f }.collect(),
+        TELOMERE_ANNOTATION.out.telomere_gff3.map { id, f -> f }.collect(),
+        TELOMERE_ANNOTATION.out.telomere_tsv.map { id, f -> f }.collect(),
+        CENTROMERE_TO_GFF3.out.centromere_gff3.map { id, f -> f }.collect()
+    )
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────

@@ -2,125 +2,117 @@
 ========================================================================================
     ANNOTATION REPORT MODULE
 ========================================================================================
-    Generate a comprehensive Markdown annotation report with embedded plots.
+    Generate a unified Markdown annotation report covering ALL assemblies,
+    with per-assembly sections and cross-assembly comparisons.
 
-    Collects outputs from all upstream modules and produces:
-      - PNG plots via R script (annotation_report_plots.R)
-      - Markdown report via Python script (generate_annotation_report.py)
-      - A plots/ directory with all generated figures
+    This process runs ONCE after all per-assembly annotations complete.
+    All inputs are collected (list) channels — one file per assembly.
+    Assembly IDs are inferred from filenames.
 
-    The report is a standalone Markdown file viewable on GitHub, with
-    relative image references to the plots/ directory.
-
-    Inputs:
-        - assembly_id:          Sample identifier
-        - assembly_stats:       Assembly stats TSV (from FILTER_ASSEMBLY)
-        - annotated_gff3:       Final merged annotated GFF3
-        - gene_summary:         Gene product summary TSV
-        - functional_tsv:       Merged functional annotations TSV
-        - repeat_tbl:           RepeatMasker summary table
-        - repeat_tbl_full:      buildSummary.pl detailed table
-        - busco_txt:            BUSCO short summary
-        - omark_summary:        OMArk summary
-        - omark_detailed:       OMArk detailed summary
-        - agat_stats:           AGAT annotation statistics
-        - trnascan_tsv:         tRNAscan-SE tabular output
-        - infernal_tblout:      Infernal tblout (merged)
-        - telomere_gff3:        Telomere annotations GFF3
-        - telomere_tsv:         tidk windowed telomere counts TSV
-        - centromere_gff3:      Centromere annotations GFF3
+    Inputs (all collected paths — one file per assembly):
+        - assembly_stats:    Assembly stats TSVs
+        - annotated_gff3s:   Annotated GFF3 files
+        - gene_summaries:    Gene product summary TSVs
+        - functional_tsvs:   Merged functional annotation TSVs
+        - repeat_tbls:       RepeatMasker summary tables
+        - repeat_tbls_full:  buildSummary.pl detailed tables
+        - busco_txts:        BUSCO short summaries
+        - omark_summaries:   OMArk summary files
+        - omark_detaileds:   OMArk detailed files
+        - agat_stats:        AGAT annotation statistics
+        - trnascan_tsvs:     tRNAscan-SE tabular outputs
+        - infernal_tblouts:  Infernal tblouts (merged)
+        - telomere_gff3s:    Telomere annotation GFF3s
+        - telomere_tsvs:     tidk windowed telomere count TSVs
+        - centromere_gff3s:   Centromere annotation GFF3s
 
     Outputs:
-        - report_md:    ${assembly_id}_annotation_report.md
-        - plots_dir:    ${assembly_id}_annotation_plots/
+        - report_md:    annotation_report.md
+        - plots_dir:    annotation_report_plots/
+        - metrics_tsv:  annotation_metrics.tsv
 
-    Tools: R (ggplot2, dplyr, tidyr, scales, patchwork, treemapify),
+    Tools: R (ggplot2, dplyr, tidyr, scales, patchwork, optparse),
            Python 3 (stdlib only)
 ========================================================================================
 */
 
 process ANNOTATION_REPORT {
-    tag "${assembly_id}"
+    tag "report"
     label 'annotation_report'
     publishDir "${params.outdir}/reports", mode: params.publish_dir_mode
 
     input:
-    tuple val(assembly_id),
-          path(assembly_stats),
-          path(annotated_gff3),
-          path(gene_summary),
-          path(functional_tsv),
-          path(repeat_tbl),
-          path(repeat_tbl_full),
-          path(repeat_landscape),
-          path(repeat_divsum),
-          path(busco_txt),
-          path(omark_plot),
-          path(omark_summary),
-          path(omark_detailed),
-          path(agat_stats),
-          path(trnascan_tsv),
-          path(infernal_tblout),
-          path(telomere_gff3),
-          path(telomere_svg),
-          path(centromere_gff3)
+    path(assembly_stats)
+    path(annotated_gff3s)
+    path(gene_summaries)
+    path(functional_tsvs)
+    path(repeat_tbls)
+    path(repeat_tbls_full)
+    path(busco_txts)
+    path(omark_summaries)
+    path(omark_detaileds)
+    path(agat_stats)
+    path(trnascan_tsvs)
+    path(infernal_tblouts)
+    path(telomere_gff3s)
+    path(telomere_tsvs)
+    path(centromere_gff3s)
 
     output:
-    tuple val(assembly_id),
-          path("${assembly_id}_annotation_report.md"),
-          emit: report_md
-    tuple val(assembly_id),
-          path("${assembly_id}_annotation_plots"),
-          emit: plots_dir
+    path("annotation_report.md"),       emit: report_md
+    path("annotation_report_plots"),    emit: plots_dir
+    path("annotation_metrics.tsv"),     emit: metrics_tsv
 
     script:
     """
     set -euo pipefail
 
-    mkdir -p ${assembly_id}_annotation_plots
+    mkdir -p annotation_report_plots
 
-    # ── 1. Generate plots with R ──────────────────────────────────────────────
+    # ── 1. Collect per-assembly metrics into a single TSV ─────────────────────
+    python3 ${projectDir}/scripts/collect_annotation_metrics.py \
+        --gff3s ${annotated_gff3s} \
+        --gene_summaries ${gene_summaries} \
+        --functional_tsvs ${functional_tsvs} \
+        --repeat_tbls ${repeat_tbls} \
+        --busco_txts ${busco_txts} \
+        --omark_summaries ${omark_summaries} \
+        --outfile annotation_metrics.tsv
+
+    # ── 2. Generate plots with R ──────────────────────────────────────────────
     Rscript ${projectDir}/scripts/annotation_report_plots.R \
-        --assembly_id ${assembly_id} \
-        --gff3 ${annotated_gff3} \
-        --gene_summary ${gene_summary} \
-        --functional_tsv ${functional_tsv} \
-        --repeat_tbl ${repeat_tbl} \
-        --repeat_tbl_full ${repeat_tbl_full} \
-        --busco_txt ${busco_txt} \
-        --omark_summary ${omark_summary} \
-        --omark_detailed ${omark_detailed} \
-        --trnascan_tsv ${trnascan_tsv} \
-        --infernal_tblout ${infernal_tblout} \
-        --telomere_gff3 ${telomere_gff3} \
-        --telomere_tsv ${telomere_tsv} \
-        --centromere_gff3 ${centromere_gff3} \
-        --outdir ${assembly_id}_annotation_plots
+        --metrics annotation_metrics.tsv \
+        --gff3s ${annotated_gff3s} \
+        --gene_summaries ${gene_summaries} \
+        --functional_tsvs ${functional_tsvs} \
+        --repeat_tbls_full ${repeat_tbls_full} \
+        --busco_txts ${busco_txts} \
+        --omark_summaries ${omark_summaries} \
+        --trnascan_tsvs ${trnascan_tsvs} \
+        --infernal_tblouts ${infernal_tblouts} \
+        --telomere_gff3s ${telomere_gff3s} \
+        --telomere_tsvs ${telomere_tsvs} \
+        --centromere_gff3s ${centromere_gff3s} \
+        --outdir annotation_report_plots
 
-    # ── 2. Assemble Markdown report ───────────────────────────────────────────
+    # ── 3. Assemble Markdown report ───────────────────────────────────────────
     python3 ${projectDir}/scripts/generate_annotation_report.py \
-        --assembly_id ${assembly_id} \
+        --metrics annotation_metrics.tsv \
         --assembly_stats ${assembly_stats} \
-        --gff3 ${annotated_gff3} \
-        --gene_summary ${gene_summary} \
-        --functional_tsv ${functional_tsv} \
-        --repeat_tbl ${repeat_tbl} \
-        --repeat_tbl_full ${repeat_tbl_full} \
-        --busco_txt ${busco_txt} \
-        --omark_summary ${omark_summary} \
-        --omark_detailed ${omark_detailed} \
+        --repeat_tbls ${repeat_tbls} \
+        --repeat_tbls_full ${repeat_tbls_full} \
+        --busco_txts ${busco_txts} \
+        --omark_summaries ${omark_summaries} \
+        --omark_detaileds ${omark_detaileds} \
         --agat_stats ${agat_stats} \
-        --trnascan_tsv ${trnascan_tsv} \
-        --infernal_tblout ${infernal_tblout} \
-        --telomere_gff3 ${telomere_gff3} \
-        --centromere_gff3 ${centromere_gff3} \
-        --plots_dir ${assembly_id}_annotation_plots \
-        --outfile ${assembly_id}_annotation_report.md
+        --plots_dir annotation_report_plots \
+        --outfile annotation_report.md
     """
 
     stub:
     """
-    mkdir -p ${assembly_id}_annotation_plots
-    touch ${assembly_id}_annotation_report.md
+    mkdir -p annotation_report_plots
+    touch annotation_report.md
+    touch annotation_metrics.tsv
     """
 }
