@@ -32,7 +32,7 @@
 process EXTRACT_SEQUENCES {
     tag "${assembly_id}"
     label 'extract_sequences'
-    publishDir "${params.outdir}/sequences", mode: params.publish_dir_mode
+    publishDir "${params.outdir}", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), path(annotated_gff3), path(genome_fasta)
