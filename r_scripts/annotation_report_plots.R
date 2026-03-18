@@ -16,6 +16,9 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(tidyr)
   library(scales)
+  library(treemapify)
+  library(GO.db)
+  library(AnnotationDbi)
 })
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
@@ -132,12 +135,23 @@ for (gff_path in gff3_files) {
   if (nrow(exons) > 0) {
     exons$parent <- extract_attr(exons$attributes, "Parent")
     epm <- exons %>% count(parent, name = "n_exons")
-    p <- ggplot(epm, aes(x = n_exons)) +
+
+    med_exons <- median(epm$n_exons)
+    n_single  <- sum(epm$n_exons == 1)
+    pct_single <- round(100 * mean(epm$n_exons == 1), 1)
+    # Cap display at 50 exons; note outliers in subtitle
+    cap <- 50
+    n_over <- sum(epm$n_exons > cap)
+    over_note <- if (n_over > 0) paste0(", ", comma(n_over), " transcripts >", cap, " exons not shown") else ""
+
+    p <- ggplot(epm %>% filter(n_exons <= cap), aes(x = n_exons)) +
       geom_histogram(binwidth = 1, fill = "#3574b0", color = "white", alpha = 0.85) +
+      scale_x_continuous(breaks = seq(0, cap, by = 5)) +
       labs(title = paste0(aid, " — Exons per transcript"),
-           subtitle = paste0("Median: ", median(epm$n_exons),
-                             ", single-exon: ", sum(epm$n_exons == 1),
-                             " (", round(100 * mean(epm$n_exons == 1), 1), "%)"),
+           subtitle = paste0("Median: ", med_exons,
+                             ", single-exon: ", comma(n_single),
+                             " (", pct_single, "%)",
+                             over_note),
            x = "Exon count", y = "Transcripts") + theme_report
     save_plot(p, paste0(aid, "_exons_per_tx"))
   }
@@ -237,6 +251,89 @@ for (func_path in functional_files) {
       labs(title = paste0(aid, " — Top GO terms"),
            x = NULL, y = "Occurrences") + theme_report
     save_plot(p, paste0(aid, "_top_go"), w = 9, h = 8)
+
+    # ── GO treemap by ontology ───────────────────────────────────────
+    #   Annotate GO IDs with names and ontology (BP/MF/CC) from GO.db,
+    #   then build a treemap showing top terms grouped by ontology.
+    go_all_counts <- as.data.frame(table(all_go), stringsAsFactors = FALSE)
+    names(go_all_counts) <- c("GOID", "Count")
+
+    go_annot <- tryCatch({
+      AnnotationDbi::select(GO.db,
+                            keys = go_all_counts$GOID,
+                            columns = c("TERM", "ONTOLOGY"),
+                            keytype = "GOID")
+    }, error = function(e) data.frame())
+
+    if (nrow(go_annot) > 0) {
+      go_tree <- go_all_counts %>%
+        inner_join(go_annot, by = "GOID") %>%
+        filter(!is.na(ONTOLOGY), !is.na(TERM)) %>%
+        mutate(Ontology = recode(ONTOLOGY,
+          BP = "Biological Process",
+          MF = "Molecular Function",
+          CC = "Cellular Component"
+        ))
+
+      # Top 15 per ontology for readability
+      go_tree_top <- go_tree %>%
+        group_by(Ontology) %>%
+        slice_max(order_by = Count, n = 15, with_ties = FALSE) %>%
+        ungroup()
+
+      # Truncate long term names
+      go_tree_top$label <- ifelse(
+        nchar(go_tree_top$TERM) > 40,
+        paste0(substr(go_tree_top$TERM, 1, 37), "..."),
+        go_tree_top$TERM
+      )
+
+      if (nrow(go_tree_top) > 0) {
+        p_treemap <- ggplot(go_tree_top,
+                            aes(area = Count, fill = Ontology,
+                                label = label, subgroup = Ontology)) +
+          geom_treemap(alpha = 0.85) +
+          geom_treemap_subgroup_border(color = "white", size = 2) +
+          geom_treemap_text(
+            colour = "white", place = "centre",
+            grow = FALSE, reflow = TRUE, size = 9
+          ) +
+          scale_fill_manual(values = c(
+            "Biological Process" = "#3574b0",
+            "Molecular Function" = "#e8913a",
+            "Cellular Component" = "#6a994e"
+          )) +
+          labs(
+            title = paste0(aid, " — GO term treemap"),
+            subtitle = paste0("Top 15 terms per ontology (",
+                              length(unique(all_go)), " unique GO terms total)")
+          ) +
+          theme_report +
+          theme(legend.position = "bottom",
+                plot.title = element_text(face = "bold", size = 14))
+        save_plot(p_treemap, paste0(aid, "_go_treemap"), w = 12, h = 8)
+
+        # ── Ontology composition bar ─────────────────────────────────
+        ont_summary <- go_tree %>%
+          group_by(Ontology) %>%
+          summarise(n_terms = n_distinct(GOID),
+                    total_hits = sum(Count), .groups = "drop")
+
+        p_ont <- ggplot(ont_summary, aes(x = reorder(Ontology, -n_terms), y = n_terms, fill = Ontology)) +
+          geom_col(alpha = 0.85) +
+          geom_text(aes(label = comma(n_terms)), vjust = -0.3, size = 3.5) +
+          scale_fill_manual(values = c(
+            "Biological Process" = "#3574b0",
+            "Molecular Function" = "#e8913a",
+            "Cellular Component" = "#6a994e"
+          )) +
+          labs(title = paste0(aid, " — GO ontology composition"),
+               subtitle = "Unique terms per ontology",
+               x = NULL, y = "Unique GO terms") +
+          theme_report + theme(legend.position = "none")
+        save_plot(p_ont, paste0(aid, "_go_ontology_composition"), w = 6, h = 5)
+      }
+    }
   }
 
   # Top InterPro domains
