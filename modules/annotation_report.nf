@@ -80,7 +80,7 @@ process ANNOTATION_REPORT {
         --outfile annotation_metrics.tsv
 
     # ── 2. Generate plots with R ──────────────────────────────────────────────
-    Rscript ${projectDir}/scripts/annotation_report_plots.R \
+    Rscript ${projectDir}/r_scripts/annotation_report_plots.R \
         --metrics annotation_metrics.tsv \
         --gff3s ${annotated_gff3s} \
         --gene_summaries ${gene_summaries} \
@@ -96,7 +96,7 @@ process ANNOTATION_REPORT {
         --outdir annotation_report_plots
 
     # ── 3. Assemble Markdown report ───────────────────────────────────────────
-    python3 ${projectDir}/scripts/generate_annotation_report.py \
+    python3 ${projectDir}/py_scripts/generate_annotation_report.py \
         --metrics annotation_metrics.tsv \
         --assembly_stats ${assembly_stats} \
         --repeat_tbls ${repeat_tbls} \
