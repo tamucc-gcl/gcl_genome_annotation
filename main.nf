@@ -404,11 +404,12 @@ workflow {
         .join(INFERNAL.out.infernal_gff3)
         .join(TELOMERE_ANNOTATION.out.telomere_gff3)
         .join(CENTROMERE_TO_GFF3.out.centromere_gff3)
+        .join(REPEAT_MASK.out.repeat_gff)
         .join(MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv)
         // produces: [assembly_id, braker_gff3, trnascan_gff3, infernal_gff3,
-        //            telomere_gff3, func_tsv]
+        //            telomere_gff3, centromere_gff3, repeat_gff, func_tsv]
 
-    ANNOTATE_GFF3(ch_annotate_input)
+    ANNOTATE_GFF3(ch_annotate_input) 
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────

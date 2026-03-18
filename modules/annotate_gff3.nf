@@ -2,8 +2,8 @@
 ========================================================================================
     ANNOTATE GFF3 MODULE
 ========================================================================================
-    Merge structural (BRAKER), tRNAscan, and Infernal GFF3 annotations into a
-    single unified GFF3 with:
+    Merge structural (BRAKER), tRNAscan, Infernal, telomere, centromere, and
+    repeat GFF3 annotations into a single unified GFF3 with:
       - Consistent ID namespacing ({assembly_id}_g{N}, _tRNA{N}, _ncRNA{N})
       - Functional attributes (Dbxref, product, Ontology_term, Note) on
         protein-coding mRNA features from the merged functional table
@@ -18,6 +18,9 @@
         - braker_gff3:          BRAKER3 gene models GFF3
         - trnascan_gff3:        tRNAscan-SE predictions GFF3
         - infernal_gff3:        Infernal/Rfam ncRNA predictions GFF3
+        - telomere_gff3:        tidk telomere annotations GFF3
+        - centromere_gff3:      centroAnno centromere annotations GFF3
+        - repeat_gff:           RepeatMasker repeat annotations GFF
         - functional_tsv:       Merged functional annotations TSV
                                 (from MERGE_FUNCTIONAL_ANNOTATIONS)
 
@@ -40,6 +43,8 @@ process ANNOTATE_GFF3 {
           path(trnascan_gff3),
           path(infernal_gff3),
           path(telomere_gff3),
+          path(centromere_gff3),
+          path(repeat_gff),
           path(functional_tsv)
 
     output:
@@ -54,14 +59,18 @@ process ANNOTATE_GFF3 {
     """
     #!/usr/bin/env python3
     \"\"\"
-    Merge BRAKER, tRNAscan, and Infernal GFF3s into a single annotated GFF3.
+    Merge BRAKER, tRNAscan, Infernal, telomere, centromere, and repeat GFF3s
+    into a single annotated GFF3.
 
     1. Parse & renumber BRAKER features  → {asm}_g{N}, mRNA → {asm}_g{N}.t{M}
     2. Parse & renumber tRNAscan features → {asm}_tRNA{N}
     3. Parse & renumber Infernal features → {asm}_ncRNA{N}
-    4. Load functional table, decorate mRNA features with product/Dbxref/GO/Note
-    5. Propagate best product name to parent gene feature
-    6. Write merged GFF3 sorted by seqid, start
+    4. Parse telomere GFF3               → {asm}_telo{N}
+    5. Parse centromere GFF3             → pass through (already has IDs)
+    6. Parse repeat GFF                  → pass through (RepeatMasker features)
+    7. Load functional table, decorate mRNA features with product/Dbxref/GO/Note
+    8. Propagate best product name to parent gene feature
+    9. Write merged GFF3 sorted by seqid, start
     \"\"\"
     import csv, re, sys, urllib.parse
     from collections import defaultdict, OrderedDict
@@ -106,12 +115,11 @@ process ANNOTATE_GFF3 {
     # 1. Parse BRAKER GFF3 — renumber genes and propagate new IDs to children
     # ═══════════════════════════════════════════════════════════════════════════
 
-    braker_records = []      # list of [seqid, source, type, start, end, score, strand, phase, attr_dict]
-    braker_id_map = {}       # old_id → new_id
+    braker_records = []
+    braker_id_map = {}
     braker_gene_counter = 0
-    braker_mrna_counters = defaultdict(int)  # new_gene_id → count of mRNAs
+    braker_mrna_counters = defaultdict(int)
 
-    # First pass: collect all features, identify gene/mRNA/child hierarchy
     raw_braker = []
     with open("${braker_gff3}") as fh:
         for line in fh:
@@ -127,7 +135,6 @@ process ANNOTATE_GFF3 {
     for cols8, attrs in raw_braker:
         ftype = cols8[2]
         old_id = attrs.get("ID", "")
-
         if ftype == "gene":
             braker_gene_counter += 1
             new_id = f"{ASM}_g{braker_gene_counter}"
@@ -139,7 +146,6 @@ process ANNOTATE_GFF3 {
         ftype = cols8[2]
         old_id = attrs.get("ID", "")
         parent = attrs.get("Parent", "")
-
         if ftype in ("mRNA", "transcript"):
             new_parent = braker_id_map.get(parent, parent)
             braker_mrna_counters[new_parent] += 1
@@ -158,7 +164,6 @@ process ANNOTATE_GFF3 {
             attrs["Parent"] = braker_id_map[parent]
         old_id = attrs.get("ID", "")
         if old_id:
-            # Rename child IDs to keep namespace clean
             new_parent = attrs.get("Parent", parent)
             attrs["ID"] = f"{new_parent}.{ftype}{old_id[-1] if old_id[-1].isdigit() else '1'}"
 
@@ -172,10 +177,6 @@ process ANNOTATE_GFF3 {
         if ftype in ("mRNA", "transcript"):
             mrna_to_gene[attrs["ID"]] = attrs.get("Parent", "")
 
-    # Collect old mRNA ID → new mRNA ID for functional annotation lookup
-    # We also need protein_id → new_mRNA_id mapping
-    # BRAKER protein IDs in the functional table typically match the original
-    # transcript/mRNA IDs with ".t1" suffix patterns
     old_mrna_to_new = {}
     for old_id, new_id in braker_id_map.items():
         if any(new_id.endswith(f".t{i}") for i in range(1, 100)):
@@ -234,7 +235,6 @@ process ANNOTATE_GFF3 {
                 continue
             cols = line.rstrip("\\n").split("\\t")
             if len(cols) < 9:
-                # infernal-tblout2gff.pl output is 9-column but may vary
                 continue
             attrs = parse_attributes(cols[8])
             ncrna_counter += 1
@@ -242,10 +242,9 @@ process ANNOTATE_GFF3 {
             new_id = f"{ASM}_ncRNA{ncrna_counter}"
             attrs["ID"] = new_id
 
-            # Preserve the Rfam model name as Name attribute
-            rfam_model = cols[2]  # feature column holds Rfam model name
+            rfam_model = cols[2]
             attrs["Name"] = rfam_model
-            cols[2] = "ncRNA"  # normalize feature type
+            cols[2] = "ncRNA"
 
             ncrna_records.append(cols[:8] + [attrs])
 
@@ -266,18 +265,58 @@ process ANNOTATE_GFF3 {
             attrs = parse_attributes(cols[8])
             telo_counter += 1
 
-            # Renumber with assembly-prefixed IDs
             new_id = f"{ASM}_telo{telo_counter}"
             attrs["ID"] = new_id
 
-            # Source is "tidk", feature type is "telomeric_repeat" — keep both
             telo_records.append(cols[:8] + [attrs])
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 3c. Parse centromere GFF3
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    centro_records = []
+    centro_counter = 0
+
+    with open("${centromere_gff3}") as fh:
+        for line in fh:
+            if line.startswith("#") or not line.strip():
+                continue
+            cols = line.rstrip("\\n").split("\\t")
+            if len(cols) < 9:
+                continue
+            attrs = parse_attributes(cols[8])
+            centro_counter += 1
+            # Keep existing IDs from CENTROMERE_TO_GFF3
+            centro_records.append(cols[:8] + [attrs])
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 3d. Parse repeat GFF (RepeatMasker output)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    repeat_records = []
+    repeat_counter = 0
+
+    with open("${repeat_gff}") as fh:
+        for line in fh:
+            if line.startswith("#") or not line.strip():
+                continue
+            cols = line.rstrip("\\n").split("\\t")
+            if len(cols) < 9:
+                continue
+            attrs = parse_attributes(cols[8])
+            repeat_counter += 1
+
+            # Assign assembly-namespaced IDs
+            new_id = f"{ASM}_repeat{repeat_counter}"
+            attrs["ID"] = new_id
+
+            repeat_records.append(cols[:8] + [attrs])
 
     # ═══════════════════════════════════════════════════════════════════════════
     # 4. Load functional annotations
     # ═══════════════════════════════════════════════════════════════════════════
 
-    func = {}  # protein_id → dict of functional fields
+    func = {}
     with open("${functional_tsv}") as fh:
         reader = csv.DictReader(fh, delimiter="\\t")
         for row in reader:
@@ -292,17 +331,13 @@ process ANNOTATE_GFF3 {
            3. KofamScan KO definition
            4. hypothetical protein
         \"\"\"
-        # 1. DIAMOND
         d_desc = rec.get("diamond_desc", "-").strip()
         if d_desc and d_desc != "-":
-            # Clean SwissProt descriptions: remove OS=Organism ... fields
             cleaned = re.sub(r"\\s+OS=.*", "", d_desc)
-            # Remove leading accession if present (e.g. "sp|Q9Y6K1|DNM3A_HUMAN ...")
             cleaned = re.sub(r"^\\S+\\s+", "", cleaned, count=1).strip()
             if cleaned:
                 return cleaned
 
-        # 2. eggNOG
         e_name = rec.get("eggnog_name", "-").strip()
         e_desc = rec.get("eggnog_desc", "-").strip()
         if e_name and e_name != "-" and e_desc and e_desc != "-":
@@ -312,7 +347,6 @@ process ANNOTATE_GFF3 {
         if e_name and e_name != "-":
             return e_name
 
-        # 3. KofamScan
         k_def = rec.get("kofam_def", "-").strip()
         if k_def and k_def != "-":
             return k_def
@@ -322,20 +356,17 @@ process ANNOTATE_GFF3 {
     def collect_dbxrefs(rec):
         \"\"\"Build Dbxref list from available annotations.\"\"\"
         xrefs = []
-        # DIAMOND SwissProt hit
         d_hit = rec.get("diamond_hit", "-").strip()
         if d_hit and d_hit != "-":
             xrefs.append(f"UniProtKB/Swiss-Prot:{d_hit}")
 
-        # eggNOG OGs
         e_ogs = rec.get("eggnog_OGs", "-").strip()
         if e_ogs and e_ogs != "-":
             for og in e_ogs.split(","):
-                og = og.strip().split("@")[0]  # remove @taxlevel suffix
+                og = og.strip().split("@")[0]
                 if og:
                     xrefs.append(f"eggNOG:{og}")
 
-        # KEGG KO from eggNOG
         e_ko = rec.get("eggnog_KEGG_ko", "-").strip()
         if e_ko and e_ko != "-":
             for ko in e_ko.split(","):
@@ -343,12 +374,10 @@ process ANNOTATE_GFF3 {
                 if ko.startswith("ko:"):
                     xrefs.append(f"KEGG:{ko}")
 
-        # KofamScan KO
         k_ko = rec.get("kofam_KO", "-").strip()
         if k_ko and k_ko != "-":
             xrefs.append(f"KEGG_KO:{k_ko}")
 
-        # InterProScan accessions
         ipr_acc = rec.get("ipr_accessions", "-").strip()
         if ipr_acc and ipr_acc != "-":
             for acc in ipr_acc.split(";"):
@@ -373,19 +402,16 @@ process ANNOTATE_GFF3 {
     def build_note(rec):
         \"\"\"Build a Note attribute with supplementary info.\"\"\"
         parts = []
-        # DeepSig signal peptide
         ds_type = rec.get("deepsig_type", "-").strip()
         if ds_type and ds_type != "-" and ds_type.lower() != "other":
             ds_start = rec.get("deepsig_start", "?")
             ds_end = rec.get("deepsig_end", "?")
             parts.append(f"Signal peptide ({ds_type}) {ds_start}-{ds_end}")
 
-        # CAZy
         cazy = rec.get("eggnog_CAZy", "-").strip()
         if cazy and cazy != "-":
             parts.append(f"CAZy:{cazy}")
 
-        # KEGG pathway
         kpath = rec.get("eggnog_KEGG_path", "-").strip()
         if kpath and kpath != "-":
             parts.append(f"KEGG_pathway:{kpath}")
@@ -396,16 +422,7 @@ process ANNOTATE_GFF3 {
     # 5. Decorate mRNA features with functional attributes
     # ═══════════════════════════════════════════════════════════════════════════
 
-    # Build mapping: protein_id (from functional table) → new mRNA ID
-    # BRAKER proteins typically have IDs matching the transcript/mRNA IDs
-    # The functional table uses the original BRAKER protein IDs
-    # We need to match them to our renumbered mRNA IDs
-
-    # Strategy: the functional table protein_ids are the ORIGINAL BRAKER IDs.
-    # We stored old→new in braker_id_map. Try direct lookup first, then
-    # try common BRAKER naming patterns.
-
-    gene_products = {}  # new_gene_id → best product name
+    gene_products = {}
 
     for rec_list in [braker_records]:
         for entry in rec_list:
@@ -418,57 +435,44 @@ process ANNOTATE_GFF3 {
 
             new_mrna_id = attrs["ID"]
 
-            # Find matching protein in functional table
-            # Try: original ID that mapped to this new ID
             func_rec = None
             for old_id, new_id in braker_id_map.items():
                 if new_id == new_mrna_id:
-                    # Try the old ID directly
                     if old_id in func:
                         func_rec = func[old_id]
                         break
-                    # BRAKER often uses .t1 suffix for proteins
                     for suffix in ("", ".t1", "_t1"):
                         candidate = old_id + suffix
                         if candidate in func:
                             func_rec = func[candidate]
                             break
-                    # Also try without common prefixes
                     base = old_id.rsplit(".", 1)[0] if "." in old_id else old_id
                     if base in func:
                         func_rec = func[base]
                     break
 
             if not func_rec:
-                # Fallback: try matching on the new ID pattern
-                # (unlikely to match, but worth trying)
                 continue
 
-            # Add product name
             product = get_product_name(func_rec)
             attrs["product"] = urllib.parse.quote(product, safe=" :/()-,.'")
 
-            # Add Dbxref
             xrefs = collect_dbxrefs(func_rec)
             if xrefs:
                 existing = attrs.get("Dbxref", "")
                 all_xrefs = ([existing] if existing else []) + xrefs
                 attrs["Dbxref"] = ",".join(all_xrefs)
 
-            # Add GO terms as Ontology_term
             go_terms = collect_go_terms(func_rec)
             if go_terms:
                 attrs["Ontology_term"] = ",".join(go_terms)
 
-            # Add Note
             note = build_note(func_rec)
             if note:
                 attrs["Note"] = urllib.parse.quote(note, safe=" :/()-,.'")
 
-            # Track product for gene-level propagation
             parent_gene = mrna_to_gene.get(new_mrna_id, "")
             if parent_gene:
-                # Keep best (non-hypothetical preferred)
                 current = gene_products.get(parent_gene, "hypothetical protein")
                 if current == "hypothetical protein" or product != "hypothetical protein":
                     gene_products[parent_gene] = product
@@ -487,13 +491,12 @@ process ANNOTATE_GFF3 {
     # 6. Write merged GFF3
     # ═══════════════════════════════════════════════════════════════════════════
 
-    # Collect all records with source annotation
     all_records = []
 
     for entry in braker_records:
         cols8 = list(entry[:8])
         attrs = entry[8]
-        cols8[1] = "BRAKER3"  # standardize source
+        cols8[1] = "BRAKER3"
         all_records.append(cols8 + [format_attributes(attrs)])
 
     for entry in trna_records:
@@ -511,7 +514,17 @@ process ANNOTATE_GFF3 {
     for entry in telo_records:
         cols8 = list(entry[:8])
         attrs = entry[8]
-        # Source already "tidk" from the module
+        all_records.append(cols8 + [format_attributes(attrs)])
+
+    for entry in centro_records:
+        cols8 = list(entry[:8])
+        attrs = entry[8]
+        all_records.append(cols8 + [format_attributes(attrs)])
+
+    for entry in repeat_records:
+        cols8 = list(entry[:8])
+        attrs = entry[8]
+        cols8[1] = "RepeatMasker"
         all_records.append(cols8 + [format_attributes(attrs)])
 
     # Sort by seqid, then start position
@@ -520,11 +533,15 @@ process ANNOTATE_GFF3 {
     with open(f"{ASM}.annotated.gff3", "w") as out:
         out.write("##gff-version 3\\n")
         out.write(f"# Genome annotation for {ASM}\\n")
-        out.write(f"# Sources: BRAKER3 (protein-coding), tRNAscan-SE (tRNA), Infernal/Rfam (ncRNA)\\n")
+        out.write(f"# Sources: BRAKER3 (protein-coding), tRNAscan-SE (tRNA), "
+                  f"Infernal/Rfam (ncRNA), tidk (telomeres), "
+                  f"centroAnno (centromeres), RepeatMasker (repeats)\\n")
         out.write(f"# Protein-coding genes: {braker_gene_counter}\\n")
         out.write(f"# tRNA genes: {trna_counter}\\n")
         out.write(f"# ncRNA features: {ncrna_counter}\\n")
         out.write(f"# Telomeric regions: {telo_counter}\\n")
+        out.write(f"# Centromere features: {centro_counter}\\n")
+        out.write(f"# Repeat features: {repeat_counter}\\n")
 
         current_seqid = None
         for rec in all_records:
@@ -553,7 +570,9 @@ process ANNOTATE_GFF3 {
     n_hypo = braker_gene_counter - n_annotated
     print(f"Merged GFF3: {braker_gene_counter} protein-coding genes, "
           f"{trna_counter} tRNAs, {ncrna_counter} ncRNAs, "
-          f"{telo_counter} telomeric regions", file=sys.stderr)
+          f"{telo_counter} telomeric regions, "
+          f"{centro_counter} centromere features, "
+          f"{repeat_counter} repeat features", file=sys.stderr)
     print(f"Functional annotation: {n_annotated} named, {n_hypo} hypothetical", file=sys.stderr)
     """
 

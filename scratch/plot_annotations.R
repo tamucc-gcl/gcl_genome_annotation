@@ -5,6 +5,7 @@ library(ggplot2)
 library(forcats)
 library(stringr)
 library(legendry)
+library(purrr)
 
 #---------------------------
 # input files
@@ -27,39 +28,20 @@ scaffold_df <- tibble(seqid = names(fa),
 #---------------------------
 # read gff3(s)
 #---------------------------
-telomere_gff <- import(telomere_gff_file) %>%
-  as_tibble() %>%
-  dplyr::select(seqid = seqnames,
-                start,
-                end,
-                strand,
-                source,
-                type) %>%
-  mutate(width = end - start + 1)
-
-centromere_gff <- import(centromere_gff_file) %>%
-  as_tibble() %>%
-  dplyr::select(seqid = seqnames,
-                start,
-                end,
-                strand,
-                source,
-                type) %>%
-  mutate(width = end - start + 1)
-
-repeat_gff <- import(repeat_gff_file) %>%
-  as_tibble() %>%
-  dplyr::select(seqid = seqnames,
-                start,
-                end,
-                strand,
-                source,
-                type) %>%
-  mutate(width = end - start + 1)
-
-gff_df <- bind_rows(telomere_gff,
-                    centromere_gff,
-                    repeat_gff)
+gff_df <- map_dfr(c(telomere_gff_file,
+                    centromere_gff_file,
+                    repeat_gff_file,
+                    ncrna_gff_file),
+                  
+                  ~import(.x) %>%
+                    as_tibble() %>%
+                    dplyr::select(seqid = seqnames,
+                                  start,
+                                  end,
+                                  strand,
+                                  source,
+                                  type) %>%
+                    mutate(width = end - start + 1))
 
 #---------------------------
 # keep only top N scaffolds that have annotations
@@ -86,16 +68,18 @@ ggplot() +
                linewidth = 2,
                color = "gray75") +
   # annotation blocks
-  geom_rect(data = filter(plot_gff, width > 1000 | source %in% c('tidk', 'centroAnno')),
+  geom_rect(data = filter(plot_gff, width > 1000 | 
+                            source %in% c('tidk', 'centroAnno', 'tRNAscan-SE')),
             aes(xmin = start,
                 xmax = end,
                 ymin = as.numeric(seqid) - 0.35,
                 ymax = as.numeric(seqid) + 0.35,
                 fill = interaction(source, type)),
-            color = NA, alpha = 0.5) +
+            color = NA, alpha = 1) +
   # scale_y_continuous(breaks = levels(plot_scaffolds$seqid),
   #                    labels = levels(plot_scaffolds$seqid)) +
   scale_x_continuous(labels = scales::comma_format(scale = 1/1e6, suffix = 'M')) +
+  facet_wrap( ~ source) +
   guides(fill = guide_legend_group()) +
   labs(x = "Position on scaffold",
        y = "Scaffold",
