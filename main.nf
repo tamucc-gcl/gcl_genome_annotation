@@ -432,7 +432,6 @@ workflow {
         ANNOTATE_GFF3.out.gene_summary.map { id, f -> f }.collect(),
         MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv.map { id, f -> f }.collect(),
         REPEAT_MASK.out.repeat_tbl.map { id, f -> f }.collect(),
-        REPEAT_MASK.out.repeat_tbl_full.map { id, f -> f }.collect(),
         BUSCO.out.busco.map { id, f -> f }.collect(),
         OMARK.out.omark_summary.map { id, f -> f }.collect(),
         OMARK.out.omark_detailed.map { id, f -> f }.collect(),

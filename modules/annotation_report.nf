@@ -47,7 +47,6 @@ process ANNOTATION_REPORT {
     path(gene_summaries)
     path(functional_tsvs)
     path(repeat_tbls)
-    path(repeat_tbls_full)
     path(busco_txts)
     path(omark_summaries)
     path(omark_detaileds)
@@ -70,7 +69,7 @@ process ANNOTATION_REPORT {
     mkdir -p annotation_report_plots
 
     # ── 1. Collect per-assembly metrics into a single TSV ─────────────────────
-    python3 ${projectDir}/py_scripts/collect_annotation_metrics.py \
+    python3 ${projectDir}/scripts/collect_annotation_metrics.py \
         --gff3s ${annotated_gff3s} \
         --gene_summaries ${gene_summaries} \
         --functional_tsvs ${functional_tsvs} \
@@ -80,12 +79,11 @@ process ANNOTATION_REPORT {
         --outfile annotation_metrics.tsv
 
     # ── 2. Generate plots with R ──────────────────────────────────────────────
-    Rscript ${projectDir}/r_scripts/annotation_report_plots.R \
+    Rscript ${projectDir}/scripts/annotation_report_plots.R \
         --metrics annotation_metrics.tsv \
         --gff3s ${annotated_gff3s} \
         --gene_summaries ${gene_summaries} \
         --functional_tsvs ${functional_tsvs} \
-        --repeat_tbls_full ${repeat_tbls_full} \
         --busco_txts ${busco_txts} \
         --omark_summaries ${omark_summaries} \
         --trnascan_tsvs ${trnascan_tsvs} \
@@ -96,11 +94,10 @@ process ANNOTATION_REPORT {
         --outdir annotation_report_plots
 
     # ── 3. Assemble Markdown report ───────────────────────────────────────────
-    python3 ${projectDir}/py_scripts/generate_annotation_report.py \
+    python3 ${projectDir}/scripts/generate_annotation_report.py \
         --metrics annotation_metrics.tsv \
         --assembly_stats ${assembly_stats} \
         --repeat_tbls ${repeat_tbls} \
-        --repeat_tbls_full ${repeat_tbls_full} \
         --busco_txts ${busco_txts} \
         --omark_summaries ${omark_summaries} \
         --omark_detaileds ${omark_detaileds} \

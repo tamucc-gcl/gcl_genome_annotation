@@ -27,7 +27,6 @@ option_list <- list(
   make_option("--gff3s",            type = "character"),  # space-separated
   make_option("--gene_summaries",   type = "character"),
   make_option("--functional_tsvs",  type = "character"),
-  make_option("--repeat_tbls_full", type = "character"),
   make_option("--busco_txts",       type = "character"),
   make_option("--omark_summaries",  type = "character"),
   make_option("--trnascan_tsvs",    type = "character"),
@@ -565,10 +564,84 @@ for (tg_path in telomere_gff3_files) {
 }
 
 # ============================================================================
-# CROSS-ASSEMBLY COMPARISON PLOTS
+# QUALITY ASSESSMENT PLOTS (always generated, single or multi)
+# ============================================================================
+
+# ── BUSCO stacked bar ────────────────────────────────────────────────────────
+busco_cols <- c("busco_single", "busco_duplicated", "busco_fragmented", "busco_missing")
+if (all(busco_cols %in% names(metrics))) {
+  bl <- metrics %>%
+    select(label, all_of(busco_cols)) %>%
+    pivot_longer(-label, names_to = "Cat", values_to = "Pct") %>%
+    mutate(Cat = factor(recode(Cat,
+      busco_single = "Single", busco_duplicated = "Duplicated",
+      busco_fragmented = "Fragmented", busco_missing = "Missing"),
+      levels = rev(c("Single", "Duplicated", "Fragmented", "Missing"))))
+  p <- ggplot(bl, aes(x = label, y = Pct, fill = Cat)) +
+    geom_col(alpha = 0.85) +
+    geom_text(aes(label = ifelse(Pct >= 3, paste0(round(Pct,1), "%"), "")),
+              position = position_stack(vjust = 0.5), size = 3) +
+    scale_fill_manual(values = c(Single="#3574b0", Duplicated="#6ab0e3",
+                                 Fragmented="#e8913a", Missing="#d1d5db")) +
+    labs(title = "BUSCO completeness", x = NULL, y = "%") + theme_compare
+  save_plot(p, "C_busco", w = max(6, 3 + n_distinct(metrics$label) * 1.5))
+}
+
+# ── OMArk completeness stacked bar ───────────────────────────────────────────
+oc <- c("omark_single", "omark_dup_unexpected", "omark_dup_expected", "omark_missing")
+if (all(oc %in% names(metrics))) {
+  ol <- metrics %>%
+    select(label, all_of(oc)) %>%
+    pivot_longer(-label, names_to = "Cat", values_to = "Pct") %>%
+    mutate(Cat = factor(recode(Cat,
+      omark_single = "Single", omark_dup_unexpected = "Dup. (unexpected)",
+      omark_dup_expected = "Dup. (expected)", omark_missing = "Missing"),
+      levels = rev(c("Single", "Dup. (unexpected)", "Dup. (expected)", "Missing"))))
+  p <- ggplot(ol, aes(x = label, y = Pct, fill = Cat)) +
+    geom_col(alpha = 0.85) +
+    geom_text(aes(label = ifelse(Pct >= 3, paste0(round(Pct,1), "%"), "")),
+              position = position_stack(vjust = 0.5), size = 3) +
+    scale_fill_manual(values = c(Single="#3574b0", `Dup. (unexpected)`="#e8913a",
+                                 `Dup. (expected)`="#6ab0e3", Missing="#d1d5db")) +
+    labs(title = "OMArk — conserved gene completeness", x = NULL, y = "%") + theme_compare
+  save_plot(p, "C_omark_completeness", w = max(6, 3 + n_distinct(metrics$label) * 1.5))
+}
+
+# ── OMArk consistency stacked bar ────────────────────────────────────────────
+oc2 <- c("omark_consistent", "omark_inconsistent", "omark_contaminant", "omark_unknown")
+if (all(oc2 %in% names(metrics))) {
+  ol2 <- metrics %>%
+    select(label, all_of(oc2)) %>%
+    pivot_longer(-label, names_to = "Cat", values_to = "Pct") %>%
+    mutate(Cat = factor(recode(Cat,
+      omark_consistent = "Consistent", omark_inconsistent = "Inconsistent",
+      omark_contaminant = "Contaminant", omark_unknown = "Unknown"),
+      levels = rev(c("Consistent", "Inconsistent", "Contaminant", "Unknown"))))
+  p <- ggplot(ol2, aes(x = label, y = Pct, fill = Cat)) +
+    geom_col(alpha = 0.85) +
+    geom_text(aes(label = ifelse(Pct >= 3, paste0(round(Pct,1), "%"), "")),
+              position = position_stack(vjust = 0.5), size = 3) +
+    scale_fill_manual(values = c(Consistent="#6a994e", Inconsistent="#e8913a",
+                                 Contaminant="#dc2626", Unknown="#9ca3af")) +
+    labs(title = "OMArk — proteome consistency", x = NULL, y = "%") + theme_compare
+  save_plot(p, "C_omark_consistency", w = max(6, 3 + n_distinct(metrics$label) * 1.5))
+}
+
+# ── Repeat masking bar (always generated) ────────────────────────────────────
+if ("repeat_masked_pct" %in% names(metrics)) {
+  p <- ggplot(metrics, aes(x = label, y = repeat_masked_pct)) +
+    geom_col(fill = "#8b5e3c", alpha = 0.85) +
+    geom_text(aes(label = paste0(round(repeat_masked_pct, 1), "%")), vjust = -0.3, size = 3.5) +
+    scale_y_continuous(labels = comma) +
+    labs(title = "Repeat masking", x = NULL, y = "% genome masked") + theme_compare
+  save_plot(p, "C_repeat_masking", w = max(6, 3 + n_distinct(metrics$label) * 1.5))
+}
+
+# ============================================================================
+# CROSS-ASSEMBLY COMPARISON PLOTS (multi only)
 # ============================================================================
 if (nrow(metrics) < 2) {
-  message("Single assembly — skipping comparison plots.")
+  message("Single assembly — skipping multi-comparison plots.")
 } else {
 
   # ── C1. Feature counts ───────────────────────────────────────────────
