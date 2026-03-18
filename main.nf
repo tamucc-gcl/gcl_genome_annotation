@@ -146,6 +146,7 @@ include { DEEPSIG; MERGE_DEEPSIG } from './modules/deepsig.nf'
 // ── Annotation merging ─────────────────────────────
 include { MERGE_FUNCTIONAL_ANNOTATIONS } from './modules/merge_functional_annotations.nf'
 include { ANNOTATE_GFF3 } from './modules/annotate_gff3.nf'
+include { EXTRACT_SEQUENCES } from './modules/extractSequences.nf'
 
 /*
 ========================================================================================
@@ -410,6 +411,13 @@ workflow {
     //            telomere_gff3, centromere_gff3, repeat_gff, func_tsv]
 
     ANNOTATE_GFF3(ch_annotate_input)
+
+    // ── Step 19: Get relevant sequences with annotations ───────
+    ch_extract_input = ANNOTATE_GFF3.out.annotated_gff3
+        .join(ch_assemblies_filtered, by: 0)
+        // produces: [assembly_id, annotated_gff3, filtered_assembly]
+
+    EXTRACT_SEQUENCES(ch_extract_input)
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────
