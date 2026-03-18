@@ -389,10 +389,8 @@ def main():
         md.append("\n")
     md.append(img(pd, "A9_telomere_positions.png"))
 
-    md.append("""
-> **Note:** The tidk telomere density SVG plot is available in the
-> `telomeres/` output directory for a per-scaffold visual.
-""")
+    md.append("### Telomere density along scaffolds\n")
+    md.append(img(pd, "A9b_telomere_density.png"))
 
     md.append("### Centromere annotation\n")
     md.append(f"Total centromere features (centroAnno): **{len(centro_f)}**\n\n")
@@ -417,7 +415,78 @@ def main():
     md.append(img(pd, "B1_busco_completeness.png"))
 
     md.append("### OMArk assessment\n")
+
+    # Parse OMArk summary compact format
+    # Completeness: S:59.32%,D:24.39%[U:24.29%,E:0.10%],M:16.29%
+    # Consistency:  A:62.16%[P:11.70%,...],I:6.80%[...],C:0.00%[...],U:31.04%
+    omark_clade = ""
+    omark_n_hogs = ""
+    omark_n_proteins = ""
+    omark_comp_line = ""
+    omark_cons_line = ""
+
+    for line in omark_summary_text.strip().splitlines():
+        line_s = line.strip().lstrip("#").strip()
+        if "selected clade was" in line_s:
+            omark_clade = line_s.split("was")[-1].strip()
+        if "Number of conserved HOGs" in line_s:
+            m = re.search(r"(\d[\d,]*)", line_s)
+            if m:
+                omark_n_hogs = m.group(1)
+        if "there are" in line_s.lower() and "proteins" in line_s.lower():
+            m = re.search(r"(\d[\d,]*)\s+proteins", line_s)
+            if m:
+                omark_n_proteins = m.group(1)
+        # Completeness percentage line: starts with S: and contains %
+        if line_s.startswith("S:") and "%" in line_s:
+            omark_comp_line = line_s
+        # Consistency percentage line: starts with A: and contains %
+        if line_s.startswith("A:") and "%" in line_s:
+            omark_cons_line = line_s
+
+    def extract_omark_pct(text, key):
+        """Extract percentage value after key like 'S:' from OMArk compact line."""
+        m = re.search(re.escape(key) + r"([\d.]+)%", text)
+        return m.group(1) if m else "—"
+
+    md.append("#### Completeness (conserved gene content)\n\n")
+    md.append(img(pd, "B1b_omark_completeness.png"))
+
+    if omark_comp_line:
+        md.append(f"""
+| Metric | Value |
+|:---|---:|
+| Reference clade | {omark_clade} |
+| Conserved HOGs assessed | {omark_n_hogs} |
+| Single-copy | {extract_omark_pct(omark_comp_line, "S:")}% |
+| Duplicated (total) | {extract_omark_pct(omark_comp_line, "D:")}% |
+| — Unexpected duplications | {extract_omark_pct(omark_comp_line, "U:")}% |
+| — Expected duplications | {extract_omark_pct(omark_comp_line, "E:")}% |
+| Missing | {extract_omark_pct(omark_comp_line, "M:")}% |
+""")
+
+    md.append("#### Consistency (proteome quality)\n\n")
+    md.append(img(pd, "B1c_omark_consistency.png"))
+
+    if omark_cons_line:
+        md.append(f"""
+| Metric | Value |
+|:---|---:|
+| Total proteins assessed | {omark_n_proteins} |
+| Consistent | {extract_omark_pct(omark_cons_line, "A:")}% |
+| — Partial hits | {extract_omark_pct(omark_cons_line, "P:")}% |
+| — Fragmented | {extract_omark_pct(omark_cons_line, "F:")}% |
+| Inconsistent | {extract_omark_pct(omark_cons_line, "I:")}% |
+| Contaminant | {extract_omark_pct(omark_cons_line, "C:")}% |
+| Unknown | {extract_omark_pct(omark_cons_line, "U:")}% |
+""")
+
+    md.append("#### Consistent gene quality breakdown\n")
+    md.append(img(pd, "B1d_omark_consistent_quality.png"))
+
+    md.append("<details>\n<summary>OMArk full summary</summary>\n\n")
     md.append("```\n" + omark_summary_text.strip() + "\n```\n")
+    md.append("</details>\n")
 
     md.append("<details>\n<summary>OMArk detailed output</summary>\n\n")
     md.append("```\n" + omark_detailed_text.strip() + "\n```\n")
@@ -591,6 +660,65 @@ based on the statistics above.
             f"- **Low DIAMOND/SwissProt coverage ({pct(n_dia, n_func)}):** "
             "Consider supplementing with TrEMBL or NR database for broader "
             "homology detection. This mainly affects product name assignment."
+        )
+
+    # Flag: OMArk high unknown rate
+    omark_unknown_pct = 0.0
+    if omark_cons_line:
+        m = re.search(r"U:([\d.]+)%", omark_cons_line)
+        if m:
+            omark_unknown_pct = float(m.group(1))
+    if omark_unknown_pct > 25:
+        flags.append(
+            f"- **High OMArk unknown rate ({omark_unknown_pct:.1f}%):** "
+            "A large fraction of predicted proteins have no similarity to "
+            "known gene families. This suggests possible over-prediction "
+            "by BRAKER3 (spurious gene models) or highly divergent/orphan "
+            "genes. Consider filtering with TSEBRA or increasing BRAKER3 "
+            "evidence stringency."
+        )
+
+    # Flag: OMArk high inconsistent rate
+    omark_incon_pct = 0.0
+    if omark_cons_line:
+        m = re.search(r"I:([\d.]+)%", omark_cons_line)
+        if m:
+            omark_incon_pct = float(m.group(1))
+    if omark_incon_pct > 5:
+        flags.append(
+            f"- **Elevated OMArk inconsistent rate ({omark_incon_pct:.1f}%):** "
+            "These proteins match gene families from unexpected lineages. "
+            "Check for residual contamination (FCS screen), or transposable "
+            "element-derived ORFs that BRAKER3 predicted as genes."
+        )
+
+    # Flag: OMArk high fragmented rate within consistent
+    omark_frag_pct = 0.0
+    if omark_cons_line:
+        m = re.search(r"F:([\d.]+)%", omark_cons_line)
+        if m:
+            omark_frag_pct = float(m.group(1))
+    if omark_frag_pct > 10:
+        flags.append(
+            f"- **High OMArk fragmented gene rate ({omark_frag_pct:.1f}%):** "
+            "Many consistent proteins are shorter than expected (<50% of "
+            "family median). This may indicate truncated gene models from "
+            "assembly gaps, aggressive filtering, or incomplete UTR "
+            "prediction. Review assembly contiguity in fragmented regions."
+        )
+
+    # Flag: OMArk high unexpected duplication
+    omark_unexp_dup = 0.0
+    if omark_comp_line:
+        m = re.search(r"U:([\d.]+)%", omark_comp_line)
+        if m:
+            omark_unexp_dup = float(m.group(1))
+    if omark_unexp_dup > 15:
+        flags.append(
+            f"- **High unexpected duplication ({omark_unexp_dup:.1f}% of conserved HOGs):** "
+            "This can indicate residual haplotig duplication in the assembly, "
+            "or genuine lineage-specific expansions. Cross-reference with "
+            "BUSCO duplicated % and Hi-C contact maps to distinguish."
         )
 
     # Flag: repeat masking percentage

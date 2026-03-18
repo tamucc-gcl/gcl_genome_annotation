@@ -29,7 +29,7 @@
         - trnascan_tsv:         tRNAscan-SE tabular output
         - infernal_tblout:      Infernal tblout (merged)
         - telomere_gff3:        Telomere annotations GFF3
-        - telomere_svg:         Telomere density plot (tidk)
+        - telomere_tsv:         tidk windowed telomere counts TSV
         - centromere_gff3:      Centromere annotations GFF3
 
     Outputs:
@@ -57,6 +57,7 @@ process ANNOTATION_REPORT {
           path(repeat_landscape),
           path(repeat_divsum),
           path(busco_txt),
+          path(omark_plot),
           path(omark_summary),
           path(omark_detailed),
           path(agat_stats),
@@ -81,7 +82,7 @@ process ANNOTATION_REPORT {
     mkdir -p ${assembly_id}_annotation_plots
 
     # ── 1. Generate plots with R ──────────────────────────────────────────────
-    Rscript ${projectDir}/r_scripts/annotation_report_plots.R \
+    Rscript ${projectDir}/scripts/annotation_report_plots.R \
         --assembly_id ${assembly_id} \
         --gff3 ${annotated_gff3} \
         --gene_summary ${gene_summary} \
@@ -90,14 +91,17 @@ process ANNOTATION_REPORT {
         --repeat_tbl_full ${repeat_tbl_full} \
         --repeat_divsum ${repeat_divsum} \
         --busco_txt ${busco_txt} \
+        --omark_summary ${omark_summary} \
+        --omark_detailed ${omark_detailed} \
         --trnascan_tsv ${trnascan_tsv} \
         --infernal_tblout ${infernal_tblout} \
         --telomere_gff3 ${telomere_gff3} \
+        --telomere_tsv ${telomere_tsv} \
         --centromere_gff3 ${centromere_gff3} \
         --outdir ${assembly_id}_annotation_plots
 
     # ── 2. Assemble Markdown report ───────────────────────────────────────────
-    python3 ${projectDir}/py_scripts/generate_annotation_report.py \
+    python3 ${projectDir}/scripts/generate_annotation_report.py \
         --assembly_id ${assembly_id} \
         --assembly_stats ${assembly_stats} \
         --gff3 ${annotated_gff3} \

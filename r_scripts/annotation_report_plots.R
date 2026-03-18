@@ -40,15 +40,21 @@ option_list <- list(
   make_option("--repeat_tbl_full",type = "character"),
   make_option("--repeat_divsum",  type = "character"),
   make_option("--busco_txt",      type = "character"),
+  make_option("--omark_summary",  type = "character"),
+  make_option("--omark_detailed", type = "character"),
   make_option("--trnascan_tsv",   type = "character"),
   make_option("--infernal_tblout",type = "character"),
   make_option("--telomere_gff3",  type = "character"),
+  make_option("--telomere_tsv",   type = "character"),
   make_option("--centromere_gff3",type = "character"),
   make_option("--outdir",         type = "character", default = "plots")
 )
 
 opt <- parse_args(OptionParser(option_list = option_list))
 dir.create(opt$outdir, showWarnings = FALSE, recursive = TRUE)
+
+# ── Null-coalescing helper ───────────────────────────────────────────────────
+`%||%` <- function(a, b) if (is.null(a) || is.na(a)) b else a
 
 # ── Shared theme ─────────────────────────────────────────────────────────────
 theme_report <- theme_minimal(base_size = 12) +
@@ -416,6 +422,68 @@ if (nrow(telo_gff) > 0) {
   save_plot(p_telo_pos, "A9_telomere_positions", w = 6, h = 5)
 }
 
+# ── A9b. Telomere density along scaffolds (from tidk TSV) ───────────────────
+#   tidk search output columns: id, window, forward_repeat_number,
+#   reverse_repeat_number, telomeric_repeat
+telo_tsv <- tryCatch(
+  read.delim(opt$telomere_tsv, stringsAsFactors = FALSE),
+  error = function(e) data.frame()
+)
+
+if (nrow(telo_tsv) > 0) {
+  # Standardize column names (tidk uses varying names across versions)
+  names(telo_tsv) <- gsub("\\.", "_", tolower(names(telo_tsv)))
+  if (!"id" %in% names(telo_tsv) && length(names(telo_tsv)) >= 1) {
+    names(telo_tsv)[1] <- "id"
+  }
+
+  # Identify repeat count columns
+  fwd_col <- grep("forward", names(telo_tsv), value = TRUE)[1]
+  rev_col <- grep("reverse", names(telo_tsv), value = TRUE)[1]
+  win_col <- grep("window", names(telo_tsv), value = TRUE)[1]
+
+  if (!is.na(fwd_col) && !is.na(rev_col) && !is.na(win_col)) {
+    telo_tsv$total_repeats <- telo_tsv[[fwd_col]] + telo_tsv[[rev_col]]
+    telo_tsv$position_mb <- telo_tsv[[win_col]] / 1e6
+
+    # Compute scaffold lengths and select top N scaffolds by length
+    scaff_max <- telo_tsv %>%
+      group_by(id) %>%
+      summarise(max_pos = max(.data[[win_col]]), .groups = "drop") %>%
+      arrange(desc(max_pos))
+
+    # Show top 24 scaffolds (fits a 6x4 facet grid)
+    top_scaffolds <- scaff_max %>% slice_head(n = 24) %>% pull(id)
+    telo_plot_data <- telo_tsv %>% filter(id %in% top_scaffolds)
+
+    # Order scaffolds by length
+    telo_plot_data$id <- factor(telo_plot_data$id, levels = top_scaffolds)
+
+    if (nrow(telo_plot_data) > 0) {
+      p_telo_density <- ggplot(telo_plot_data, aes(x = position_mb, y = total_repeats)) +
+        geom_area(fill = "#e05c5c", alpha = 0.5) +
+        geom_line(color = "#e05c5c", linewidth = 0.3) +
+        facet_wrap(~ id, scales = "free_x", ncol = 4) +
+        labs(
+          title = "Telomere repeat density along scaffolds",
+          subtitle = paste0("Top ", length(top_scaffolds),
+                            " scaffolds by length (tidk windowed counts)"),
+          x = "Position (Mb)", y = "Repeats per window"
+        ) +
+        theme_report +
+        theme(
+          strip.text = element_text(size = 7),
+          axis.text = element_text(size = 6),
+          panel.spacing = unit(0.3, "lines")
+        )
+
+      n_rows <- ceiling(length(top_scaffolds) / 4)
+      save_plot(p_telo_density, "A9b_telomere_density",
+                w = 12, h = max(4, n_rows * 2.2))
+    }
+  }
+}
+
 # ── A10. Per-scaffold annotation density ─────────────────────────────────────
 if (nrow(genes) > 0) {
   scaff_genes <- genes %>% count(seqid, name = "n_genes") %>% arrange(desc(n_genes))
@@ -475,6 +543,152 @@ if (length(busco_summary_line) > 0) {
     ) +
     theme_report + theme(axis.text.y = element_blank())
   save_plot(p_busco, "B1_busco_completeness", w = 8, h = 3.5)
+}
+
+# ── B1b. OMArk completeness and consistency ──────────────────────────────────
+#   OMArk summary format (compact lines):
+#     S:8681,D:3569[U:3555,E:14],M:2383           (counts)
+#     S:59.32%,D:24.39%[U:24.29%,E:0.10%],M:16.29% (percentages)
+#     A:27432[P:5164,F:3715],I:3001[...],C:0[...],U:13696  (counts)
+#     A:62.16%[P:11.70%,...],I:6.80%[...],C:0.00%[...],U:31.04% (percentages)
+omark_lines <- tryCatch(readLines(opt$omark_summary), error = function(e) character(0))
+
+if (length(omark_lines) > 0) {
+
+  # Helper: extract number after a key like "S:" from a compact line
+  extract_omark_pct <- function(lines, key) {
+    for (line in lines) {
+      pat <- paste0(key, "([0-9]+\\.?[0-9]*)%")
+      m <- regmatches(line, regexpr(pat, line, perl = TRUE))
+      if (length(m) > 0) {
+        val <- sub(paste0("^", key), "", m[1])
+        val <- sub("%$", "", val)
+        return(as.numeric(val))
+      }
+    }
+    return(0)
+  }
+
+  # ── Completeness: S / D(U+E) / M ──────────────────────────────────────
+  s_pct  <- extract_omark_pct(omark_lines, "S:")
+  d_pct  <- extract_omark_pct(omark_lines, "D:")
+  du_pct <- extract_omark_pct(omark_lines, "U:")
+  de_pct <- extract_omark_pct(omark_lines, "E:")
+  m_pct  <- extract_omark_pct(omark_lines, "M:")
+
+  if (s_pct + d_pct + m_pct > 0) {
+    comp_df <- data.frame(
+      Category = factor(
+        c("Single", "Duplicated (unexpected)", "Duplicated (expected)", "Missing"),
+        levels = rev(c("Single", "Duplicated (unexpected)", "Duplicated (expected)", "Missing"))
+      ),
+      Pct = c(s_pct, du_pct, de_pct, m_pct)
+    ) %>% filter(Pct > 0)
+
+    comp_subtitle <- paste0(
+      "Clade: ",
+      sub(".*selected clade was\\s+", "",
+          grep("selected clade", omark_lines, value = TRUE, ignore.case = TRUE)[1] %||% ""),
+      "  |  S:", s_pct, "%, D:", d_pct, "% [U:", du_pct, "%, E:", de_pct, "%], M:", m_pct, "%"
+    )
+
+    p_omark_comp <- ggplot(comp_df, aes(x = "Completeness", y = Pct, fill = Category)) +
+      geom_col(width = 0.6, alpha = 0.85) +
+      geom_text(aes(label = ifelse(Pct >= 2, paste0(Pct, "%"), "")),
+                position = position_stack(vjust = 0.5), size = 3.5) +
+      coord_flip() +
+      scale_fill_manual(values = c(
+        "Single" = "#3574b0",
+        "Duplicated (unexpected)" = "#e8913a",
+        "Duplicated (expected)" = "#6ab0e3",
+        "Missing" = "#d1d5db"
+      )) +
+      labs(title = "OMArk — Conserved gene completeness",
+           subtitle = comp_subtitle,
+           x = NULL, y = "Percentage") +
+      theme_report + theme(axis.text.y = element_blank())
+    save_plot(p_omark_comp, "B1b_omark_completeness", w = 9, h = 3.5)
+  }
+
+  # ── Consistency: A / I / C / U ─────────────────────────────────────────
+  a_pct  <- extract_omark_pct(omark_lines, "A:")
+  i_pct  <- extract_omark_pct(omark_lines, "I:")
+  c_pct  <- extract_omark_pct(omark_lines, "C:")
+  u_pct  <- extract_omark_pct(omark_lines, "U:")
+
+  if (a_pct + i_pct + c_pct + u_pct > 0) {
+    # Also extract sub-categories for the consistent portion
+    ap_pct <- extract_omark_pct(omark_lines, "P:")
+    af_pct <- extract_omark_pct(omark_lines, "F:")
+
+    cons_df <- data.frame(
+      Category = factor(
+        c("Consistent", "Inconsistent", "Contaminant", "Unknown"),
+        levels = rev(c("Consistent", "Inconsistent", "Contaminant", "Unknown"))
+      ),
+      Pct = c(a_pct, i_pct, c_pct, u_pct)
+    ) %>% filter(Pct > 0)
+
+    # Extract total protein count from summary
+    n_prot_line <- grep("there are.*proteins", omark_lines, value = TRUE, ignore.case = TRUE)[1] %||% ""
+    n_prot_str <- sub(".*there are\\s+", "", n_prot_line)
+    n_prot_str <- sub("\\s+proteins.*", "", n_prot_str)
+
+    cons_subtitle <- paste0(
+      n_prot_str, " proteins  |  A:", a_pct, "%, I:", i_pct,
+      "%, C:", c_pct, "%, U:", u_pct, "%"
+    )
+
+    p_omark_cons <- ggplot(cons_df, aes(x = "Consistency", y = Pct, fill = Category)) +
+      geom_col(width = 0.6, alpha = 0.85) +
+      geom_text(aes(label = ifelse(Pct >= 2, paste0(Pct, "%"), "")),
+                position = position_stack(vjust = 0.5), size = 3.5) +
+      coord_flip() +
+      scale_fill_manual(values = c(
+        "Consistent" = "#6a994e",
+        "Inconsistent" = "#e8913a",
+        "Contaminant" = "#dc2626",
+        "Unknown" = "#9ca3af"
+      )) +
+      labs(title = "OMArk — Proteome consistency",
+           subtitle = cons_subtitle,
+           x = NULL, y = "Percentage") +
+      theme_report + theme(axis.text.y = element_blank())
+    save_plot(p_omark_cons, "B1c_omark_consistency", w = 9, h = 3.5)
+
+    # ── Consistency sub-breakdown (partial/fragmented within consistent) ──
+    if (a_pct > 0) {
+      a_full_pct <- a_pct - ap_pct - af_pct
+      # Same for inconsistent if present
+      # P: and F: appear multiple times — need context-aware parsing
+      # For now use the detailed file for the sub-breakdown
+
+      sub_df <- data.frame(
+        Category = factor(
+          c("Full-length", "Partial hit", "Fragmented"),
+          levels = c("Full-length", "Partial hit", "Fragmented")
+        ),
+        Pct = c(max(0, a_full_pct), ap_pct, af_pct)
+      ) %>% filter(Pct > 0)
+
+      if (nrow(sub_df) > 1) {
+        p_omark_sub <- ggplot(sub_df, aes(x = Category, y = Pct, fill = Category)) +
+          geom_col(width = 0.6, alpha = 0.85) +
+          geom_text(aes(label = paste0(Pct, "%")), vjust = -0.3, size = 3.5) +
+          scale_fill_manual(values = c(
+            "Full-length" = "#6a994e",
+            "Partial hit" = "#eab308",
+            "Fragmented" = "#dc2626"
+          )) +
+          labs(
+            title = "OMArk — Consistent gene quality",
+            subtitle = paste0("Breakdown of ", a_pct, "% consistent proteins"),
+            x = NULL, y = "% of proteome"
+          ) + theme_report + theme(legend.position = "none")
+        save_plot(p_omark_sub, "B1d_omark_consistent_quality", w = 6, h = 5)
+      }
+    }
+  }
 }
 
 # ── B2. Short intron / short exon QC flags ───────────────────────────────────

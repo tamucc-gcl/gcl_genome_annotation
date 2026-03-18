@@ -441,7 +441,7 @@ workflow {
         .join(tRNASCAN.out.trnascan_tsv)
         .join(INFERNAL.out.infernal_tblout)
         .join(TELOMERE_ANNOTATION.out.telomere_gff3)
-        .join(TELOMERE_ANNOTATION.out.telomere_plot)
+        .join(TELOMERE_ANNOTATION.out.telomere_tsv)
         .join(CENTROMERE_TO_GFF3.out.centromere_gff3)
 
     ANNOTATION_REPORT(ch_report_input)
