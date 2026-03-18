@@ -1,4 +1,60 @@
 #!/usr/bin/env Rscript
+# ── Per-assembly: per-scaffold repeat masking percentage ─────────────────────
+for (gff_path in gff3_files) {
+  aid <- infer_id(gff_path, c(".annotated.gff3"))
+  gff <- tryCatch(parse_gff3(gff_path), error = function(e) data.frame())
+  if (nrow(gff) == 0) next
+
+  repeats <- gff %>% filter(source == "RepeatMasker")
+  if (nrow(repeats) == 0) next
+
+  # Calculate total masked bp per scaffold
+  masked_per_scaff <- repeats %>%
+    group_by(seqid) %>%
+    summarise(masked_bp = sum(length), .groups = "drop")
+
+  # Get scaffold lengths from gene/repeat coordinates (max end per scaffold)
+  all_features <- gff
+  scaff_lens <- all_features %>%
+    group_by(seqid) %>%
+    summarise(scaff_len = max(end), .groups = "drop")
+
+  scaff_mask <- masked_per_scaff %>%
+    inner_join(scaff_lens, by = "seqid") %>%
+    mutate(pct_masked = 100 * masked_bp / scaff_len) %>%
+    filter(scaff_len >= 100000) %>%  # only scaffolds >= 100 kb
+    arrange(desc(scaff_len))
+
+  if (nrow(scaff_mask) == 0) next
+
+  # Order by scaffold size (largest first)
+  scaff_mask$seqid <- factor(scaff_mask$seqid, levels = rev(scaff_mask$seqid))
+
+  # Truncate scaffold names if too long
+  scaff_mask$label <- ifelse(nchar(as.character(scaff_mask$seqid)) > 25,
+                              paste0(substr(as.character(scaff_mask$seqid), 1, 22), "..."),
+                              as.character(scaff_mask$seqid))
+  scaff_mask$label <- factor(scaff_mask$label, levels = rev(scaff_mask$label))
+
+  # Size label for subtitle
+  size_label <- paste0(comma(scaff_mask$scaff_len[1]), " bp largest, ",
+                       nrow(scaff_mask), " scaffolds >= 100 kb")
+
+  n_scaff <- nrow(scaff_mask)
+  plot_h <- max(5, min(20, n_scaff * 0.3 + 2))
+
+  p <- ggplot(scaff_mask, aes(x = label, y = pct_masked)) +
+    geom_col(fill = "#8b5e3c", alpha = 0.85) +
+    geom_text(aes(label = paste0(round(pct_masked, 1), "%")),
+              hjust = -0.1, size = 2.5) +
+    coord_flip() +
+    scale_y_continuous(limits = c(0, 100), labels = function(x) paste0(x, "%")) +
+    labs(title = paste0(aid, " — Repeat masking per scaffold"),
+         subtitle = size_label,
+         x = NULL, y = "% scaffold masked") + theme_report
+  save_plot(p, paste0(aid, "_repeat_masking_per_scaffold"), w = 10, h = plot_h)
+}
+
 # ============================================================================
 # annotation_report_plots.R
 # ============================================================================
