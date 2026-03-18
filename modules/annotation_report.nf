@@ -70,7 +70,7 @@ process ANNOTATION_REPORT {
     mkdir -p annotation_report_plots
 
     # ── 1. Collect per-assembly metrics into a single TSV ─────────────────────
-    python3 ${projectDir}/scripts/collect_annotation_metrics.py \
+    python3 ${projectDir}/py_scripts/collect_annotation_metrics.py \
         --gff3s ${annotated_gff3s} \
         --gene_summaries ${gene_summaries} \
         --functional_tsvs ${functional_tsvs} \
