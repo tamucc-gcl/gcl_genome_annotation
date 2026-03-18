@@ -21,6 +21,9 @@ suppressPackageStartupMessages({
   library(AnnotationDbi)
 })
 
+# Restore dplyr::select as the default after AnnotationDbi masks it
+select <- dplyr::select
+
 # ── CLI ──────────────────────────────────────────────────────────────────────
 option_list <- list(
   make_option("--metrics",          type = "character"),
