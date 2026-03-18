@@ -102,32 +102,35 @@ def metrics_table(aids, met, fields):
     return table(header, data)
 
 
-def plot_grid(aids, pd, filename_template):
-    """Render plots in a markdown table with one column per assembly."""
-    header = [f"`{a}`" for a in aids]
+def plot_grid(aids, pd, label, filename_template):
+    """Single row of plots in a table with one column per assembly."""
+    header = [""] + [f"`{a}`" for a in aids]
     imgs = []
     for a in aids:
-        i = img(pd, filename_template.format(aid=a))
+        fn = filename_template.format(aid=a) + ".png"
+        i = img(pd, fn)
         imgs.append(i if i else "—")
     lines = []
     lines.append("| " + " | ".join(header) + " |")
-    lines.append("|" + "|".join("---" for _ in aids) + "|")
-    lines.append("| " + " | ".join(imgs) + " |")
+    lines.append("|:---|" + "|".join("---" for _ in aids) + "|")
+    lines.append("| " + label + " | " + " | ".join(imgs) + " |")
     return "\n".join(lines) + "\n"
 
 
-def plot_grid_multi(aids, pd, filename_templates):
-    """Multiple rows of plots in a table, one column per assembly."""
-    header = [f"`{a}`" for a in aids]
+def plot_grid_multi(aids, pd, rows):
+    """Multiple rows of plots in a table. rows = [(label, template), ...].
+    Each template uses {aid} placeholder, .png appended automatically."""
+    header = [""] + [f"`{a}`" for a in aids]
     lines = []
     lines.append("| " + " | ".join(header) + " |")
-    lines.append("|" + "|".join("---" for _ in aids) + "|")
-    for tmpl in filename_templates:
+    lines.append("|:---|" + "|".join("---" for _ in aids) + "|")
+    for label, tmpl in rows:
         imgs = []
         for a in aids:
-            i = img(pd, tmpl.format(aid=a))
+            fn = tmpl.format(aid=a) + ".png"
+            i = img(pd, fn)
             imgs.append(i if i else "—")
-        lines.append("| " + " | ".join(imgs) + " |")
+        lines.append("| " + label + " | " + " | ".join(imgs) + " |")
     return "\n".join(lines) + "\n"
 
 
@@ -205,10 +208,10 @@ def main():
     # ═══════════════════════════════════════════════════════════════════════
     W.append("---\n## 2. Gene Model Structure\n")
     W.append(plot_grid_multi(aids, pd, [
-        "{aid}_gene_length_dist",
-        "{aid}_exons_per_tx",
-        "{aid}_intron_qc",
-        "{aid}_genes_per_scaffold",
+        ("Gene length distribution",  "{aid}_gene_length_dist"),
+        ("Exons per transcript",      "{aid}_exons_per_tx"),
+        ("Intron length QC",          "{aid}_intron_qc"),
+        ("Genes per scaffold",        "{aid}_genes_per_scaffold"),
     ]))
     W.append("")
 
@@ -223,7 +226,7 @@ def main():
     ]))
     W.append("")
 
-    W.append(plot_grid(aids, pd, "{aid}_repeat_masking_per_scaffold"))
+    W.append(plot_grid(aids, pd, "Per-scaffold masking", "{aid}_repeat_masking_per_scaffold"))
     W.append("")
 
     # Per-assembly compact summary
@@ -253,8 +256,8 @@ def main():
     W.append("")
 
     W.append(plot_grid_multi(aids, pd, [
-        "{aid}_trna_isotypes",
-        "{aid}_ncrna_rfam",
+        ("tRNA isotypes",    "{aid}_trna_isotypes"),
+        ("Rfam families",    "{aid}_ncrna_rfam"),
     ]))
     W.append("")
 
@@ -269,8 +272,8 @@ def main():
     W.append("")
 
     W.append(plot_grid_multi(aids, pd, [
-        "{aid}_telomere_positions",
-        "{aid}_telomere_density",
+        ("Telomere positions",     "{aid}_telomere_positions"),
+        ("Telomere density",       "{aid}_telomere_density"),
     ]))
     W.append("")
 
@@ -428,13 +431,13 @@ def main():
 
     W.append("### Details\n")
     W.append(plot_grid_multi(aids, pd, [
-        "{aid}_functional_coverage",
-        "{aid}_top_products",
-        "{aid}_top_go",
-        "{aid}_go_treemap",
-        "{aid}_go_ontology_composition",
-        "{aid}_top_kegg",
-        "{aid}_top_ipr",
+        ("Tool coverage",          "{aid}_functional_coverage"),
+        ("Top products",           "{aid}_top_products"),
+        ("Top GO terms",           "{aid}_top_go"),
+        ("GO treemap",             "{aid}_go_treemap"),
+        ("GO ontology composition","{aid}_go_ontology_composition"),
+        ("Top KEGG orthologs",     "{aid}_top_kegg"),
+        ("Top InterPro domains",   "{aid}_top_ipr"),
     ]))
     W.append("")
 
