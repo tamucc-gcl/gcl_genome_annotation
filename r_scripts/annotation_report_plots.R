@@ -508,28 +508,17 @@ if (nrow(introns) > 0) {
 
 # ── B3. Gene length vs exon count (diagnostic scatter) ──────────────────────
 if (nrow(genes) > 0 && exists("exons_per_mrna")) {
+  genes$gene_id <- extract_attr(genes$attributes, "ID")
+
   mrnas_info <- mrnas %>%
     mutate(mrna_id = extract_attr(attributes, "ID"),
            parent_gene = extract_attr(attributes, "Parent"))
 
-  gene_exon <- mrnas_info %>%
-    left_join(exons_per_mrna, by = c("mrna_id" = "parent")) %>%
-    left_join(genes %>% select(gene_id = seqid, gene_start = start, gene_end = end, attributes) %>%
-                mutate(gene_id_attr = extract_attr(attributes, "ID")) %>%
-                select(gene_id_attr, gene_len = gene_end) %>%
-                # Recalculate from genes df
-                {NULL},  # placeholder
-              by = character(0))
+  genes_lookup <- genes %>% select(gene_id, gene_length = length)
 
-  # Simpler approach: just use gene length and exon count
-  genes$gene_id <- extract_attr(genes$attributes, "ID")
-  mrnas_info2 <- mrnas %>%
-    mutate(mrna_id = extract_attr(attributes, "ID"),
-           parent_gene = extract_attr(attributes, "Parent"))
-
-  gene_vs_exon <- mrnas_info2 %>%
+  gene_vs_exon <- mrnas_info %>%
     left_join(exons_per_mrna, by = c("mrna_id" = "parent")) %>%
-    left_join(genes %>% select(gene_id, gene_length = length), by = c("parent_gene" = "gene_id"))
+    left_join(genes_lookup, by = c("parent_gene" = "gene_id"))
 
   if (nrow(gene_vs_exon) > 0 && !all(is.na(gene_vs_exon$n_exons))) {
     p_scatter <- ggplot(gene_vs_exon, aes(x = n_exons, y = gene_length)) +
