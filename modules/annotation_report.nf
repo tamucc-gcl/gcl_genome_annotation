@@ -1,4 +1,4 @@
-/*
+python3 ${projectDir}/py_scripts/generate_annotation_report./*
 ========================================================================================
     ANNOTATION REPORT MODULE
 ========================================================================================
@@ -39,7 +39,9 @@
 process ANNOTATION_REPORT {
     tag "report"
     label 'annotation_report'
-    publishDir "${params.outdir}/reports", mode: params.publish_dir_mode
+    publishDir "${params.outdir}",         mode: params.publish_dir_mode, pattern: "annotation_report.md"
+    publishDir "${params.outdir}/reports", mode: params.publish_dir_mode, pattern: "annotation_report_plots"
+    publishDir "${params.outdir}/reports", mode: params.publish_dir_mode, pattern: "annotation_metrics.tsv"
 
     input:
     path(assembly_stats)
@@ -103,6 +105,7 @@ process ANNOTATION_REPORT {
         --omark_detaileds ${omark_detaileds} \
         --agat_stats ${agat_stats} \
         --plots_dir annotation_report_plots \
+        --plots_md_path reports/annotation_report_plots \
         --outfile annotation_report.md
     """
 
