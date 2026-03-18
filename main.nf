@@ -399,17 +399,18 @@ workflow {
     MERGE_FUNCTIONAL_ANNOTATIONS(ch_func_merged)
 
     // ── Step 18: Merge all GFF3s and decorate with functional annotations ───────
-    ch_annotate_input = BRAKER.out.braker_gff3
+    MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv.view { "FUNC -> ${it}" }
+
+    ch_before_func = BRAKER.out.braker_gff3
         .join(tRNASCAN.out.trnascan_gff3)
-        .view { "J1 braker+trna: ${it[0]} n=${it.size()}" }
         .join(INFERNAL.out.infernal_gff3)
-        .view { "J2 +infernal: ${it[0]} n=${it.size()}" }
         .join(TELOMERE_ANNOTATION.out.telomere_gff3)
-        .view { "J3 +telomere: ${it[0]} n=${it.size()}" }
         .join(CENTROMERE_TO_GFF3.out.centromere_gff3)
-        .view { "J4 +centromere: ${it[0]} n=${it.size()}" }
         .join(REPEAT_MASK.out.repeat_gff)
-        .view { "J5 +repeat: ${it[0]} n=${it.size()}" }
+
+    ch_before_func.view { "PRE-FUNC -> ${it}" }
+
+    ch_annotate_input = ch_before_func
         .join(MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv)
         .view { "J6 +func: ${it[0]} n=${it.size()}" }
         // produces: [assembly_id, braker_gff3, trnascan_gff3, infernal_gff3,
