@@ -32,7 +32,7 @@
 process EXTRACT_SEQUENCES {
     tag "${assembly_id}"
     label 'extract_sequences'
-    publishDir "${params.outdir}", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/sequences", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), path(annotated_gff3), path(genome_fasta)
@@ -49,7 +49,106 @@ process EXTRACT_SEQUENCES {
 
     # ── 1. Extract protein-coding features from annotated GFF3 ────────────────
     #   Filter to BRAKER3-sourced lines only (gene, mRNA, exon, CDS, etc.)
-    awk '/^#/ || \$2 == "BRAKER3"' ${annotated_gff3} > coding.gff3
+    awk '/^#/ || \$2 == "BRAKER3"' ${annotated_gff3} > coding_raw.gff3
+
+    # ── 1b. Validate coordinates against scaffold lengths ─────────────────────
+    #   BRAKER can occasionally produce CDS features extending past scaffold
+    #   ends. gffread aborts on these, so we identify and remove the offending
+    #   gene models (entire gene tree) before extraction.
+    seqkit fx2tab -n -l ${genome_fasta} > scaffold_lengths.tsv
+
+    python3 - <<'VALIDATE'
+import sys
+
+# Load scaffold lengths
+slen = {}
+with open("scaffold_lengths.tsv") as fh:
+    for line in fh:
+        parts = line.strip().split("\t")
+        slen[parts[0]] = int(parts[1])
+
+# Pass 1: find all features with out-of-bounds coordinates, collect their
+# gene-level parent IDs so we can remove entire gene trees
+bad_genes = set()
+features = []
+
+with open("coding_raw.gff3") as fh:
+    for line in fh:
+        if line.startswith("#"):
+            features.append(("comment", line, None, None))
+            continue
+        line_s = line.strip()
+        if not line_s:
+            continue
+        cols = line_s.split("\t")
+        if len(cols) != 9:
+            features.append(("comment", line, None, None))
+            continue
+
+        seqid = cols[0]
+        end   = int(cols[4])
+        attrs = {}
+        for token in cols[8].split(";"):
+            if "=" in token:
+                k, v = token.split("=", 1)
+                attrs[k.strip()] = v.strip()
+
+        scaffold_len = slen.get(seqid, 0)
+        oob = end > scaffold_len
+
+        features.append(("feature", line, attrs, oob))
+
+        if oob:
+            ftype = cols[2]
+            fid = attrs.get("ID", "")
+            parent = attrs.get("Parent", "")
+            # Walk up to gene level
+            if ftype == "gene":
+                bad_genes.add(fid)
+            elif ftype in ("mRNA", "transcript"):
+                bad_genes.add(parent)
+                bad_genes.add(fid)  # also mark mRNA so children get caught
+            else:
+                # CDS/exon — parent is mRNA, grandparent is gene
+                bad_genes.add(parent)
+
+# Pass 2: find mRNA parents of bad mRNAs → bad genes
+# Re-scan to resolve mRNA→gene mappings
+mrna_to_gene = {}
+for tag, line, attrs, oob in features:
+    if tag != "feature" or attrs is None:
+        continue
+    cols = line.strip().split("\t")
+    if cols[2] in ("mRNA", "transcript"):
+        mrna_to_gene[attrs.get("ID", "")] = attrs.get("Parent", "")
+
+# Expand bad_genes: if a bad mRNA ID is in the set, add its gene parent
+expanded = set()
+for bg in bad_genes:
+    expanded.add(bg)
+    if bg in mrna_to_gene:
+        expanded.add(mrna_to_gene[bg])
+bad_genes = expanded
+
+n_removed = 0
+with open("coding.gff3", "w") as out:
+    for tag, line, attrs, oob in features:
+        if tag == "comment":
+            out.write(line)
+            continue
+        fid = attrs.get("ID", "") if attrs else ""
+        parent = attrs.get("Parent", "") if attrs else ""
+        # Skip if this feature or its parent belongs to a bad gene tree
+        if fid in bad_genes or parent in bad_genes:
+            n_removed += 1
+            continue
+        out.write(line)
+
+if n_removed > 0:
+    print(f"WARNING: Removed {n_removed} GFF3 features from "
+          f"{len(bad_genes)} gene models with out-of-bounds coordinates",
+          file=sys.stderr)
+VALIDATE
 
     # ── 2. Protein sequences (translated from CDS) ───────────────────────────
     gffread coding.gff3 -g ${genome_fasta} -y ${assembly_id}.proteins.fa -F -S
