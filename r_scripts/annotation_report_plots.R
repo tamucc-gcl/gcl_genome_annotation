@@ -241,16 +241,35 @@ for (func_path in functional_files) {
   go_raw <- go_raw[go_raw != "-" & !is.na(go_raw)]
   all_go <- unlist(strsplit(go_raw, "[;,|]+"))
   all_go <- trimws(all_go)
-  all_go <- all_go[grepl("^GO:", all_go)]
+  # Strip source annotations like "(InterPro)", "(PANTHER)" etc.
+  all_go <- sub("\\(.*\\)$", "", all_go)
+  all_go <- trimws(all_go)
+  all_go <- all_go[grepl("^GO:\\d+$", all_go)]
   if (length(all_go) > 0) {
     go_ct <- as.data.frame(table(all_go), stringsAsFactors = FALSE)
-    names(go_ct) <- c("GO", "Count")
+    names(go_ct) <- c("GOID", "Count")
     go_ct <- go_ct %>% arrange(desc(Count)) %>% slice_head(n = 30)
-    p <- ggplot(go_ct, aes(x = reorder(GO, Count), y = Count)) +
+
+    # Resolve GO IDs to human-readable names
+    go_names <- tryCatch({
+      AnnotationDbi::select(GO.db, keys = go_ct$GOID,
+                            columns = c("TERM"), keytype = "GOID")
+    }, error = function(e) data.frame(GOID = character(), TERM = character()))
+
+    go_ct <- go_ct %>%
+      left_join(go_names, by = "GOID") %>%
+      mutate(label = ifelse(
+        !is.na(TERM) & TERM != "",
+        paste0(GOID, ": ", ifelse(nchar(TERM) > 45, paste0(substr(TERM, 1, 42), "..."), TERM)),
+        GOID
+      ))
+
+    p <- ggplot(go_ct, aes(x = reorder(label, Count), y = Count)) +
       geom_col(fill = "#6a994e", alpha = 0.85) + coord_flip() +
       labs(title = paste0(aid, " — Top GO terms"),
+           subtitle = paste0(length(unique(all_go)), " unique GO terms total"),
            x = NULL, y = "Occurrences") + theme_report
-    save_plot(p, paste0(aid, "_top_go"), w = 9, h = 8)
+    save_plot(p, paste0(aid, "_top_go"), w = 11, h = 9)
 
     # ── GO treemap by ontology ───────────────────────────────────────
     #   Annotate GO IDs with names and ontology (BP/MF/CC) from GO.db,
@@ -336,20 +355,90 @@ for (func_path in functional_files) {
     }
   }
 
-  # Top InterPro domains
+  # Top InterPro domains (with human-readable names)
   ipr_raw <- func$ipr_accessions[func$ipr_accessions != "-" & !is.na(func$ipr_accessions)]
   all_ipr <- unlist(strsplit(ipr_raw, "[;,]+"))
   all_ipr <- trimws(all_ipr)
   all_ipr <- all_ipr[grepl("^IPR", all_ipr)]
+
+  # Build IPR accession → description mapping from the functional TSV
+  ipr_name_map <- list()
+  for (i in seq_len(nrow(func))) {
+    accs_str <- func$ipr_accessions[i]
+    desc_str <- func$ipr_descriptions[i]
+    if (is.na(accs_str) || accs_str == "-" || is.na(desc_str) || desc_str == "-") next
+    accs <- trimws(unlist(strsplit(accs_str, ";+")))
+    descs <- trimws(unlist(strsplit(desc_str, ";+")))
+    accs <- accs[grepl("^IPR", accs)]
+    descs <- descs[descs != "-" & descs != ""]
+    # Map each accession to the first available description
+    for (j in seq_along(accs)) {
+      if (!(accs[j] %in% names(ipr_name_map)) && j <= length(descs) && descs[j] != "") {
+        ipr_name_map[[accs[j]]] <- descs[j]
+      }
+    }
+  }
+
   if (length(all_ipr) > 0) {
     ipr_ct <- as.data.frame(table(all_ipr), stringsAsFactors = FALSE)
     names(ipr_ct) <- c("IPR", "Count")
     ipr_ct <- ipr_ct %>% arrange(desc(Count)) %>% slice_head(n = 30)
-    p <- ggplot(ipr_ct, aes(x = reorder(IPR, Count), y = Count)) +
+
+    # Add human-readable labels
+    ipr_ct$desc <- sapply(ipr_ct$IPR, function(x) ipr_name_map[[x]] %||% "")
+    ipr_ct$label <- ifelse(
+      ipr_ct$desc != "",
+      paste0(ipr_ct$IPR, ": ", ifelse(nchar(ipr_ct$desc) > 40,
+                                       paste0(substr(ipr_ct$desc, 1, 37), "..."),
+                                       ipr_ct$desc)),
+      ipr_ct$IPR
+    )
+
+    p <- ggplot(ipr_ct, aes(x = reorder(label, Count), y = Count)) +
       geom_col(fill = "#a855f7", alpha = 0.85) + coord_flip() +
       labs(title = paste0(aid, " — Top InterPro domains"),
+           subtitle = paste0(length(unique(all_ipr)), " unique IPR accessions total"),
            x = NULL, y = "Occurrences") + theme_report
-    save_plot(p, paste0(aid, "_top_ipr"), w = 9, h = 8)
+    save_plot(p, paste0(aid, "_top_ipr"), w = 11, h = 9)
+  }
+
+  # Top KEGG terms
+  kegg_raw <- c(func$eggnog_KEGG_ko, func$kofam_KO)
+  kegg_raw <- kegg_raw[kegg_raw != "-" & !is.na(kegg_raw)]
+  all_kegg <- unlist(strsplit(kegg_raw, "[;,]+"))
+  all_kegg <- trimws(all_kegg)
+  all_kegg <- all_kegg[nchar(all_kegg) > 0]
+
+  # Build KO → definition mapping from kofam columns
+  ko_name_map <- list()
+  for (i in seq_len(nrow(func))) {
+    ko <- trimws(func$kofam_KO[i] %||% "-")
+    kd <- trimws(func$kofam_def[i] %||% "-")
+    if (ko != "-" && kd != "-" && !(ko %in% names(ko_name_map))) {
+      ko_name_map[[ko]] <- kd
+    }
+  }
+
+  if (length(all_kegg) > 0) {
+    kegg_ct <- as.data.frame(table(all_kegg), stringsAsFactors = FALSE)
+    names(kegg_ct) <- c("KO", "Count")
+    kegg_ct <- kegg_ct %>% arrange(desc(Count)) %>% slice_head(n = 30)
+
+    kegg_ct$desc <- sapply(kegg_ct$KO, function(x) ko_name_map[[x]] %||% "")
+    kegg_ct$label <- ifelse(
+      kegg_ct$desc != "",
+      paste0(kegg_ct$KO, ": ", ifelse(nchar(kegg_ct$desc) > 40,
+                                       paste0(substr(kegg_ct$desc, 1, 37), "..."),
+                                       kegg_ct$desc)),
+      kegg_ct$KO
+    )
+
+    p <- ggplot(kegg_ct, aes(x = reorder(label, Count), y = Count)) +
+      geom_col(fill = "#e8913a", alpha = 0.85) + coord_flip() +
+      labs(title = paste0(aid, " — Top KEGG orthologs"),
+           subtitle = paste0(length(unique(all_kegg)), " unique KEGG terms total"),
+           x = NULL, y = "Occurrences") + theme_report
+    save_plot(p, paste0(aid, "_top_kegg"), w = 11, h = 9)
   }
 }
 

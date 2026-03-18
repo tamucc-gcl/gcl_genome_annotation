@@ -325,6 +325,7 @@ def main():
         md.append(img(pd, f"{aid}_top_go.png"))
         md.append(img(pd, f"{aid}_go_treemap.png"))
         md.append(img(pd, f"{aid}_go_ontology_composition.png"))
+        md.append(img(pd, f"{aid}_top_kegg.png"))
         md.append(img(pd, f"{aid}_top_ipr.png"))
 
     # ═════════════════════════════════════════════════════════════════════
