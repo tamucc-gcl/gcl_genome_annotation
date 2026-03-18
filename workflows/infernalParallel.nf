@@ -90,7 +90,7 @@ workflow INFERNAL_PARALLEL {
     MERGE_INFERNAL(ch_merge)
 
     emit:
-    infernal_tblout = MERGE_INFERNAL.out.infernal_tblout
-    infernal_cmscan = MERGE_INFERNAL.out.infernal_cmscan
-    infernal_gff3   = MERGE_INFERNAL.out.infernal_gff3
+    infernal_tblout = MERGE_INFERNAL.out.infernal_tblout.map { id, f -> [id.toString(), f] }
+    infernal_cmscan = MERGE_INFERNAL.out.infernal_cmscan.map { id, f -> [id.toString(), f] }
+    infernal_gff3   = MERGE_INFERNAL.out.infernal_gff3.map   { id, f -> [id.toString(), f] }
 }

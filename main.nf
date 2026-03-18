@@ -399,26 +399,17 @@ workflow {
     MERGE_FUNCTIONAL_ANNOTATIONS(ch_func_merged)
 
     // ── Step 18: Merge all GFF3s and decorate with functional annotations ───────
-    ch_j5 = BRAKER.out.braker_gff3
-            .join(tRNASCAN.out.trnascan_gff3)
-            .join(INFERNAL.out.infernal_gff3)
-            .join(TELOMERE_ANNOTATION.out.telomere_gff3)
-            .join(CENTROMERE_TO_GFF3.out.centromere_gff3)
-            .join(REPEAT_MASK.out.repeat_gff)
-            .view { "LEFT key: class=${it[0].getClass().name} hash=${it[0].hashCode()} val='${it[0]}'" }
-
-    MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv
-        .view { "RIGHT key: class=${it[0].getClass().name} hash=${it[0].hashCode()} val='${it[0]}'" }
-
-    ch_annotate_input = ch_j5
-        .join(MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv, remainder: true)
-        .view { "J6 result: n=${it.size()} vals=${it.collect { v -> v?.toString()?.take(30) }}" }
+    ch_annotate_input = BRAKER.out.braker_gff3
+        .join(tRNASCAN.out.trnascan_gff3)
+        .join(INFERNAL.out.infernal_gff3)
+        .join(TELOMERE_ANNOTATION.out.telomere_gff3)
+        .join(CENTROMERE_TO_GFF3.out.centromere_gff3)
+        .join(REPEAT_MASK.out.repeat_gff)
+        .join(MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv)
+    // produces: [assembly_id, braker_gff3, trnascan_gff3, infernal_gff3,
+    //            telomere_gff3, centromere_gff3, repeat_gff, func_tsv]
 
     ANNOTATE_GFF3(ch_annotate_input)
-        // produces: [assembly_id, braker_gff3, trnascan_gff3, infernal_gff3,
-        //            telomere_gff3, centromere_gff3, repeat_gff, func_tsv]
-
-    //ANNOTATE_GFF3(ch_annotate_input) 
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────
