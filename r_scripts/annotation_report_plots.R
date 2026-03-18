@@ -61,10 +61,10 @@ save_plot <- function(p, name, w = 8, h = 6) {
 
 # Decide whether a numeric vector benefits from log10 scale.
 # Returns TRUE if the data spans > 2 orders of magnitude (max/min > 100)
-# and has enough positive values to be meaningful on a log axis.
+# and has at least 2 positive values.
 should_log <- function(x) {
   x <- x[is.finite(x) & x > 0]
-  if (length(x) < 5) return(FALSE)
+  if (length(x) < 2) return(FALSE)
   ratio <- max(x) / min(x)
   ratio > 100
 }
@@ -85,6 +85,16 @@ smart_x <- function(p, values) {
     p + scale_x_log10(labels = comma)
   } else {
     p + scale_x_continuous(labels = comma)
+  }
+}
+
+# For bar charts: log10 doesn't work (bars start at 0), so use sqrt
+# transform when range is extreme. Always uses comma labels.
+smart_y_bar <- function(p, values) {
+  if (should_log(values)) {
+    p + scale_y_sqrt(labels = comma)
+  } else {
+    p + scale_y_continuous(labels = comma)
   }
 }
 
@@ -544,10 +554,13 @@ for (tg_path in telomere_gff3_files) {
   tg$position[!grepl("position=", tg$attributes)] <- "unknown"
   tp <- tg %>% count(position)
   p <- ggplot(tp, aes(x = reorder(position, -n), y = n, fill = position)) +
-    geom_col(alpha = 0.85) + scale_fill_brewer(palette = "Set2") +
+    geom_col(alpha = 0.85) +
+    geom_text(aes(label = comma(n)), vjust = -0.3, size = 3.5) +
+    scale_fill_brewer(palette = "Set2") +
     labs(title = paste0(aid, " — Telomere positions"),
          subtitle = paste0(nrow(tg), " regions"), x = NULL, y = "Count") +
     theme_report + theme(legend.position = "none")
+  p <- smart_y_bar(p, tp$n)
   save_plot(p, paste0(aid, "_telomere_positions"), w = 6, h = 5)
 }
 
