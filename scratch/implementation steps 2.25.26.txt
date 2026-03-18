@@ -67,3 +67,7 @@ Merged functional annotation table — This is the single most impactful output 
 Functional GFF3 — Adding Dbxref, product names, GO terms, and Note attributes to the GFF3 mRNA/gene features. This makes the GFF3 self-contained for genome browsers and submission. The merge logic needs a clear hierarchy for product naming (e.g., prefer SwissProt DIAMOND hit description > eggNOG description > "hypothetical protein").
 QC Consolidation
 Annotation completeness — Beyond BUSCO/OMArk (which assess gene content completeness), you want functional coverage metrics: what % of predicted proteins got hits from each source, what % have at least one functional annotation from any source, what % remain completely unannotated (candidates for filtering or flagging). This is straightforward to compute from the merged functional table.
+
+
+need to make sure i have the quality metrics available in outputs
+TSEBRA to cleanup the braker output - slot in between braker and everything else
