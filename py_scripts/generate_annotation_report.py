@@ -291,10 +291,7 @@ def main():
 
         omark_det_file = find_file(args.omark_detaileds, aid,
                                     ["_detailed.txt"])
-        if omark_det_file:
-            md.append("<details>\n<summary>OMArk detailed output</summary>\n\n")
-            md.append("```\n" + read_text(omark_det_file).strip() + "\n```\n")
-            md.append("</details>\n")
+        # Detailed output omitted for brevity — available in qc/omark/ output dir
 
         # ── AGAT stats ────────────────────────────────────────────────
         agat_file = find_file(args.agat_stats, aid,
