@@ -1,38 +1,11 @@
-python3 ${projectDir}/py_scripts/generate_annotation_report./*
+/*
 ========================================================================================
     ANNOTATION REPORT MODULE
 ========================================================================================
-    Generate a unified Markdown annotation report covering ALL assemblies,
-    with per-assembly sections and cross-assembly comparisons.
-
-    This process runs ONCE after all per-assembly annotations complete.
+    Generate a unified Markdown annotation report covering ALL assemblies.
+    Runs ONCE after all per-assembly annotations complete.
     All inputs are collected (list) channels — one file per assembly.
     Assembly IDs are inferred from filenames.
-
-    Inputs (all collected paths — one file per assembly):
-        - assembly_stats:    Assembly stats TSVs
-        - annotated_gff3s:   Annotated GFF3 files
-        - gene_summaries:    Gene product summary TSVs
-        - functional_tsvs:   Merged functional annotation TSVs
-        - repeat_tbls:       RepeatMasker summary tables
-        - repeat_tbls_full:  buildSummary.pl detailed tables
-        - busco_txts:        BUSCO short summaries
-        - omark_summaries:   OMArk summary files
-        - omark_detaileds:   OMArk detailed files
-        - agat_stats:        AGAT annotation statistics
-        - trnascan_tsvs:     tRNAscan-SE tabular outputs
-        - infernal_tblouts:  Infernal tblouts (merged)
-        - telomere_gff3s:    Telomere annotation GFF3s
-        - telomere_tsvs:     tidk windowed telomere count TSVs
-        - centromere_gff3s:   Centromere annotation GFF3s
-
-    Outputs:
-        - report_md:    annotation_report.md
-        - plots_dir:    annotation_report_plots/
-        - metrics_tsv:  annotation_metrics.tsv
-
-    Tools: R (ggplot2, dplyr, tidyr, scales, patchwork, optparse),
-           Python 3 (stdlib only)
 ========================================================================================
 */
 
