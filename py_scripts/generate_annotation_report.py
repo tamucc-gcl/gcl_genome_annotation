@@ -1,146 +1,64 @@
 #!/usr/bin/env python3
 """
-generate_annotation_report.py
-=============================
-Unified multi-assembly Markdown annotation report.
+generate_annotation_report.py — Unified multi-assembly Markdown annotation report.
 """
-
-import argparse
-import csv
-import os
-import re
-import sys
+import argparse, csv, os, re, sys
 from datetime import datetime
 
 
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
 def img(pd, md_pd, filename):
-    """Return markdown image ref. Check existence at pd, write path as md_pd."""
-    path = os.path.join(pd, filename)
-    if os.path.exists(path):
+    """Markdown image ref. Check existence at pd, write path using md_pd."""
+    if os.path.exists(os.path.join(pd, filename)):
         return f"![{filename}]({md_pd}/{filename})"
     return ""
 
-
 def fmt(n):
-    try:
-        return f"{int(float(n)):,}"
-    except (ValueError, TypeError):
-        return str(n)
-
+    try: return f"{int(float(n)):,}"
+    except (ValueError, TypeError): return str(n)
 
 def read_text(path):
     try:
-        with open(path) as f:
-            return f.read()
-    except (FileNotFoundError, IOError):
-        return ""
-
+        with open(path) as f: return f.read()
+    except (FileNotFoundError, IOError): return ""
 
 def infer_id(path, suffixes):
     base = os.path.basename(path)
     for s in suffixes:
-        if base.endswith(s):
-            return base[: -len(s)]
+        if base.endswith(s): return base[:-len(s)]
     return os.path.splitext(base)[0]
 
-
-def find_file(file_list, assembly_id, suffixes):
+def find_file(file_list, aid, suffixes):
     for f in file_list:
-        if infer_id(f, suffixes) == assembly_id:
-            return f
+        if infer_id(f, suffixes) == aid: return f
     return None
 
+def link(path, text=None):
+    if text is None: text = os.path.basename(path)
+    return f"[{text}]({path})"
 
 def extract_omark_pct(text, key):
     m = re.search(re.escape(key) + r"([\d.]+)%", text)
     return m.group(1) if m else "—"
 
-
 def parse_omark_summary(text):
-    result = {}
+    r = {}
     for line in text.splitlines():
         ls = line.strip().lstrip("#").strip()
         ll = ls.lower()
-        if ls.startswith("S:") and "%" in ls:
-            result["comp_line"] = ls
-        if ls.startswith("A:") and "%" in ls:
-            result["cons_line"] = ls
-        if "selected clade was" in ll:
-            result["clade"] = ls.split("was")[-1].strip()
+        if ls.startswith("S:") and "%" in ls: r["comp_line"] = ls
+        if ls.startswith("A:") and "%" in ls: r["cons_line"] = ls
+        if "selected clade was" in ll: r["clade"] = ls.split("was")[-1].strip()
         if "conserved hogs" in ll:
             m = re.search(r"(\d[\d,]*)", ls)
-            if m:
-                result["n_hogs"] = m.group(1)
+            if m: r["n_hogs"] = m.group(1)
         if "there are" in ll and "proteins" in ll:
             m = re.search(r"(\d[\d,]*)\s+proteins", ls)
-            if m:
-                result["n_proteins"] = m.group(1)
-    return result
-
-
-def link(path, text=None):
-    """Markdown link to a results path."""
-    if text is None:
-        text = os.path.basename(path)
-    return f"[{text}]({path})"
-
-
-# ─── Table builders ──────────────────────────────────────────────────────────
-
-def table(header_row, data_rows):
-    lines = []
-    lines.append("| " + " | ".join(header_row) + " |")
-    lines.append("|:---|" + "|".join("---:" for _ in header_row[1:]) + "|")
-    for row in data_rows:
-        lines.append("| " + " | ".join(str(c) for c in row) + " |")
-    return "\n".join(lines) + "\n"
-
-
-def metrics_table(aids, met, fields):
-    header = ["Metric"] + [f"`{a}`" for a in aids]
-    data = []
-    for key, label, is_count in fields:
-        vals = []
-        for a in aids:
-            v = met[a].get(key, "—")
-            vals.append(fmt(v) if is_count else v)
-        data.append([label] + vals)
-    return table(header, data)
-
-
-def plot_grid(aids, pd, label, filename_template):
-    header = [""] + [f"`{a}`" for a in aids]
-    imgs = []
-    for a in aids:
-        fn = filename_template.format(aid=a) + ".png"
-        i = img(pd, fn)
-        imgs.append(i if i else "—")
-    lines = []
-    lines.append("| " + " | ".join(header) + " |")
-    lines.append("|:---|" + "|".join("---" for _ in aids) + "|")
-    lines.append("| " + label + " | " + " | ".join(imgs) + " |")
-    return "\n".join(lines) + "\n"
-
-
-def plot_grid_multi(aids, pd, rows):
-    header = [""] + [f"`{a}`" for a in aids]
-    lines = []
-    lines.append("| " + " | ".join(header) + " |")
-    lines.append("|:---|" + "|".join("---" for _ in aids) + "|")
-    for label, tmpl in rows:
-        imgs = []
-        for a in aids:
-            fn = tmpl.format(aid=a) + ".png"
-            i = img(pd, fn)
-            imgs.append(i if i else "—")
-        lines.append("| " + label + " | " + " | ".join(imgs) + " |")
-    return "\n".join(lines) + "\n"
-
-
-# ─── Repeat .tbl parser ─────────────────────────────────────────────────────
+            if m: r["n_proteins"] = m.group(1)
+    return r
 
 def parse_repeat_tbl(text):
-    """Extract key stats from RM .tbl header."""
     r = {}
     for line in text.splitlines():
         if "sequences:" in line:
@@ -160,6 +78,48 @@ def parse_repeat_tbl(text):
     return r
 
 
+# ─── Table builders ──────────────────────────────────────────────────────────
+
+def table(header_row, data_rows):
+    lines = []
+    lines.append("| " + " | ".join(header_row) + " |")
+    lines.append("|:---|" + "|".join("---:" for _ in header_row[1:]) + "|")
+    for row in data_rows:
+        lines.append("| " + " | ".join(str(c) for c in row) + " |")
+    return "\n".join(lines) + "\n"
+
+def metrics_table(aids, met, fields):
+    header = ["Metric"] + [f"`{a}`" for a in aids]
+    data = []
+    for key, label, is_count in fields:
+        vals = [fmt(met[a].get(key, "—")) if is_count else met[a].get(key, "—") for a in aids]
+        data.append([label] + vals)
+    return table(header, data)
+
+def plot_grid(aids, pd, md_pd, label, tmpl):
+    header = [""] + [f"`{a}`" for a in aids]
+    imgs = [img(pd, md_pd, tmpl.format(aid=a) + ".png") or "—" for a in aids]
+    lines = [
+        "| " + " | ".join(header) + " |",
+        "|:---|" + "|".join("---" for _ in aids) + "|",
+        "| " + label + " | " + " | ".join(imgs) + " |",
+    ]
+    return "\n".join(lines) + "\n"
+
+def plot_grid_multi(aids, pd, md_pd, rows):
+    header = [""] + [f"`{a}`" for a in aids]
+    lines = [
+        "| " + " | ".join(header) + " |",
+        "|:---|" + "|".join("---" for _ in aids) + "|",
+    ]
+    for label, tmpl in rows:
+        imgs = [img(pd, md_pd, tmpl.format(aid=a) + ".png") or "—" for a in aids]
+        lines.append("| " + label + " | " + " | ".join(imgs) + " |")
+    return "\n".join(lines) + "\n"
+
+
+# ─── Main ────────────────────────────────────────────────────────────────────
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--metrics", required=True)
@@ -169,10 +129,8 @@ def main():
     parser.add_argument("--omark_summaries", nargs="+", required=True)
     parser.add_argument("--omark_detaileds", nargs="+", required=True)
     parser.add_argument("--agat_stats", nargs="+", required=True)
-    parser.add_argument("--plots_dir", required=True,
-                        help="Disk path to plots (for existence checks)")
-    parser.add_argument("--plots_md_path", default=None,
-                        help="Relative path for markdown image refs (default: same as --plots_dir)")
+    parser.add_argument("--plots_dir", required=True)
+    parser.add_argument("--plots_md_path", default=None)
     parser.add_argument("--outfile", required=True)
     args = parser.parse_args()
 
@@ -181,44 +139,41 @@ def main():
 
     met = {}
     with open(args.metrics) as fh:
-        reader = csv.DictReader(fh, delimiter="\t")
-        for row in reader:
+        for row in csv.DictReader(fh, delimiter="\t"):
             met[row["assembly_id"]] = row
     aids = sorted(met.keys())
-    n_asm = len(aids)
 
     W = []
 
+    # ═══════════════════════════════════════════════════════════════════════
+    # Header
+    # ═══════════════════════════════════════════════════════════════════════
     W.append("# Genome Annotation Report\n")
     W.append(f"**Assemblies:** {', '.join(f'`{a}`' for a in aids)}  ")
     W.append(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
     W.append("---\n")
 
     # ═══════════════════════════════════════════════════════════════════════
-    # Annotation outputs table
+    # Annotation outputs
     # ═══════════════════════════════════════════════════════════════════════
     W.append("## Annotation Outputs\n")
-    out_header = ["File"] + [f"`{a}`" for a in aids]
-    out_rows = [
-        ("Annotated GFF3",        "{aid}.annotated.gff3"),
-        ("Protein sequences",     "{aid}.proteins.fa"),
-        ("CDS sequences",         "{aid}.cds.fa"),
-        ("Transcript sequences",  "{aid}.transcripts.fa"),
-        ("tRNA sequences",        "{aid}.tRNA.fa"),
-        ("Functional annotations","{aid}.functional_annotations.tsv"),
-        ("Gene product summary",  "{aid}.gene_product_summary.tsv"),
+    out_files = [
+        ("Annotated GFF3",         "{aid}.annotated.gff3"),
+        ("Protein sequences",      "{aid}.proteins.fa"),
+        ("CDS sequences",          "{aid}.cds.fa"),
+        ("Transcript sequences",   "{aid}.transcripts.fa"),
+        ("tRNA sequences",         "{aid}.tRNA.fa"),
+        ("Functional annotations", "{aid}.functional_annotations.tsv"),
+        ("Gene product summary",   "{aid}.gene_product_summary.tsv"),
     ]
-    out_data = []
-    for label, path_tmpl in out_rows:
-        row = [label]
-        for a in aids:
-            p = path_tmpl.format(aid=a)
-            row.append(link(p))
-        out_data.append(row)
-    W.append(table(out_header, out_data))
+    oh = ["File"] + [f"`{a}`" for a in aids]
+    od = [[label] + [link(t.format(aid=a)) for a in aids] for label, t in out_files]
+    W.append(table(oh, od))
     W.append("")
 
-    # ── TOC
+    # ═══════════════════════════════════════════════════════════════════════
+    # TOC
+    # ═══════════════════════════════════════════════════════════════════════
     W.append("""## Table of Contents
 
 1. [Overview](#1-overview)
@@ -261,10 +216,10 @@ def main():
     # ═══════════════════════════════════════════════════════════════════════
     W.append("---\n## 2. Gene Model Structure\n")
     W.append(plot_grid_multi(aids, pd, md_pd, [
-        ("Gene length distribution",  "{aid}_gene_length_dist"),
-        ("Exons per transcript",      "{aid}_exons_per_tx"),
-        ("Intron length QC",          "{aid}_intron_qc"),
-        ("Genes per scaffold",        "{aid}_genes_per_scaffold"),
+        ("Gene length distribution", "{aid}_gene_length_dist"),
+        ("Exons per transcript",     "{aid}_exons_per_tx"),
+        ("Intron length QC",         "{aid}_intron_qc"),
+        ("Genes per scaffold",       "{aid}_genes_per_scaffold"),
     ]))
     W.append("")
 
@@ -273,46 +228,32 @@ def main():
     # ═══════════════════════════════════════════════════════════════════════
     W.append("---\n## 3. Repeat Annotation\n")
 
-    # Build repeat summary table with parsed .tbl info
-    rep_header = ["Metric"] + [f"`{a}`" for a in aids]
-    rep_rows = []
-    rep_data = {}
+    rh = ["Metric"] + [f"`{a}`" for a in aids]
+    rd = {}
     for aid in aids:
-        tbl_file = find_file(args.repeat_tbls, aid, [".tbl"])
-        if tbl_file:
-            rep_data[aid] = parse_repeat_tbl(read_text(tbl_file))
-        else:
-            rep_data[aid] = {}
+        tf = find_file(args.repeat_tbls, aid, [".tbl"])
+        rd[aid] = parse_repeat_tbl(read_text(tf)) if tf else {}
 
-    rep_fields = [
-        ("n_sequences",    "Sequences"),
-        ("total_length",   "Total length (bp)"),
-        ("gc_pct",         "GC (%)"),
-        ("masked_bp",      "Bases masked (bp)"),
-        ("masked_pct",     "Bases masked (%)"),
-    ]
-    for key, label in rep_fields:
+    rr = []
+    for key, label in [("n_sequences","Sequences"), ("total_length","Total length (bp)"),
+                        ("gc_pct","GC (%)"), ("masked_bp","Bases masked (bp)"),
+                        ("masked_pct","Bases masked (%)")]:
         vals = []
         for a in aids:
-            v = rep_data.get(a, {}).get(key, "—")
-            if key in ("total_length", "masked_bp", "n_sequences"):
-                vals.append(fmt(v))
-            else:
-                vals.append(v)
-        rep_rows.append([label] + vals)
+            v = rd.get(a, {}).get(key, "—")
+            vals.append(fmt(v) if key in ("total_length","masked_bp","n_sequences") else v)
+        rr.append([label] + vals)
 
-    # Add links row
-    link_vals = []
+    # Links row
+    lv = []
     for a in aids:
-        links = ", ".join([
+        lv.append(", ".join([
             link(f"repeats/{a}.tbl", "summary"),
             link(f"repeats/{a}.buildSummary.tbl", "families"),
             link(f"repeats/{a}.repeat_landscape.html", "landscape"),
-        ])
-        link_vals.append(links)
-    rep_rows.append(["Reports"] + link_vals)
-
-    W.append(table(rep_header, rep_rows))
+        ]))
+    rr.append(["Reports"] + lv)
+    W.append(table(rh, rr))
     W.append("")
 
     W.append(plot_grid(aids, pd, md_pd, "Per-scaffold masking", "{aid}_repeat_masking_per_scaffold"))
@@ -322,17 +263,17 @@ def main():
     # 4. Non-coding RNA
     # ═══════════════════════════════════════════════════════════════════════
     W.append("---\n## 4. Non-coding RNA\n")
-    nc_header = ["Metric"] + [f"`{a}`" for a in aids]
-    nc_rows = []
-    nc_rows.append(["tRNA genes"] + [fmt(met[a].get("n_trna", "—")) for a in aids])
-    nc_rows.append(["ncRNA features (Rfam)"] + [fmt(met[a].get("n_ncrna", "—")) for a in aids])
-    nc_rows.append(["Reports"] + [link("ncRNA/", "ncRNA output") for _ in aids])
-    W.append(table(nc_header, nc_rows))
+    nh = ["Metric"] + [f"`{a}`" for a in aids]
+    nr = [
+        ["tRNA genes"] + [fmt(met[a].get("n_trna", "—")) for a in aids],
+        ["ncRNA features (Rfam)"] + [fmt(met[a].get("n_ncrna", "—")) for a in aids],
+        ["Reports"] + [link("ncRNA/", "ncRNA output") for _ in aids],
+    ]
+    W.append(table(nh, nr))
     W.append("")
-
     W.append(plot_grid_multi(aids, pd, md_pd, [
-        ("tRNA isotypes",    "{aid}_trna_isotypes"),
-        ("Rfam families",    "{aid}_ncrna_rfam"),
+        ("tRNA isotypes", "{aid}_trna_isotypes"),
+        ("Rfam families", "{aid}_ncrna_rfam"),
     ]))
     W.append("")
 
@@ -341,14 +282,13 @@ def main():
     # ═══════════════════════════════════════════════════════════════════════
     W.append("---\n## 5. Telomeres & Centromeres\n")
     W.append(metrics_table(aids, met, [
-        ("n_telomere",    "Telomeric regions",   True),
-        ("n_centromere",  "Centromere features",  True),
+        ("n_telomere",   "Telomeric regions",  True),
+        ("n_centromere", "Centromere features", True),
     ]))
     W.append("")
-
     W.append(plot_grid_multi(aids, pd, md_pd, [
-        ("Telomere positions",     "{aid}_telomere_positions"),
-        ("Telomere density",       "{aid}_telomere_density"),
+        ("Telomere positions", "{aid}_telomere_positions"),
+        ("Telomere density",   "{aid}_telomere_density"),
     ]))
     W.append("")
 
@@ -357,17 +297,16 @@ def main():
     # ═══════════════════════════════════════════════════════════════════════
     W.append("---\n## 6. Quality Assessment\n")
 
-    # ── BUSCO
+    # BUSCO
     W.append("### BUSCO\n")
     W.append(metrics_table(aids, met, [
-        ("busco_complete",    "Complete (%)",      False),
-        ("busco_single",      "— Single (%)",     False),
-        ("busco_duplicated",  "— Duplicated (%)", False),
-        ("busco_fragmented",  "Fragmented (%)",    False),
-        ("busco_missing",     "Missing (%)",       False),
-        ("busco_total",       "Total BUSCOs",      True),
+        ("busco_complete",   "Complete (%)",    False),
+        ("busco_single",     "— Single (%)",   False),
+        ("busco_duplicated", "— Duplicated (%)",False),
+        ("busco_fragmented", "Fragmented (%)",  False),
+        ("busco_missing",    "Missing (%)",     False),
+        ("busco_total",      "Total BUSCOs",    True),
     ]))
-
     for aid in aids:
         bf = find_file(args.busco_txts, aid, ["_busco.txt"])
         if bf:
@@ -376,114 +315,82 @@ def main():
                     W.append(f"\n*{line.strip()}*\n")
                     break
             break
-
     W.append(f"\n{img(pd, md_pd, 'C_busco.png')}\n")
     W.append(f"> Full reports: {link('qc/busco/', 'BUSCO output')}\n")
 
-    # ── OMArk
+    # OMArk
     W.append("\n### OMArk\n")
-
-    omark_info = {}
+    oi = {}
     for aid in aids:
         of = find_file(args.omark_summaries, aid, [".summary.txt"])
-        if of:
-            omark_info[aid] = parse_omark_summary(read_text(of))
+        if of: oi[aid] = parse_omark_summary(read_text(of))
 
-    if omark_info:
-        first = next(iter(omark_info.values()))
+    if oi:
+        first = next(iter(oi.values()))
         W.append(f"**Reference clade:** {first.get('clade', '—')}\n")
 
     W.append("\n#### Completeness (conserved genes)\n")
-    header = ["Metric"] + [f"`{a}`" for a in aids]
-    rows = []
-    rows.append(["Conserved HOGs"] + [
-        fmt(omark_info.get(a, {}).get("n_hogs", "—")) for a in aids])
-    for key, label in [
-        ("omark_single",          "Single (%)"),
-        ("omark_duplicated",      "Duplicated total (%)"),
-        ("omark_dup_unexpected",  "— Unexpected (%)"),
-        ("omark_dup_expected",    "— Expected (%)"),
-        ("omark_missing",         "Missing (%)"),
-    ]:
-        rows.append([label] + [met[a].get(key, "—") for a in aids])
-    W.append(table(header, rows))
+    h = ["Metric"] + [f"`{a}`" for a in aids]
+    cr = [["Conserved HOGs"] + [fmt(oi.get(a, {}).get("n_hogs", "—")) for a in aids]]
+    for key, label in [("omark_single","Single (%)"), ("omark_duplicated","Duplicated total (%)"),
+                        ("omark_dup_unexpected","— Unexpected (%)"), ("omark_dup_expected","— Expected (%)"),
+                        ("omark_missing","Missing (%)")]:
+        cr.append([label] + [met[a].get(key, "—") for a in aids])
+    W.append(table(h, cr))
     W.append(f"\n{img(pd, md_pd, 'C_omark_completeness.png')}\n")
 
     W.append("#### Consistency (proteome quality)\n")
-    rows2 = []
-    rows2.append(["Total proteins"] + [
-        fmt(omark_info.get(a, {}).get("n_proteins", "—")) for a in aids])
-    for key, label in [
-        ("omark_consistent",   "Consistent (%)"),
-        ("omark_partial",      "— Partial hits (%)"),
-        ("omark_fragmented",   "— Fragmented (%)"),
-        ("omark_inconsistent", "Inconsistent (%)"),
-        ("omark_contaminant",  "Contaminant (%)"),
-        ("omark_unknown",      "Unknown (%)"),
-    ]:
-        rows2.append([label] + [met[a].get(key, "—") for a in aids])
-    W.append(table(header, rows2))
+    cr2 = [["Total proteins"] + [fmt(oi.get(a, {}).get("n_proteins", "—")) for a in aids]]
+    for key, label in [("omark_consistent","Consistent (%)"), ("omark_partial","— Partial hits (%)"),
+                        ("omark_fragmented","— Fragmented (%)"), ("omark_inconsistent","Inconsistent (%)"),
+                        ("omark_contaminant","Contaminant (%)"), ("omark_unknown","Unknown (%)")]:
+        cr2.append([label] + [met[a].get(key, "—") for a in aids])
+    W.append(table(h, cr2))
     W.append(f"\n{img(pd, md_pd, 'C_omark_consistency.png')}\n")
     W.append(f"> Full reports: {link('qc/omark/', 'OMArk output')}\n")
 
-    # ── AGAT
+    # AGAT
     W.append("\n### Structural statistics (AGAT)\n")
+    kp = [("number of gene","Genes"), ("number of mrna","mRNAs"),
+          ("number of exon","Exons"), ("number of cds","CDS features"),
+          ("number of intron","Introns"), ("number of single exon gene","Single-exon genes"),
+          ("mean gene length","Mean gene length (bp)"), ("mean mrna length","Mean mRNA length (bp)"),
+          ("mean cds length","Mean CDS length (bp)"), ("mean exon length","Mean exon length (bp)"),
+          ("mean intron length","Mean intron length (bp)"), ("mean exons per","Mean exons/mRNA"),
+          ("mean introns per","Mean introns/mRNA"), ("longest gene","Longest gene (bp)"),
+          ("shortest gene","Shortest gene (bp)"), ("total gene length","Total gene space (bp)"),
+          ("% of genome","% genome in genes")]
 
-    key_patterns = [
-        ("number of gene",              "Genes"),
-        ("number of mrna",              "mRNAs"),
-        ("number of exon",              "Exons"),
-        ("number of cds",               "CDS features"),
-        ("number of intron",            "Introns"),
-        ("number of single exon gene",  "Single-exon genes"),
-        ("mean gene length",            "Mean gene length (bp)"),
-        ("mean mrna length",            "Mean mRNA length (bp)"),
-        ("mean cds length",             "Mean CDS length (bp)"),
-        ("mean exon length",            "Mean exon length (bp)"),
-        ("mean intron length",          "Mean intron length (bp)"),
-        ("mean exons per",              "Mean exons/mRNA"),
-        ("mean introns per",            "Mean introns/mRNA"),
-        ("longest gene",                "Longest gene (bp)"),
-        ("shortest gene",               "Shortest gene (bp)"),
-        ("total gene length",           "Total gene space (bp)"),
-        ("% of genome",                 "% genome in genes"),
-    ]
-
-    agat_data = {}
-    agat_labels_ordered = []
+    ad = {}
+    al = []
     for aid in aids:
-        agat_file = find_file(args.agat_stats, aid, ["_annotation_stats"])
-        if not agat_file:
-            continue
-        agat_text = read_text(agat_file)
-        agat_data[aid] = {}
-        for line in agat_text.splitlines():
+        af = find_file(args.agat_stats, aid, ["_annotation_stats"])
+        if not af: continue
+        ad[aid] = {}
+        for line in read_text(af).splitlines():
             ll = line.lower().strip()
-            for pattern, label in key_patterns:
-                if pattern in ll:
+            for pat, label in kp:
+                if pat in ll:
                     nums = re.findall(r"[\d,.]+", line)
                     if nums:
-                        agat_data[aid][label] = nums[-1]
-                        if label not in agat_labels_ordered:
-                            agat_labels_ordered.append(label)
+                        ad[aid][label] = nums[-1]
+                        if label not in al: al.append(label)
 
-    if agat_data:
-        header = ["Metric"] + [f"`{a}`" for a in aids]
-        rows = []
-        for label in agat_labels_ordered:
-            row_vals = []
+    if ad:
+        ah = ["Metric"] + [f"`{a}`" for a in aids]
+        ar = []
+        for label in al:
+            vals = []
             for a in aids:
-                v = agat_data.get(a, {}).get(label, "—")
-                # Add commas to large integers
+                v = ad.get(a, {}).get(label, "—")
                 try:
                     if "." not in v and "%" not in label.lower():
-                        row_vals.append(fmt(v))
+                        vals.append(fmt(v))
                     else:
-                        row_vals.append(v)
-                except (ValueError, TypeError):
-                    row_vals.append(v)
-            rows.append([label] + row_vals)
-        W.append(table(header, rows))
+                        vals.append(v)
+                except: vals.append(v)
+            ar.append([label] + vals)
+        W.append(table(ah, ar))
 
     W.append(f"\n> Full reports: {link('qc/', 'QC output')}\n")
 
@@ -491,29 +398,27 @@ def main():
     # 7. Functional Annotation
     # ═══════════════════════════════════════════════════════════════════════
     W.append("\n---\n## 7. Functional Annotation\n")
-
     W.append("### Tool coverage\n")
     W.append(metrics_table(aids, met, [
-        ("n_proteins",      "Total proteins",      True),
-        ("n_ipr",           "InterProScan hits",   True),
-        ("pct_ipr",         "InterProScan (%)",    False),
-        ("n_eggnog",        "eggNOG hits",         True),
-        ("pct_eggnog",      "eggNOG (%)",          False),
-        ("n_diamond",       "DIAMOND hits",        True),
-        ("pct_diamond",     "DIAMOND (%)",         False),
-        ("n_kofamscan",     "KofamScan hits",      True),
-        ("pct_kofamscan",   "KofamScan (%)",       False),
-        ("n_deepsig",       "DeepSig hits",        True),
-        ("pct_deepsig",     "DeepSig (%)",         False),
-        ("n_named",         "Named products",      True),
-        ("n_hypothetical",  "Hypothetical",        True),
-        ("pct_named",       "Named (%)",           False),
-        ("pct_hypothetical","Hypothetical (%)",    False),
-        ("unique_go_terms", "Unique GO terms",     True),
-        ("unique_kegg_kos", "Unique KEGG KOs",     True),
+        ("n_proteins",      "Total proteins",    True),
+        ("n_ipr",           "InterProScan hits", True),
+        ("pct_ipr",         "InterProScan (%)",  False),
+        ("n_eggnog",        "eggNOG hits",       True),
+        ("pct_eggnog",      "eggNOG (%)",        False),
+        ("n_diamond",       "DIAMOND hits",      True),
+        ("pct_diamond",     "DIAMOND (%)",       False),
+        ("n_kofamscan",     "KofamScan hits",    True),
+        ("pct_kofamscan",   "KofamScan (%)",     False),
+        ("n_deepsig",       "DeepSig hits",      True),
+        ("pct_deepsig",     "DeepSig (%)",       False),
+        ("n_named",         "Named products",    True),
+        ("n_hypothetical",  "Hypothetical",      True),
+        ("pct_named",       "Named (%)",         False),
+        ("pct_hypothetical","Hypothetical (%)",  False),
+        ("unique_go_terms", "Unique GO terms",   True),
+        ("unique_kegg_kos", "Unique KEGG KOs",   True),
     ]))
     W.append("")
-
     W.append("### Details\n")
     W.append(plot_grid_multi(aids, pd, md_pd, [
         ("Tool coverage",           "{aid}_functional_coverage"),
@@ -530,47 +435,34 @@ def main():
     # 8. Tuning Recommendations
     # ═══════════════════════════════════════════════════════════════════════
     W.append("---\n## 8. Tuning Recommendations\n")
-
     any_flags = False
     for aid in aids:
         row = met[aid]
         flags = []
-
         checks = [
-            ("pct_hypothetical", 50, None, "High hypothetical rate ({v:.1f}%) — consider RNA-seq evidence or broader protein DBs."),
-            ("busco_complete", None, 80, "Low BUSCO completeness ({v:.1f}%) — check repeat masking, contiguity, or BRAKER3 rounds."),
-            ("omark_unknown", 25, None, "High OMArk unknown rate ({v:.1f}%) — possible over-prediction. Consider TSEBRA."),
-            ("omark_fragmented", 10, None, "High OMArk fragmented rate ({v:.1f}%) — many genes shorter than expected."),
+            ("pct_hypothetical",    50, None, "High hypothetical rate ({v:.1f}%) — consider RNA-seq evidence or broader protein DBs."),
+            ("busco_complete",      None, 80, "Low BUSCO completeness ({v:.1f}%) — check repeat masking, contiguity, or BRAKER3 rounds."),
+            ("omark_unknown",       25, None, "High OMArk unknown rate ({v:.1f}%) — possible over-prediction. Consider TSEBRA."),
+            ("omark_fragmented",    10, None, "High OMArk fragmented rate ({v:.1f}%) — many genes shorter than expected."),
             ("omark_dup_unexpected", 15, None, "High unexpected duplication ({v:.1f}%) — possible haplotig duplication."),
-            ("repeat_masked_pct", None, 20, "Low repeat masking ({v:.1f}%) — fish genomes typically 30–50%."),
-            ("pct_diamond", None, 30, "Low SwissProt coverage ({v:.1f}%) — consider TrEMBL/NR."),
+            ("repeat_masked_pct",   None, 20, "Low repeat masking ({v:.1f}%) — fish genomes typically 30–50%."),
+            ("pct_diamond",         None, 30, "Low SwissProt coverage ({v:.1f}%) — consider TrEMBL/NR."),
         ]
-
         for key, above, below, msg in checks:
             try:
                 v = float(row.get(key, 0))
-                trigger = False
-                if above is not None and v > above:
-                    trigger = True
-                if below is not None and v < below:
-                    trigger = True
-                if trigger:
+                if (above is not None and v > above) or (below is not None and v < below):
                     flags.append(msg.format(v=v))
-            except (ValueError, TypeError):
-                pass
-
+            except (ValueError, TypeError): pass
         try:
             si = int(float(row.get("short_introns_lt10", 0)))
-            if si > 50:
-                flags.append(f"{si:,} introns < 10 bp — likely gene model artifacts.")
-        except (ValueError, TypeError):
-            pass
+            if si > 50: flags.append(f"{si:,} introns < 10 bp — likely gene model artifacts.")
+        except (ValueError, TypeError): pass
 
         if flags:
             any_flags = True
             W.append(f"### `{aid}`\n")
-            for f in flags:
-                W.append(f"- {f}")
+            for f in flags: W.append(f"- {f}")
             W.append("")
 
     if not any_flags:
@@ -580,9 +472,7 @@ def main():
 
     with open(args.outfile, "w") as out:
         out.write("\n".join(W))
-
-    print(f"Report: {n_asm} assemblies → {args.outfile}", file=sys.stderr)
-
+    print(f"Report: {len(aids)} assemblies → {args.outfile}", file=sys.stderr)
 
 if __name__ == "__main__":
     main()
