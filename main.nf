@@ -399,6 +399,15 @@ workflow {
     MERGE_FUNCTIONAL_ANNOTATIONS(ch_func_merged)
 
     // ── Step 18: Merge all GFF3s and decorate with functional annotations ───────
+    // ── DEBUG: verify each channel emits ─────────────────────────────────────
+    BRAKER.out.braker_gff3.view { "DEBUG braker_gff3: ${it[0]}" }
+    tRNASCAN.out.trnascan_gff3.view { "DEBUG trnascan_gff3: ${it[0]}" }
+    INFERNAL.out.infernal_gff3.view { "DEBUG infernal_gff3: ${it[0]}" }
+    TELOMERE_ANNOTATION.out.telomere_gff3.view { "DEBUG telomere_gff3: ${it[0]}" }
+    CENTROMERE_TO_GFF3.out.centromere_gff3.view { "DEBUG centromere_gff3: ${it[0]}" }
+    REPEAT_MASK.out.repeat_gff.view { "DEBUG repeat_gff: ${it[0]}" }
+    MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv.view { "DEBUG func_tsv: ${it[0]}" }
+
     ch_annotate_input = BRAKER.out.braker_gff3
         .join(tRNASCAN.out.trnascan_gff3)
         .join(INFERNAL.out.infernal_gff3)
@@ -408,6 +417,8 @@ workflow {
         .join(MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv)
         // produces: [assembly_id, braker_gff3, trnascan_gff3, infernal_gff3,
         //            telomere_gff3, centromere_gff3, repeat_gff, func_tsv]
+
+    ch_annotate_input.view { "DEBUG join result: ${it[0]} (${it.size()} elements)" }
 
     ANNOTATE_GFF3(ch_annotate_input) 
 }
