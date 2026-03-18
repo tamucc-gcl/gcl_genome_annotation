@@ -147,6 +147,8 @@ include { DEEPSIG; MERGE_DEEPSIG } from './modules/deepsig.nf'
 include { MERGE_FUNCTIONAL_ANNOTATIONS } from './modules/merge_functional_annotations.nf'
 include { ANNOTATE_GFF3 } from './modules/annotate_gff3.nf'
 include { EXTRACT_SEQUENCES } from './modules/extractSequences.nf'
+include { ANNOTATION_REPORT } from './modules/annotation_report.nf'
+
 
 /*
 ========================================================================================
@@ -418,6 +420,31 @@ workflow {
         // produces: [assembly_id, annotated_gff3, filtered_assembly]
 
     EXTRACT_SEQUENCES(ch_extract_input)
+
+    /*
+    ========================================================================================
+        Create Report
+    ========================================================================================
+    */
+    ch_report_input = FILTER_ASSEMBLY.out.assembly_stats
+        .join(ANNOTATE_GFF3.out.annotated_gff3)
+        .join(ANNOTATE_GFF3.out.gene_summary)
+        .join(MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv)
+        .join(REPEAT_MASK.out.repeat_tbl)
+        .join(REPEAT_MASK.out.repeat_tbl_full)
+        .join(REPEAT_MASK.out.repeat_landscape)
+        .join(REPEAT_MASK.out.repeat_divsum)
+        .join(BUSCO.out.busco)
+        .join(OMARK.out.omark_summary)
+        .join(OMARK.out.omark_detailed)
+        .join(AGAT.out.annotation_stats)
+        .join(tRNASCAN.out.trnascan_tsv)
+        .join(INFERNAL.out.infernal_tblout)
+        .join(TELOMERE_ANNOTATION.out.telomere_gff3)
+        .join(TELOMERE_ANNOTATION.out.telomere_plot)
+        .join(CENTROMERE_TO_GFF3.out.centromere_gff3)
+
+    ANNOTATION_REPORT(ch_report_input)
 }
 
 // ── On-complete summary ──────────────────────────────────────────────────────
