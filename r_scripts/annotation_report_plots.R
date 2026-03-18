@@ -59,6 +59,35 @@ save_plot <- function(p, name, w = 8, h = 6) {
          plot = p, width = w, height = h, dpi = 150, bg = "white")
 }
 
+# Decide whether a numeric vector benefits from log10 scale.
+# Returns TRUE if the data spans > 2 orders of magnitude (max/min > 100)
+# and has enough positive values to be meaningful on a log axis.
+should_log <- function(x) {
+  x <- x[is.finite(x) & x > 0]
+  if (length(x) < 5) return(FALSE)
+  ratio <- max(x) / min(x)
+  ratio > 100
+}
+
+# Convenience: add a smart y-axis — log10 with comma labels if warranted,
+# otherwise plain comma labels. Call on a ggplot object.
+smart_y <- function(p, values) {
+  if (should_log(values)) {
+    p + scale_y_log10(labels = comma)
+  } else {
+    p + scale_y_continuous(labels = comma)
+  }
+}
+
+# Same for x-axis (used in histograms where x is the data axis)
+smart_x <- function(p, values) {
+  if (should_log(values)) {
+    p + scale_x_log10(labels = comma)
+  } else {
+    p + scale_x_continuous(labels = comma)
+  }
+}
+
 split_files <- function(arg) {
   if (is.null(arg) || arg == "") return(character(0))
   strsplit(arg, "\\s+")[[1]]
@@ -124,10 +153,11 @@ for (gff_path in gff3_files) {
   if (nrow(genes) > 0) {
     p <- ggplot(genes, aes(x = length)) +
       geom_histogram(bins = 80, fill = "#3574b0", color = "white", alpha = 0.85) +
-      scale_x_log10(labels = comma) +
       labs(title = paste0(aid, " — Gene length distribution"),
            subtitle = paste0("n=", comma(nrow(genes)), ", median=", comma(median(genes$length)), " bp"),
-           x = "Gene length (bp, log)", y = "Count") + theme_report
+           x = "Gene length (bp)", y = "Count") + theme_report
+    p <- smart_x(p, genes$length)
+    p <- p + scale_y_continuous(labels = comma)
     save_plot(p, paste0(aid, "_gene_length_dist"))
   }
 
@@ -147,6 +177,7 @@ for (gff_path in gff3_files) {
     p <- ggplot(epm %>% filter(n_exons <= cap), aes(x = n_exons)) +
       geom_histogram(binwidth = 1, fill = "#3574b0", color = "white", alpha = 0.85) +
       scale_x_continuous(breaks = seq(0, cap, by = 5)) +
+      scale_y_continuous(labels = comma) +
       labs(title = paste0(aid, " — Exons per transcript"),
            subtitle = paste0("Median: ", med_exons,
                              ", single-exon: ", comma(n_single),
@@ -167,6 +198,7 @@ for (gff_path in gff3_files) {
     p <- ggplot(intron_qc, aes(x = Category, y = Count, fill = Category)) +
       geom_col(alpha = 0.85) +
       scale_fill_manual(values = c("#dc2626", "#e8913a", "#eab308", "#6a994e")) +
+      scale_y_continuous(labels = comma) +
       labs(title = paste0(aid, " — Intron length QC"),
            subtitle = "Introns < 10 bp are likely artifacts",
            x = NULL, y = "Count") + theme_report + theme(legend.position = "none")
@@ -181,6 +213,7 @@ for (gff_path in gff3_files) {
     iso <- trna_gff %>% count(isotype, sort = TRUE)
     p <- ggplot(iso, aes(x = reorder(isotype, n), y = n)) +
       geom_col(fill = "#e05c5c", alpha = 0.85) + coord_flip() +
+      scale_y_continuous(labels = comma) +
       labs(title = paste0(aid, " — tRNA isotypes"),
            subtitle = paste0(nrow(trna_gff), " tRNAs"), x = NULL, y = "Count") + theme_report
     save_plot(p, paste0(aid, "_trna_isotypes"), w = 7, h = 6)
@@ -193,6 +226,7 @@ for (gff_path in gff3_files) {
     rfam_ct <- ncrna %>% count(rfam, sort = TRUE) %>% slice_head(n = 25)
     p <- ggplot(rfam_ct, aes(x = reorder(rfam, n), y = n)) +
       geom_col(fill = "#f59e42", alpha = 0.85) + coord_flip() +
+      scale_y_continuous(labels = comma) +
       labs(title = paste0(aid, " — Top Rfam families"),
            subtitle = paste0(nrow(ncrna), " ncRNA features"),
            x = NULL, y = "Count") + theme_report
@@ -204,6 +238,7 @@ for (gff_path in gff3_files) {
     sg <- genes %>% count(seqid, name = "n_genes") %>% arrange(desc(n_genes)) %>% slice_head(n = 30)
     p <- ggplot(sg, aes(x = reorder(seqid, n_genes), y = n_genes)) +
       geom_col(fill = "#3574b0", alpha = 0.85) + coord_flip() +
+      scale_y_continuous(labels = comma) +
       labs(title = paste0(aid, " — Genes per scaffold (top 30)"),
            x = NULL, y = "Gene count") + theme_report
     save_plot(p, paste0(aid, "_genes_per_scaffold"), w = 9, h = 7)
@@ -231,6 +266,7 @@ for (func_path in functional_files) {
   p <- ggplot(cov, aes(x = reorder(Tool, -Annotated), y = Annotated)) +
     geom_col(fill = "#3574b0", alpha = 0.85) +
     geom_text(aes(label = paste0(Pct, "%")), vjust = -0.3, size = 3.5) +
+    scale_y_continuous(labels = comma) +
     labs(title = paste0(aid, " — Functional tool coverage"),
          subtitle = paste0(comma(nrow(func)), " proteins"),
          x = NULL, y = "Proteins annotated") + theme_report
@@ -266,6 +302,7 @@ for (func_path in functional_files) {
 
     p <- ggplot(go_ct, aes(x = reorder(label, Count), y = Count)) +
       geom_col(fill = "#6a994e", alpha = 0.85) + coord_flip() +
+      scale_y_continuous(labels = comma) +
       labs(title = paste0(aid, " — Top GO terms"),
            subtitle = paste0(length(unique(all_go)), " unique GO terms total"),
            x = NULL, y = "Occurrences") + theme_report
@@ -341,6 +378,7 @@ for (func_path in functional_files) {
         p_ont <- ggplot(ont_summary, aes(x = reorder(Ontology, -n_terms), y = n_terms, fill = Ontology)) +
           geom_col(alpha = 0.85) +
           geom_text(aes(label = comma(n_terms)), vjust = -0.3, size = 3.5) +
+          scale_y_continuous(labels = comma) +
           scale_fill_manual(values = c(
             "Biological Process" = "#3574b0",
             "Molecular Function" = "#e8913a",
@@ -396,6 +434,7 @@ for (func_path in functional_files) {
 
     p <- ggplot(ipr_ct, aes(x = reorder(label, Count), y = Count)) +
       geom_col(fill = "#a855f7", alpha = 0.85) + coord_flip() +
+      scale_y_continuous(labels = comma) +
       labs(title = paste0(aid, " — Top InterPro domains"),
            subtitle = paste0(length(unique(all_ipr)), " unique IPR accessions total"),
            x = NULL, y = "Occurrences") + theme_report
@@ -435,6 +474,7 @@ for (func_path in functional_files) {
 
     p <- ggplot(kegg_ct, aes(x = reorder(label, Count), y = Count)) +
       geom_col(fill = "#e8913a", alpha = 0.85) + coord_flip() +
+      scale_y_continuous(labels = comma) +
       labs(title = paste0(aid, " — Top KEGG orthologs"),
            subtitle = paste0(length(unique(all_kegg)), " unique KEGG terms total"),
            x = NULL, y = "Occurrences") + theme_report
@@ -453,6 +493,7 @@ for (gs_path in gene_summary_files) {
   if (nrow(top_prod) > 0) {
     p <- ggplot(top_prod, aes(x = reorder(product, n), y = n)) +
       geom_col(fill = "#3574b0", alpha = 0.85) + coord_flip() +
+      scale_y_continuous(labels = comma) +
       labs(title = paste0(aid, " — Top 20 gene products"), x = NULL, y = "Count") + theme_report
     save_plot(p, paste0(aid, "_top_products"), w = 10, h = 7)
   }
