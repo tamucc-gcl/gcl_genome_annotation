@@ -185,15 +185,6 @@ process ANNOTATE_GFF3 {
     # ═══════════════════════════════════════════════════════════════════════════
     # 2. Parse tRNAscan GFF3 — renumber
     # ═══════════════════════════════════════════════════════════════════════════
-    #   tRNAscan-SE (v2.x) emits tRNA and pseudogene as top-level features
-    #   (no wrapping gene feature). Hierarchy is:
-    #       tRNA → exon(s)
-    #       pseudogene (standalone, no children or with exon children)
-    #
-    #   We treat tRNA as the top-level feature and assign:
-    #       tRNA       → {ASM}_tRNA{N}
-    #       pseudogene → {ASM}_tRNA_pseudo{M}
-    #       exon       → parent updated to new tRNA/pseudogene ID
 
     trna_records = []
     trna_counter = 0
@@ -218,7 +209,7 @@ process ANNOTATE_GFF3 {
         parent = attrs.get("Parent", "")
 
         if ftype == "gene":
-            # Some tRNAscan versions emit gene wrappers — handle both formats
+            # Some tRNAscan versions emit gene wrappers
             trna_counter += 1
             new_id = f"{ASM}_tRNA{trna_counter}"
             trna_id_map[old_id] = new_id
@@ -226,14 +217,14 @@ process ANNOTATE_GFF3 {
 
         elif ftype == "tRNA":
             if parent and parent in trna_id_map:
-                # tRNA is child of a gene → treat as transcript
+                # tRNA is child of a gene wrapper
                 new_parent = trna_id_map[parent]
                 new_id = f"{new_parent}.trna1"
                 trna_id_map[old_id] = new_id
                 attrs["ID"] = new_id
                 attrs["Parent"] = new_parent
             else:
-                # tRNA is top-level (no gene parent) — this is the common case
+                # tRNA is top-level (no gene parent) — common in tRNAscan v2.x
                 trna_counter += 1
                 new_id = f"{ASM}_tRNA{trna_counter}"
                 trna_id_map[old_id] = new_id
@@ -257,12 +248,9 @@ process ANNOTATE_GFF3 {
         if old_parent in trna_id_map:
             new_parent = trna_id_map[old_parent]
             attrs["Parent"] = new_parent
-            # Renumber exon ID
             old_id = attrs.get("ID", "")
             if old_id:
-                # Preserve exon numbering from original ID if present
-                import re as _re
-                exon_match = _re.search(r'exon(\d+)', old_id)
+                exon_match = re.search(r'exon(\\d+)', old_id)
                 exon_num = exon_match.group(1) if exon_match else "1"
                 attrs["ID"] = f"{new_parent}.exon{exon_num}"
 
