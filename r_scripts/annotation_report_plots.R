@@ -38,7 +38,6 @@ option_list <- list(
   make_option("--functional_tsv", type = "character"),
   make_option("--repeat_tbl",     type = "character"),
   make_option("--repeat_tbl_full",type = "character"),
-  make_option("--repeat_divsum",  type = "character"),
   make_option("--busco_txt",      type = "character"),
   make_option("--omark_summary",  type = "character"),
   make_option("--omark_detailed", type = "character"),

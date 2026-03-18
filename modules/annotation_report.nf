@@ -20,8 +20,6 @@
         - functional_tsv:       Merged functional annotations TSV
         - repeat_tbl:           RepeatMasker summary table
         - repeat_tbl_full:      buildSummary.pl detailed table
-        - repeat_landscape:     Repeat landscape HTML
-        - repeat_divsum:        Divergence summary file
         - busco_txt:            BUSCO short summary
         - omark_summary:        OMArk summary
         - omark_detailed:       OMArk detailed summary
@@ -89,7 +87,6 @@ process ANNOTATION_REPORT {
         --functional_tsv ${functional_tsv} \
         --repeat_tbl ${repeat_tbl} \
         --repeat_tbl_full ${repeat_tbl_full} \
-        --repeat_divsum ${repeat_divsum} \
         --busco_txt ${busco_txt} \
         --omark_summary ${omark_summary} \
         --omark_detailed ${omark_detailed} \
