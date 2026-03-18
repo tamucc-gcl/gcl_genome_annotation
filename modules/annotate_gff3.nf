@@ -185,11 +185,22 @@ process ANNOTATE_GFF3 {
     # ═══════════════════════════════════════════════════════════════════════════
     # 2. Parse tRNAscan GFF3 — renumber
     # ═══════════════════════════════════════════════════════════════════════════
+    #   tRNAscan-SE (v2.x) emits tRNA and pseudogene as top-level features
+    #   (no wrapping gene feature). Hierarchy is:
+    #       tRNA → exon(s)
+    #       pseudogene (standalone, no children or with exon children)
+    #
+    #   We treat tRNA as the top-level feature and assign:
+    #       tRNA       → {ASM}_tRNA{N}
+    #       pseudogene → {ASM}_tRNA_pseudo{M}
+    #       exon       → parent updated to new tRNA/pseudogene ID
 
     trna_records = []
     trna_counter = 0
+    trna_pseudo_counter = 0
     trna_id_map = {}
 
+    raw_trna = []
     with open("${trnascan_gff3}") as fh:
         for line in fh:
             if line.startswith("#") or not line.strip():
@@ -198,29 +209,65 @@ process ANNOTATE_GFF3 {
             if len(cols) != 9:
                 continue
             attrs = parse_attributes(cols[8])
-            ftype = cols[2]
-            old_id = attrs.get("ID", "")
+            raw_trna.append((cols[:8], attrs))
 
-            if ftype == "gene":
-                trna_counter += 1
-                new_id = f"{ASM}_tRNA{trna_counter}"
-                trna_id_map[old_id] = new_id
-                attrs["ID"] = new_id
-            elif ftype == "tRNA":
-                parent = attrs.get("Parent", "")
-                new_parent = trna_id_map.get(parent, parent)
+    # Pass 1: assign new IDs to top-level features (tRNA, pseudogene, or gene)
+    for cols8, attrs in raw_trna:
+        ftype = cols8[2]
+        old_id = attrs.get("ID", "")
+        parent = attrs.get("Parent", "")
+
+        if ftype == "gene":
+            # Some tRNAscan versions emit gene wrappers — handle both formats
+            trna_counter += 1
+            new_id = f"{ASM}_tRNA{trna_counter}"
+            trna_id_map[old_id] = new_id
+            attrs["ID"] = new_id
+
+        elif ftype == "tRNA":
+            if parent and parent in trna_id_map:
+                # tRNA is child of a gene → treat as transcript
+                new_parent = trna_id_map[parent]
                 new_id = f"{new_parent}.trna1"
                 trna_id_map[old_id] = new_id
                 attrs["ID"] = new_id
                 attrs["Parent"] = new_parent
             else:
-                parent = attrs.get("Parent", "")
-                if parent in trna_id_map:
-                    attrs["Parent"] = trna_id_map[parent]
-                if old_id in trna_id_map:
-                    attrs["ID"] = trna_id_map[old_id]
+                # tRNA is top-level (no gene parent) — this is the common case
+                trna_counter += 1
+                new_id = f"{ASM}_tRNA{trna_counter}"
+                trna_id_map[old_id] = new_id
+                attrs["ID"] = new_id
+                # Remove empty/dangling Parent if present
+                if "Parent" in attrs and not attrs["Parent"]:
+                    del attrs["Parent"]
 
-            trna_records.append(cols[:8] + [attrs])
+        elif ftype == "pseudogene":
+            trna_pseudo_counter += 1
+            new_id = f"{ASM}_tRNA_pseudo{trna_pseudo_counter}"
+            trna_id_map[old_id] = new_id
+            attrs["ID"] = new_id
+
+    # Pass 2: update child features (exons) to point to new parent IDs
+    for cols8, attrs in raw_trna:
+        ftype = cols8[2]
+        if ftype in ("gene", "tRNA", "pseudogene"):
+            continue
+        old_parent = attrs.get("Parent", "")
+        if old_parent in trna_id_map:
+            new_parent = trna_id_map[old_parent]
+            attrs["Parent"] = new_parent
+            # Renumber exon ID
+            old_id = attrs.get("ID", "")
+            if old_id:
+                # Preserve exon numbering from original ID if present
+                import re as _re
+                exon_match = _re.search(r'exon(\d+)', old_id)
+                exon_num = exon_match.group(1) if exon_match else "1"
+                attrs["ID"] = f"{new_parent}.exon{exon_num}"
+
+    for cols8, attrs in raw_trna:
+        trna_records.append(cols8 + [attrs])
 
     # ═══════════════════════════════════════════════════════════════════════════
     # 3. Parse Infernal GFF3 — renumber
