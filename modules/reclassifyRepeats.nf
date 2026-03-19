@@ -12,15 +12,9 @@
     patterns to classify these into Wicker superfamilies without requiring
     homology, reducing the Unknown fraction substantially.
 
-    Already-classified families (those with a class/superfamily from
-    RepeatClassifier) are trusted and passed through unchanged — homology-based
-    classification is more precise when a close match exists.
-
-    Strategy:
-      1. Split classified library into Known (has class) and Unknown subsets
-      2. Run Terrier on Unknown subset with user-defined confidence threshold
-      3. Merge reclassified families back with Known families
-      4. Produce a reclassification report
+    Terrier's --unknown-only flag ensures that already-classified families
+    (those with a class/superfamily from RepeatClassifier) pass through
+    unchanged — only "Unknown" headers are updated.
 
     Inputs:
         - assembly_id:       Sample identifier
@@ -30,7 +24,7 @@
         - reclassified_lib:  ${assembly_id}_reclassified_repeats.fa
         - reclass_report:    ${assembly_id}_reclassification_report.tsv
 
-    Tools: Terrier (pip: terrier-bio), Python 3 (stdlib only), seqkit
+    Tools: Terrier (pip: bio-terrier), Python 3 (stdlib only)
     Reference:
         Turnbull et al. (2025) Terrier: a deep learning repeat classifier.
         Briefings in Bioinformatics 26(4):bbaf442
@@ -56,189 +50,82 @@ process RECLASSIFY_REPEATS {
     """
     set -euo pipefail
 
-    # ── 1. Split library into Known and Unknown ───────────────────────────────
-    #   RepeatClassifier format: >famname#Class/Superfamily
-    #   Unknown families have #Unknown or no classification after #
+    # ── 1. Run Terrier on entire library (--unknown-only renames only Unknown) ─
+    terrier \\
+        --input ${classified_lib} \\
+        --output-fasta ${assembly_id}_reclassified_repeats.fa \\
+        --output-csv terrier_probabilities.csv \\
+        --threshold ${threshold} \\
+        --unknown-only
+
+    # ── 2. Build reclassification report ──────────────────────────────────────
     python3 - <<'PYEOF'
 import sys
 
-known_f = open("known_repeats.fa", "w")
-unknown_f = open("unknown_repeats.fa", "w")
-unknown_ids = set()
-known_ids = set()
-
-current_header = None
-current_seq = []
-is_unknown = False
-
-def flush():
-    if current_header is None:
-        return
-    if is_unknown:
-        unknown_f.write(current_header + "\\n")
-        unknown_ids.add(current_header.split()[0][1:])
-        for s in current_seq:
-            unknown_f.write(s + "\\n")
-    else:
-        known_f.write(current_header + "\\n")
-        known_ids.add(current_header.split()[0][1:])
-        for s in current_seq:
-            known_f.write(s + "\\n")
-
-with open("${classified_lib}") as fh:
-    for line in fh:
-        line = line.rstrip("\\n")
-        if line.startswith(">"):
-            flush()
-            current_header = line
-            current_seq = []
-            # Check classification
-            seqid = line.split()[0][1:]  # strip >
-            if "#" in seqid:
-                classif = seqid.split("#", 1)[1]
-                is_unknown = classif.lower().startswith("unknown") or classif == ""
-            else:
-                is_unknown = True
-        else:
-            current_seq.append(line)
-    flush()
-
-known_f.close()
-unknown_f.close()
-
-print(f"Split: {len(known_ids)} known, {len(unknown_ids)} unknown", file=sys.stderr)
-PYEOF
-
-    n_unknown=\$(grep -c '^>' unknown_repeats.fa || echo 0)
-    n_known=\$(grep -c '^>' known_repeats.fa || echo 0)
-    echo "Known families: \${n_known}, Unknown families: \${n_unknown}" >&2
-
-    # ── 2. Run Terrier on Unknown families ────────────────────────────────────
-    if [ "\${n_unknown}" -gt 0 ]; then
-        terrier \\
-            --input unknown_repeats.fa \\
-            --output-fasta terrier_classified.fa \\
-            --csv terrier_probabilities.csv \\
-            --threshold ${threshold}
-    else
-        touch terrier_classified.fa
-        touch terrier_probabilities.csv
-        echo "No unknown families to reclassify" >&2
-    fi
-
-    # ── 3. Parse Terrier output and build reclassified library ────────────────
-    python3 - <<'PYEOF2'
-import csv
-import sys
-
-THRESHOLD = ${threshold}
 ASM = "${assembly_id}"
 
-# ── Parse Terrier classified FASTA ────────────────────────────────────────
-#   Terrier appends classification to the header:
-#   >famname#Unknown → >famname#Unknown DNA/hAT-Ac
-#   or leaves it unchanged if below threshold
-terrier_classes = {}  # original_id → new_class
+# Compare input and output headers to identify what changed
+original_headers = {}
+with open("${classified_lib}") as fh:
+    for line in fh:
+        if line.startswith(">"):
+            seqid = line.strip().split()[0][1:]
+            original_headers[seqid] = line.strip()
 
-try:
-    with open("terrier_classified.fa") as fh:
-        for line in fh:
-            if line.startswith(">"):
-                parts = line.strip()[1:].split()
-                original_id = parts[0]  # famname#Unknown
-                if len(parts) > 1:
-                    # Terrier appended a classification
-                    new_class = parts[-1]
-                    # Validate it looks like a TE class
-                    if "/" in new_class or new_class in (
-                        "DNA", "LINE", "SINE", "LTR", "RC",
-                        "Retroposon", "Satellite", "Unknown"
-                    ):
-                        if new_class.lower() != "unknown":
-                            terrier_classes[original_id] = new_class
-except FileNotFoundError:
-    pass
+reclassified_headers = {}
+with open(f"{ASM}_reclassified_repeats.fa") as fh:
+    for line in fh:
+        if line.startswith(">"):
+            seqid_full = line.strip().split()[0][1:]
+            reclassified_headers[seqid_full] = line.strip()
 
-n_reclassified = len(terrier_classes)
-print(f"Terrier reclassified {n_reclassified} families (threshold={THRESHOLD})",
-      file=sys.stderr)
+# Match by sequence order (Terrier may change the seqid when reclassifying)
+orig_list = []
+with open("${classified_lib}") as fh:
+    for line in fh:
+        if line.startswith(">"):
+            orig_list.append(line.strip())
 
-# ── Build reclassified library ────────────────────────────────────────────
-#   Known families: pass through unchanged
-#   Unknown families: update header if Terrier provided a classification
-n_kept_unknown = 0
+reclass_list = []
+with open(f"{ASM}_reclassified_repeats.fa") as fh:
+    for line in fh:
+        if line.startswith(">"):
+            reclass_list.append(line.strip())
 
-with open(f"{ASM}_reclassified_repeats.fa", "w") as out:
-    # Write known families unchanged
-    with open("known_repeats.fa") as fh:
-        for line in fh:
-            out.write(line)
+n_reclassified = 0
+n_unchanged = 0
+n_known = 0
 
-    # Write unknown families with updated classification
-    current_header = None
-    current_seq = []
-
-    def flush_unknown():
-        global n_kept_unknown
-        if current_header is None:
-            return
-        seqid = current_header.split()[0][1:]
-        rest = current_header.split()[1:] if len(current_header.split()) > 1 else []
-
-        if seqid in terrier_classes:
-            # Replace Unknown with Terrier classification
-            base_name = seqid.split("#")[0]
-            new_class = terrier_classes[seqid]
-            new_header = f">{base_name}#{new_class}"
-            if rest:
-                new_header += " " + " ".join(rest)
-            out.write(new_header + "\\n")
-        else:
-            # Keep as Unknown
-            out.write(current_header + "\\n")
-            n_kept_unknown += 1
-
-        for s in current_seq:
-            out.write(s + "\\n")
-
-    try:
-        with open("unknown_repeats.fa") as fh:
-            for line in fh:
-                line = line.rstrip("\\n")
-                if line.startswith(">"):
-                    flush_unknown()
-                    current_header = line
-                    current_seq = []
-                else:
-                    current_seq.append(line)
-            flush_unknown()
-    except FileNotFoundError:
-        pass
-
-print(f"Final: {n_reclassified} reclassified, {n_kept_unknown} still Unknown",
-      file=sys.stderr)
-
-# ── Write report ──────────────────────────────────────────────────────────
 with open(f"{ASM}_reclassification_report.tsv", "w") as out:
     out.write("repeat_id\\toriginal_class\\tterrier_class\\tstatus\\n")
 
-    # Parse all unknown IDs
-    try:
-        with open("unknown_repeats.fa") as fh:
-            for line in fh:
-                if line.startswith(">"):
-                    seqid = line.strip().split()[0][1:]
-                    original = seqid.split("#", 1)[1] if "#" in seqid else "Unknown"
-                    if seqid in terrier_classes:
-                        out.write(f"{seqid}\\t{original}\\t{terrier_classes[seqid]}\\treclassified\\n")
-                    else:
-                        out.write(f"{seqid}\\t{original}\\t-\\tunchanged\\n")
-    except FileNotFoundError:
-        pass
+    for i, (orig_hdr, new_hdr) in enumerate(zip(orig_list, reclass_list)):
+        orig_id = orig_hdr.split()[0][1:]
+        new_id = new_hdr.split()[0][1:]
 
-PYEOF2
+        orig_class = orig_id.split("#", 1)[1] if "#" in orig_id else ""
+        new_class = new_id.split("#", 1)[1] if "#" in new_id else ""
 
-    # ── 4. Summary ────────────────────────────────────────────────────────────
+        is_unknown = orig_class.lower().startswith("unknown") or orig_class == ""
+
+        if not is_unknown:
+            n_known += 1
+            # Don't report known families
+            continue
+
+        if new_class != orig_class and new_class.lower() != "unknown" and new_class != "":
+            n_reclassified += 1
+            out.write(f"{orig_id}\\t{orig_class}\\t{new_class}\\treclassified\\n")
+        else:
+            n_unchanged += 1
+            out.write(f"{orig_id}\\t{orig_class}\\t-\\tunchanged\\n")
+
+print(f"Reclassification: {n_known} already classified, "
+      f"{n_reclassified} reclassified by Terrier, "
+      f"{n_unchanged} still Unknown", file=sys.stderr)
+PYEOF
+
+    # ── 3. Summary ────────────────────────────────────────────────────────────
     n_total=\$(grep -c '^>' ${assembly_id}_reclassified_repeats.fa)
     n_still_unknown=\$(grep '^>' ${assembly_id}_reclassified_repeats.fa | grep -ci '#unknown' || echo 0)
     echo "Reclassified library: \${n_total} total families, \${n_still_unknown} still Unknown" >&2
