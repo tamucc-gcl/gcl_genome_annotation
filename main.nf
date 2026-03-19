@@ -36,6 +36,9 @@ params.repModel_rounds = 3
 params.min_repeat_length = 100
 params.cluster_pct       = 0.95   // set to 0 or null to skip clustering
 
+// Repeat reclassification (Terrier)
+params.terrier_threshold = 0.7    // min probability for Terrier classification
+
 // Repeat library filtering
 params.repeat_filter_pident = 25     // min % identity to flag as gene-derived
 params.repeat_filter_evalue = 1e-10  // max e-value for repeat library BLASTX
@@ -123,6 +126,7 @@ include { CURATE_DFAM; DOWNLOAD_DFAM_DB } from './modules/curateDfam.nf'
 include { REPEAT_MODEL  } from './modules/repeatModel.nf'
 include { CURATE_REPEATS } from './modules/curateRepeats.nf'
 include { CLASSIFY_REPEATS } from './modules/classifyRepeats.nf'
+include { RECLASSIFY_REPEATS } from './modules/reclassifyRepeats.nf'
 include { EXTRACT_REPEAT_PEPS; FILTER_REPEAT_LIBRARY } from './modules/filterRepeatLibrary.nf'
 //include { REPEAT_MASK   } from './modules/repeatMask.nf'
 include { REPEAT_MASK_PARALLEL as REPEAT_MASK } from './workflows/repeatMaskParallel.nf'
@@ -235,20 +239,26 @@ workflow {
     // ── Step 3: Classify de novo repeats (per genome) ──────────────────────────
     CLASSIFY_REPEATS(CURATE_REPEATS.out.clustered_repeats)
 
-    // ── Step 4: Filter gene-derived sequences from repeat library ──────────────────────────
+    // ── Step 3b: Reclassify Unknown families with Terrier (per genome) ───────
+    //   Uses deep learning to assign superfamily labels to families that
+    //   RepeatClassifier couldn't classify via homology. Already-classified
+    //   families pass through unchanged.
+    RECLASSIFY_REPEATS(CLASSIFY_REPEATS.out.curated_repeats)
+
+    // ── Step 4: Filter gene-derived sequences from repeat library ──────────────
     //   Uses two-database strategy: RepeatPeps (TE proteins) + SwissProt
     //   Repeats hitting RepeatPeps are confirmed TEs → kept
     //   Repeats hitting only SwissProt above threshold → gene-derived → removed
     FILTER_REPEAT_LIBRARY(
-        CLASSIFY_REPEATS.out.curated_repeats,
+        RECLASSIFY_REPEATS.out.reclassified_lib,
         DOWNLOAD_DIAMOND_DB.out.diamond_db,
         EXTRACT_REPEAT_PEPS.out.repeat_peps)
 
     // ── Step 5: Mask genome with combined libraries (per genome) ─────────────
-    // Join assembly path back with curated repeats on assembly_id
+    // Join assembly path back with filtered repeats on assembly_id
     ch_mask_input = ch_assemblies_filtered
         .join(FILTER_REPEAT_LIBRARY.out.filtered_lib)
-        // produces: [assembly_id, assembly_path, curated_repeats]
+        // produces: [assembly_id, assembly_path, filtered_repeats]
 
     REPEAT_MASK(ch_mask_input, 
                 CURATE_DFAM.out.dfam_lib.collect())
@@ -305,7 +315,7 @@ workflow {
 
     FLAG_TE_GENES(
         ch_flag_input,
-        CLASSIFY_REPEATS.out.curated_repeats)
+        RECLASSIFY_REPEATS.out.reclassified_lib)
     //   ↑ Use the PRE-filter repeat library here — we want all TE sequences
     //     for homology detection, including ones removed from masking library
 
