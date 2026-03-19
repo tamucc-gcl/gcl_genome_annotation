@@ -59,9 +59,16 @@ params.rfam_database = null // path to Rfam database directory (contains Rfam.cm
 params.rfam_version = 'CURRENT' // only one version
 
 // Braker Params
-params.braker_rounds     = 5
+params.braker_rounds     = 8
 params.braker_ab_initio  = false
-params.protein_database  = null   // path to OrthoDB proteins
+params.orthodb_database  = null  // permanent store for OrthoDB
+params.orthodb_clade     = 'Vertebrata'                       // OrthoDB clade to download set to null to skip and not include orthoDB
+params.ref_proteome_accession = null  // NCBI accession for close relative (e.g. 'GCF_900700415.2' for Clupea harengus)
+
+// Post-BRAKER gene model filtering
+params.filter_min_cds_length    = 300   // min CDS bp for single-exon genes (100 aa)
+params.filter_min_gene_length   = 200   // min gene span bp
+params.filter_min_intron_length = 10    // genes with ALL introns below this are removed
 
 // Structural QC
 params.busco_lineage = 'actinopterygii_odb10'
@@ -73,7 +80,6 @@ params.ncbi_speciesID = null
 // TE gene flagging
 params.te_flag_overlap_frac = 0.5    // min fraction of gene covered by repeats
 params.te_flag_evalue       = 1e-10  // max e-value for protein-vs-TE BLASTP
-
 
 // Functional Annotations
 params.n_chunks = 8 // number of chunks to split proteins into for parallel processing in InterProScan, Diamond, eggNOG. Adjust based on size of proteome and available resources.
@@ -138,7 +144,10 @@ include { TELOMERE_ANNOTATION } from './modules/telomere.nf'
 include { CENTROMERE_ANNOTATION; CENTROMERE_TO_GFF3 } from './modules/centromere.nf'
 
 // ── Structural annotation ─────────────────────────────
+include { DOWNLOAD_ORTHODB } from './modules/downloadOrthoDB.nf'
+include { PREPARE_PROTEIN_DB } from './modules/prepareProteinDb.nf'
 include { BRAKER } from './modules/braker.nf'
+include { FILTER_GENE_MODELS } from './modules/filterGeneModels.nf'
 include { FLAG_TE_GENES } from './modules/flagTeGenes.nf'
 include { AGAT } from './modules/agat.nf'
 include { BUSCO; DOWNLOAD_BUSCO_DB } from './modules/busco.nf'
@@ -180,6 +189,21 @@ workflow {
         Database Downloads
     ========================================================================================
     */
+
+    // ── Step 0: Prepare protein database for BRAKER ─────────────────────────
+    //   Supports four configurations:
+    //     --orthodb_clade Vertebrata --ref_proteome_accession GCF_xxx → combined
+    //     --orthodb_clade Vertebrata                                  → OrthoDB only
+    //     --ref_proteome_accession GCF_xxx                            → reference only
+    //     (neither specified)                                         → no protein evidence
+    if (params.orthodb_clade) {
+        DOWNLOAD_ORTHODB(params.orthodb_clade)
+        ch_orthodb = DOWNLOAD_ORTHODB.out.orthodb_proteins
+    } else {
+        ch_orthodb = Channel.fromPath("${projectDir}/assets/NO_PROT_DB")
+    }
+    
+    PREPARE_PROTEIN_DB(DOWNLOAD_ORTHODB.out.orthodb_proteins)
 
     // ── Step 0: DFam (runs once) ─────────────────────────────
     DOWNLOAD_DFAM_DB(params.dfam_version)
@@ -297,19 +321,19 @@ workflow {
     ========================================================================================
     */
 
-    // ── Step 5: Run Breaker on SoftMasked genome (per genome) ─────────────
-    ch_prot_db = params.protein_database
-        ? Channel.fromPath(params.protein_database, checkIfExists: true)
-        : Channel.fromPath("${projectDir}/assets/NO_PROT_DB")
-    //ch_augustus_config = Channel.fromPath(params.augustus_config, checkIfExists: true)
+    // ── Step 5a: Run Breaker on SoftMasked genome (per genome) ─────────────
+    BRAKER(REPEAT_MASK.out.masked_fasta,
+            PREPARE_PROTEIN_DB.out.combined_proteins.collect())
 
-    BRAKER(REPEAT_MASK.out.masked_fasta, 
-            ch_prot_db.collect()) 
-            //ch_augustus_config.collect())
+    // ── Step 5b: Run gene filtering (per genome) ─────────────
+    FILTER_GENE_MODELS(
+        BRAKER.out.braker_gff3
+            .join(BRAKER.out.braker_proteins))
 
-    // ── Step 5b: Flag TE-derived gene models ───────────────────────────────
-    ch_flag_input = BRAKER.out.braker_gff3
-        .join(BRAKER.out.braker_proteins)
+
+    // ── Step 5c: Flag TE-derived gene models ───────────────────────────────
+    ch_flag_input = FILTER_GENE_MODELS.out.filtered_gff3
+        .join(FILTER_GENE_MODELS.out.filtered_proteins)
         .join(REPEAT_MASK.out.repeat_gff)
         // produces: [assembly_id, braker_gff3, braker_proteins, repeat_gff]
 
@@ -329,12 +353,12 @@ workflow {
 
     // ── Step 7: Run BUSCO on protein predictions (per genome) ─────────────
     BUSCO(
-        BRAKER.out.braker_proteins,
+        FILTER_GENE_MODELS.out.filtered_proteins,
         DOWNLOAD_BUSCO_DB.out.db)
 
     // ── Step 8: Run OMArk on protein predictions (per genome) ─────────────
     OMARK(
-        BRAKER.out.braker_proteins,
+        FILTER_GENE_MODELS.out.filtered_proteins,
         DOWNLOAD_OMARK_DB.out.omamer_db,
         DOWNLOAD_OMARK_DB.out.taxa_db)
 
@@ -359,7 +383,7 @@ workflow {
 
     // ── Step 11: Split proteins into chunks ─────────────
     CHUNK_PROTEINS(
-        BRAKER.out.braker_proteins)
+        FILTER_GENE_MODELS.out.filtered_proteins)
 
     // ch_chunks: (assembly_id, chunk_id, chunk_file)
     ch_chunks = CHUNK_PROTEINS.out.chunks

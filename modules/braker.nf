@@ -34,7 +34,7 @@ process BRAKER {
     tuple val(assembly_id), path("${assembly_id}_cds.fa"), emit: braker_cds
 
     script:
-    def prot_arg       = protein_database.name != 'NO_PROT_DB' ? "--prot_seq=${protein_database}" : ''
+    def prot_arg       = protein_database.size() > 0 ? "--prot_seq=${protein_database}" : ''
     def ab_initio_arg  = params.braker_ab_initio ? '--AUGUSTUS_ab_initio' : ''
     def rounds         = params.braker_rounds ?: 5
     //def species        = params.braker_species ?: assembly_id
