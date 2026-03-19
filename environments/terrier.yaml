@@ -4,7 +4,7 @@ channels:
   - defaults
 dependencies:
   - python >=3.9,<3.12
-  - pytorch >=2.0,<2.6
   - pip
   - pip:
+    - torch >=2.0,<2.6
     - bio-terrier
