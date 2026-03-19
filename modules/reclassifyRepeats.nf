@@ -115,8 +115,9 @@ PYEOF
 
     # ── 2. Run Terrier on Unknown families ────────────────────────────────────
     if [ "\${n_unknown}" -gt 0 ]; then
-        terrier classify unknown_repeats.fa \\
-            --output terrier_classified.fa \\
+        terrier \\
+            --input unknown_repeats.fa \\
+            --output-fasta terrier_classified.fa \\
             --csv terrier_probabilities.csv \\
             --threshold ${threshold}
     else

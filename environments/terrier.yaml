@@ -6,4 +6,4 @@ dependencies:
   - python >=3.9,<3.12
   - pip
   - pip:
-    - terrier-bio
+    - bio-terrier
