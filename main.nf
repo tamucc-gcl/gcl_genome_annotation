@@ -5,7 +5,7 @@
     GENOME ANNOTATION PIPELINE
 ========================================================================================
     Repeat modeling, curation, and masking pipeline
-
+ 
     Usage:
         nextflow run main.nf \
             --sample_sheet samples.csv \
@@ -36,6 +36,10 @@ params.repModel_rounds = 3
 params.min_repeat_length = 100
 params.cluster_pct       = 0.95   // set to 0 or null to skip clustering
 
+// Repeat library filtering
+params.repeat_filter_pident = 25     // min % identity to flag as gene-derived
+params.repeat_filter_evalue = 1e-10  // max e-value for repeat library BLASTX
+
 // RepeatMasker
 params.job_speed = 's'            // null, 's', 'q', 'qq'
 params.n_rm_chunks = 8          // number of chunks to split genome into for parallel RepeatMasker runs. Adjust based on genome size and available resources.
@@ -62,6 +66,11 @@ params.busco_database = '/work/birdlab/databases/busco'
 params.oma_db_name = 'LUCA'   //https://omabrowser.org/oma/current/ see here for names
 params.omark_database = '/work/birdlab/databases/omark' 
 params.ncbi_speciesID = null
+
+// TE gene flagging
+params.te_flag_overlap_frac = 0.5    // min fraction of gene covered by repeats
+params.te_flag_evalue       = 1e-10  // max e-value for protein-vs-TE BLASTP
+
 
 // Functional Annotations
 params.n_chunks = 8 // number of chunks to split proteins into for parallel processing in InterProScan, Diamond, eggNOG. Adjust based on size of proteome and available resources.
@@ -114,6 +123,7 @@ include { CURATE_DFAM; DOWNLOAD_DFAM_DB } from './modules/curateDfam.nf'
 include { REPEAT_MODEL  } from './modules/repeatModel.nf'
 include { CURATE_REPEATS } from './modules/curateRepeats.nf'
 include { CLASSIFY_REPEATS } from './modules/classifyRepeats.nf'
+include { EXTRACT_REPEAT_PEPS; FILTER_REPEAT_LIBRARY } from './modules/filterRepeatLibrary.nf'
 //include { REPEAT_MASK   } from './modules/repeatMask.nf'
 include { REPEAT_MASK_PARALLEL as REPEAT_MASK } from './workflows/repeatMaskParallel.nf'
 
@@ -125,6 +135,7 @@ include { CENTROMERE_ANNOTATION; CENTROMERE_TO_GFF3 } from './modules/centromere
 
 // ── Structural annotation ─────────────────────────────
 include { BRAKER } from './modules/braker.nf'
+include { FLAG_TE_GENES } from './modules/flagTeGenes.nf'
 include { AGAT } from './modules/agat.nf'
 include { BUSCO; DOWNLOAD_BUSCO_DB } from './modules/busco.nf'
 include { OMARK; DOWNLOAD_OMARK_DB } from './modules/omark.nf'
@@ -191,6 +202,9 @@ workflow {
     // ── Step 0: Download KoFamScan database (runs once) ─────────────────────────────
     DOWNLOAD_KOFAMSCAN_DB(params.kofamscan_version)
 
+    // ── Step 0: Extract repeat peptides (runs once) ───────────────────────────── 
+    EXTRACT_REPEAT_PEPS()
+
     /*
     ========================================================================================
         Assembly Filtering and Stats
@@ -221,10 +235,19 @@ workflow {
     // ── Step 3: Classify de novo repeats (per genome) ──────────────────────────
     CLASSIFY_REPEATS(CURATE_REPEATS.out.clustered_repeats)
 
-    // ── Step 4: Mask genome with combined libraries (per genome) ─────────────
+    // ── Step 4: Filter gene-derived sequences from repeat library ──────────────────────────
+    //   Uses two-database strategy: RepeatPeps (TE proteins) + SwissProt
+    //   Repeats hitting RepeatPeps are confirmed TEs → kept
+    //   Repeats hitting only SwissProt above threshold → gene-derived → removed
+    FILTER_REPEAT_LIBRARY(
+        CLASSIFY_REPEATS.out.curated_repeats,
+        DOWNLOAD_DIAMOND_DB.out.diamond_db,
+        EXTRACT_REPEAT_PEPS.out.repeat_peps)
+
+    // ── Step 5: Mask genome with combined libraries (per genome) ─────────────
     // Join assembly path back with curated repeats on assembly_id
     ch_mask_input = ch_assemblies_filtered
-        .join(CLASSIFY_REPEATS.out.curated_repeats)
+        .join(FILTER_REPEAT_LIBRARY.out.filtered_lib)
         // produces: [assembly_id, assembly_path, curated_repeats]
 
     REPEAT_MASK(ch_mask_input, 
@@ -274,9 +297,22 @@ workflow {
             ch_prot_db.collect()) 
             //ch_augustus_config.collect())
 
+    // ── Step 5b: Flag TE-derived gene models ───────────────────────────────
+    ch_flag_input = BRAKER.out.braker_gff3
+        .join(BRAKER.out.braker_proteins)
+        .join(REPEAT_MASK.out.repeat_gff)
+        // produces: [assembly_id, braker_gff3, braker_proteins, repeat_gff]
+
+    FLAG_TE_GENES(
+        ch_flag_input,
+        CLASSIFY_REPEATS.out.curated_repeats)
+    //   ↑ Use the PRE-filter repeat library here — we want all TE sequences
+    //     for homology detection, including ones removed from masking library
+
+
     // ── Step 6: Get descriptive stats for annotations (per genome) ─────────────
     ch_agat_inputs = ch_assemblies_filtered
-        .join(BRAKER.out.braker_gff3, by: 0)
+        .join(FLAG_TE_GENES.out.flagged_gff3, by: 0)
         .map { id, assembly_path, gff_path -> tuple(id, assembly_path, gff_path) }
 
     AGAT(ch_agat_inputs)
@@ -402,7 +438,7 @@ workflow {
     MERGE_FUNCTIONAL_ANNOTATIONS(ch_func_merged)
 
     // ── Step 18: Merge all GFF3s and decorate with functional annotations ───────
-    ch_annotate_input = BRAKER.out.braker_gff3
+    ch_annotate_input = FLAG_TE_GENES.out.flagged_gff3
         .join(tRNASCAN.out.trnascan_gff3)
         .join(INFERNAL.out.infernal_gff3)
         .join(TELOMERE_ANNOTATION.out.telomere_gff3)

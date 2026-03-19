@@ -206,6 +206,8 @@ def main():
         ("n_named",              "Named products",        True),
         ("n_hypothetical",       "Hypothetical proteins", True),
         ("pct_named",            "Named (%)",             False),
+        ("n_te_flagged",         "TE-flagged genes",      True),
+        ("pct_te_flagged",       "TE-flagged (%)",        False),
         ("unique_go_terms",      "Unique GO terms",       True),
         ("unique_kegg_kos",      "Unique KEGG KOs",       True),
     ]))
@@ -415,11 +417,24 @@ def main():
         ("n_hypothetical",  "Hypothetical",      True),
         ("pct_named",       "Named (%)",         False),
         ("pct_hypothetical","Hypothetical (%)",  False),
+        ("n_te_flagged",    "TE-flagged genes",  True),
+        ("pct_te_flagged",  "TE-flagged (%)",    False),
         ("unique_go_terms", "Unique GO terms",   True),
         ("unique_kegg_kos", "Unique KEGG KOs",   True),
     ]))
     W.append("")
     W.append("### Details\n")
+
+    # TE-derived gene models section
+    te_img = img(pd, md_pd, "C_te_flagged.png")
+    if te_img:
+        W.append("#### TE-derived gene models\n")
+        W.append("Gene models flagged as putative TE-derived based on repeat overlap "
+                 "(≥50% covered by RepeatMasker) and/or protein homology to known TE sequences. "
+                 "These are retained in the GFF3 with `Note=putative_TE_derived` — "
+                 "filter with `grep -v putative_TE_derived` for a clean gene set.\n")
+        W.append(f"\n{te_img}\n")
+
     W.append(plot_grid_multi(aids, pd, md_pd, [
         ("Tool coverage",           "{aid}_functional_coverage"),
         ("Top products",            "{aid}_top_products"),
@@ -447,6 +462,7 @@ def main():
             ("omark_dup_unexpected", 15, None, "High unexpected duplication ({v:.1f}%) — possible haplotig duplication."),
             ("repeat_masked_pct",   None, 20, "Low repeat masking ({v:.1f}%) — fish genomes typically 30–50%."),
             ("pct_diamond",         None, 30, "Low SwissProt coverage ({v:.1f}%) — consider TrEMBL/NR."),
+            ("pct_te_flagged",      5,  None, "TE-flagged genes at {v:.1f}% — unclassified repeats may be inflating gene count. Consider cleaning repeat library or adding RNA-seq evidence."),
         ]
         for key, above, below, msg in checks:
             try:

@@ -31,6 +31,7 @@ def parse_gff3_counts(path):
     """Count features by source and type from a GFF3 file."""
     counts = defaultdict(int)
     scaffolds_with_genes = set()
+    n_te_flagged = 0
     with open(path) as fh:
         for line in fh:
             if line.startswith("#") or not line.strip():
@@ -42,6 +43,8 @@ def parse_gff3_counts(path):
             counts[(source, ftype)] += 1
             if source == "BRAKER3" and ftype == "gene":
                 scaffolds_with_genes.add(cols[0])
+                if "putative_TE_derived" in cols[8]:
+                    n_te_flagged += 1
 
     # Extract intron lengths for QC
     intron_lengths = []
@@ -66,6 +69,7 @@ def parse_gff3_counts(path):
         "n_repeat": sum(v for (s, t), v in counts.items() if s == "RepeatMasker"),
         "scaffolds_with_genes": len(scaffolds_with_genes),
         "short_introns_lt10": sum(1 for l in intron_lengths if l < 10),
+        "n_te_flagged": n_te_flagged,
     }
 
 
@@ -249,6 +253,8 @@ def main():
         n_named = m.get("n_named", 0)
         m["pct_named"] = round(100 * n_named / n_genes, 2) if n_genes else 0
         m["pct_hypothetical"] = round(100 * m.get("n_hypothetical", 0) / n_genes, 2) if n_genes else 0
+        n_te = m.get("n_te_flagged", 0)
+        m["pct_te_flagged"] = round(100 * n_te / n_genes, 2) if n_genes else 0
 
     # Write TSV
     if not assemblies:

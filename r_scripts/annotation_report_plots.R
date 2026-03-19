@@ -614,18 +614,32 @@ if ("repeat_masked_pct" %in% names(metrics)) {
             w = max(6, 3 + n_distinct(metrics$label) * 1.5))
 }
 
+if ("pct_te_flagged" %in% names(metrics)) {
+  p <- ggplot(metrics, aes(x = label, y = pct_te_flagged)) +
+    geom_col(fill = "#dc2626", alpha = 0.85) +
+    geom_text(aes(label = paste0(round(pct_te_flagged, 1), "%")),
+              vjust = -0.3, size = 3.5) +
+    scale_y_continuous(labels = comma) +
+    labs(title = "TE-flagged genes",
+         subtitle = "Putative transposable element-derived gene models",
+         x = NULL, y = "% of predicted genes") + theme_compare
+  save_plot(p, "C_te_flagged",
+            w = max(6, 3 + n_distinct(metrics$label) * 1.5))
+}
+
 # ============================================================================
 # MULTI-ASSEMBLY ONLY PLOTS
 # ============================================================================
 if (nrow(metrics) >= 2) {
 
-  feat_cols <- c("n_genes","n_trna","n_ncrna","n_telomere","n_centromere")
+  feat_cols <- c("n_genes","n_te_flagged","n_trna","n_ncrna","n_telomere","n_centromere")
   feat_cols <- feat_cols[feat_cols %in% names(metrics)]
   if (length(feat_cols) > 0) {
     fl <- metrics %>% select(label, all_of(feat_cols)) %>%
       pivot_longer(-label, names_to = "Feature", values_to = "Count") %>%
-      mutate(Feature = recode(Feature, n_genes="Genes", n_trna="tRNA",
-             n_ncrna="ncRNA", n_telomere="Telomeres", n_centromere="Centromeres"))
+      mutate(Feature = recode(Feature, n_genes="Genes", n_te_flagged="TE-flagged",
+             n_trna="tRNA", n_ncrna="ncRNA", n_telomere="Telomeres",
+             n_centromere="Centromeres"))
     p <- ggplot(fl, aes(x = label, y = Count, fill = Feature)) +
       geom_col(position = "dodge", alpha = 0.85) +
       scale_fill_brewer(palette = "Set2") + scale_y_continuous(labels = comma) +
@@ -674,14 +688,17 @@ if (nrow(metrics) >= 2) {
   }
 
   rc <- c("busco_complete","omark_consistent","pct_named",
-          "repeat_masked_pct","pct_diamond")
+          "repeat_masked_pct","pct_diamond","pct_te_flagged")
   rc <- rc[rc %in% names(metrics)]
   if (length(rc) >= 3) {
+    # Invert TE-flagged so lower = better displays correctly
     rl <- metrics %>% select(label, all_of(rc)) %>%
+      mutate(across(any_of("pct_te_flagged"), ~ 100 - .x)) %>%
       pivot_longer(-label, names_to = "Metric", values_to = "Score") %>%
       mutate(Metric = recode(Metric, busco_complete="BUSCO",
              omark_consistent="OMArk", pct_named="Named",
-             repeat_masked_pct="Masked", pct_diamond="SwissProt"))
+             repeat_masked_pct="Masked", pct_diamond="SwissProt",
+             pct_te_flagged="Non-TE (100-TE%)"))
     p <- ggplot(rl, aes(x = Metric, y = Score, color = label, group = label)) +
       geom_point(size = 3) + geom_line(linewidth = 0.8, alpha = 0.7) +
       scale_color_brewer(palette = "Set1") + coord_flip() +
