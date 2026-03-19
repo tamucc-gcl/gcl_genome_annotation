@@ -50,7 +50,8 @@
 process EXTRACT_REPEAT_PEPS {
     tag "RepeatPeps"
     label 'dfam'
-    storeDir "${params.outdir}/repeats/databases"
+    //storeDir "${params.outdir}/repeats/databases"
+    storeDir "${params.dfam_database}"
 
     output:
     path("RepeatPeps.lib"), emit: repeat_peps
