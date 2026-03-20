@@ -66,6 +66,7 @@ params.orthodb_clade     = 'Vertebrata'                       // OrthoDB clade t
 params.ref_proteome_accession = null  // NCBI accession for close relative (e.g. 'GCF_900700415.2' for Clupea harengus)
 
 // Post-BRAKER gene model filtering
+params.filter_max_aed = 0.7   // null = no AED filter; set e.g. 0.7 to remove unsupported genes
 params.filter_min_cds_length    = 300   // min CDS bp for single-exon genes (100 aa)
 params.filter_min_gene_length   = 200   // min gene span bp
 params.filter_min_intron_length = 10    // genes with ALL introns below this are removed
@@ -147,11 +148,13 @@ include { CENTROMERE_ANNOTATION; CENTROMERE_TO_GFF3 } from './modules/centromere
 include { DOWNLOAD_ORTHODB } from './modules/downloadOrthoDB.nf'
 include { PREPARE_PROTEIN_DB } from './modules/prepareProteinDb.nf'
 include { BRAKER } from './modules/braker.nf'
+include { COMPUTE_AED; AED_STUB } from './modules/computeAed.nf'
 include { FILTER_GENE_MODELS } from './modules/filterGeneModels.nf'
 include { FLAG_TE_GENES } from './modules/flagTeGenes.nf'
 include { AGAT } from './modules/agat.nf'
 include { BUSCO; DOWNLOAD_BUSCO_DB } from './modules/busco.nf'
 include { OMARK; DOWNLOAD_OMARK_DB } from './modules/omark.nf'
+include { STRUCTURAL_QC } from './modules/structural_qc.nf'
 
 // ── ncRNA annotation ─────────────────────────────
 include { tRNASCAN } from './modules/trna-scan.nf'
@@ -202,7 +205,7 @@ workflow {
     } else {
         ch_orthodb = Channel.fromPath("${projectDir}/assets/NO_PROT_DB")
     }
-    
+
     PREPARE_PROTEIN_DB(DOWNLOAD_ORTHODB.out.orthodb_proteins)
 
     // ── Step 0: DFam (runs once) ─────────────────────────────
@@ -325,10 +328,30 @@ workflow {
     BRAKER(REPEAT_MASK.out.masked_fasta,
             PREPARE_PROTEIN_DB.out.combined_proteins.collect())
 
+    // ── Compute AED (runs immediately after BRAKER) ──────────────
+    // protein_db is the combined FASTA from PREPARE_PROTEIN_DB.
+    // Only compute AED if a protein database was actually built.
+
+    ch_braker_for_aed = BRAKER.out.braker_gff3
+        .join(ch_masked_assembly)
+        .map { aid, gff, fa -> tuple(aid, fa, gff) }
+
+    if (params.orthodb_clade || params.ref_proteome_accession) {
+        COMPUTE_AED(ch_braker_for_aed, protein_db)
+        ch_aed_scores = COMPUTE_AED.out.aed_scores
+    } else {
+        // No protein DB → skip AED, emit header-only stub via /dev/null trick
+        AED_STUB(BRAKER.out.braker_gff3)
+        ch_aed_scores = AED_STUB.out.aed_scores
+    }
+
     // ── Step 5b: Run gene filtering (per genome) ─────────────
     FILTER_GENE_MODELS(
         BRAKER.out.braker_gff3
-            .join(BRAKER.out.braker_proteins))
+            .join(BRAKER.out.braker_proteins)
+            .join(COMPUTE_AED.out.aed_scores)
+            // → (assembly_id, gff3, proteins, aed_scores)
+        )
 
 
     // ── Step 5c: Flag TE-derived gene models ───────────────────────────────
@@ -467,7 +490,13 @@ workflow {
         .join(MERGE_DIAMOND.out.merged)
         .join(MERGE_KOFAMSCAN.out.merged)
         .join(MERGE_DEEPSIG.out.merged_gff3)
-        // produces: [assembly_id, ipr_tsv, eggnog_tsv, diamond_tsv, kofam_tsv, deepsig_gff3]
+        .join(BRAKER.out.braker_proteins)
+        .join(FLAG_TE_GENES.out.flagged_gff3)
+        .join(ch_assemblies_filtered)
+        .join(OMARK.out.omark_detailed)
+        .join(FILTER_GENE_MODELS.out.filtered_aed)
+        // produces: [assembly_id, ipr_tsv, eggnog_tsv, diamond_tsv, kofam_tsv, deepsig_gff3,
+        //            proteins_fa, flagged_gff3, genome_fasta, omark_detailed]
 
     MERGE_FUNCTIONAL_ANNOTATIONS(ch_func_merged)
 
@@ -483,6 +512,12 @@ workflow {
     //            telomere_gff3, centromere_gff3, repeat_gff, func_tsv]
 
     ANNOTATE_GFF3(ch_annotate_input)
+
+    // ── Step 18b: Structural QC per assembly ─────────────────────────
+    ch_structural_qc_in = MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv
+        .join(FLAG_TE_GENES.out.flagged_gff3)
+
+    STRUCTURAL_QC(ch_structural_qc_in)
 
     // ── Step 19: Get relevant sequences with annotations ───────
     ch_extract_input = ANNOTATE_GFF3.out.annotated_gff3
@@ -510,7 +545,8 @@ workflow {
         INFERNAL.out.infernal_tblout.map { id, f -> f }.collect(),
         TELOMERE_ANNOTATION.out.telomere_gff3.map { id, f -> f }.collect(),
         TELOMERE_ANNOTATION.out.telomere_tsv.map { id, f -> f }.collect(),
-        CENTROMERE_TO_GFF3.out.centromere_gff3.map { id, f -> f }.collect()
+        CENTROMERE_TO_GFF3.out.centromere_gff3.map { id, f -> f }.collect(),
+        STRUCTURAL_QC.out.structural_qc.map { id, f -> f }.collect()
     )
 }
 

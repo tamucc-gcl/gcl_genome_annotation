@@ -458,6 +458,8 @@ process ANNOTATE_GFF3 {
     # ═══════════════════════════════════════════════════════════════════════════
 
     gene_products = {}
+    gene_qualities = {}
+    FLAG_ORDER = {"FAIL": 2, "WARN": 1, "PASS": 0}
 
     for rec_list in [braker_records]:
         for entry in rec_list:
@@ -506,13 +508,38 @@ process ANNOTATE_GFF3 {
             if note:
                 attrs["Note"] = urllib.parse.quote(note, safe=" :/()-,.'")
 
+            # ── Quality attributes from enriched functional TSV ────────────
+            quality_flag = (func_rec.get("quality_flag") or "").strip()
+            if quality_flag and quality_flag not in (".", "-"):
+                attrs["quality_flag"] = quality_flag
+
+            omark_class = (func_rec.get("omark_class") or "").strip()
+            if omark_class and omark_class not in (".", "-"):
+                attrs["omark_class"] = omark_class
+
+            quality_reasons = (func_rec.get("quality_reasons") or "").strip()
+            if quality_reasons and quality_reasons not in (".", "-"):
+                existing_note = attrs.get("Note", "")
+                qr_safe = urllib.parse.quote(quality_reasons, safe=":;/()-,.")
+                qual_note = f"quality_issues:{qr_safe}"
+                attrs["Note"] = (existing_note + ";" + qual_note) if existing_note else qual_note
+
+            # ── AED attribute ──────────────────────────────────────────────
+            aed_val = (func_rec.get("aed") or "").strip()
+            if aed_val and aed_val not in (".", "-", ""):
+                attrs["_AED"] = aed_val
+
             parent_gene = mrna_to_gene.get(new_mrna_id, "")
             if parent_gene:
                 current = gene_products.get(parent_gene, "hypothetical protein")
                 if current == "hypothetical protein" or product != "hypothetical protein":
                     gene_products[parent_gene] = product
+                # Propagate worst quality flag to gene level
+                current_q = gene_qualities.get(parent_gene, "PASS")
+                if FLAG_ORDER.get(quality_flag, 0) > FLAG_ORDER.get(current_q, 0):
+                    gene_qualities[parent_gene] = quality_flag
 
-    # Propagate product to gene features
+    # Propagate product and quality flag to gene features
     for entry in braker_records:
         cols8 = entry[:8]
         attrs = entry[8]
@@ -521,6 +548,8 @@ process ANNOTATE_GFF3 {
             if gene_id in gene_products:
                 attrs["product"] = urllib.parse.quote(
                     gene_products[gene_id], safe=" :/()-,.'")
+            if gene_id in gene_qualities:
+                attrs["quality_flag"] = gene_qualities[gene_id]
 
     # ═══════════════════════════════════════════════════════════════════════════
     # 6. Write merged GFF3

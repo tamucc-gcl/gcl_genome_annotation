@@ -1,0 +1,8 @@
+name: miniprot
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - miniprot>=0.13
+  - python>=3.8

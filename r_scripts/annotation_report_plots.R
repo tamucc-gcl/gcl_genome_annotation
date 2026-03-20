@@ -279,6 +279,46 @@ for (func_path in functional_files) {
                    error = function(e) data.frame())
   if (nrow(func) == 0) next
 
+  # ── AED distribution ───────────────────────────────────────────────
+  if ("aed" %in% names(func)) {
+    aed_df <- func %>%
+      filter(!is.na(aed), aed != ".", aed != "-") %>%
+      mutate(aed = as.numeric(aed)) %>%
+      filter(!is.na(aed))
+
+    if (nrow(aed_df) > 0) {
+      # Cumulative distribution (the standard MAKER-style figure)
+      p <- ggplot(aed_df, aes(x = aed)) +
+        stat_ecdf(geom = "step", linewidth = 1, colour = "#2563eb") +
+        scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.1)) +
+        scale_y_continuous(labels = percent) +
+        geom_vline(xintercept = 0.5, linetype = "dashed", colour = "grey50") +
+        annotate("text", x = 0.52, y = 0.1, label = "AED = 0.5",
+                 color = "grey50", hjust = 0, size = 3) +
+        labs(title = paste0(aid, " — Cumulative AED Distribution"),
+             subtitle = paste0("n=", comma(nrow(aed_df)),
+                               ", median=", round(median(aed_df$aed), 3),
+                               ", <0.5: ", round(100 * mean(aed_df$aed < 0.5), 1), "%"),
+             x = "Annotation Edit Distance (AED)",
+             y = "Cumulative fraction of transcripts") + theme_report
+      save_plot(p, paste0(aid, "_aed_cumulative"))
+
+      # Histogram
+      p2 <- ggplot(aed_df, aes(x = aed)) +
+        geom_histogram(binwidth = 0.05, fill = "#2563eb",
+                       colour = "white", alpha = 0.85) +
+        scale_x_continuous(limits = c(0, 1.05), breaks = seq(0, 1, 0.1)) +
+        scale_y_continuous(labels = comma) +
+        geom_vline(xintercept = 0.5, linetype = "dashed", colour = "grey50") +
+        labs(title = paste0(aid, " — AED Distribution"),
+             subtitle = paste0("n=", comma(nrow(aed_df)),
+                               ", AED=1 (no evidence): ",
+                               comma(sum(aed_df$aed >= 0.999))),
+             x = "AED", y = "Number of transcripts") + theme_report
+      save_plot(p2, paste0(aid, "_aed_histogram"))
+    }
+  }
+
   # Tool coverage bar
   cov <- data.frame(
     Tool = c("InterProScan", "eggNOG", "DIAMOND", "KofamScan", "DeepSig"),
