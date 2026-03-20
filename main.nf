@@ -333,7 +333,7 @@ workflow {
     // Only compute AED if a protein database was actually built.
 
     ch_braker_for_aed = BRAKER.out.braker_gff3
-        .join(ch_masked_assembly)
+        .join(REPEAT_MASK.out.masked_fasta)
         .map { aid, gff, fa -> tuple(aid, fa, gff) }
 
     if (params.orthodb_clade || params.ref_proteome_accession) {
