@@ -337,7 +337,8 @@ workflow {
         .map { aid, gff, fa -> tuple(aid, fa, gff) }
 
     if (params.orthodb_clade || params.ref_proteome_accession) {
-        COMPUTE_AED(ch_braker_for_aed, protein_db)
+        COMPUTE_AED(ch_braker_for_aed, 
+                PREPARE_PROTEIN_DB.out.combined_proteins.collect())
         ch_aed_scores = COMPUTE_AED.out.aed_scores
     } else {
         // No protein DB → skip AED, emit header-only stub via /dev/null trick
