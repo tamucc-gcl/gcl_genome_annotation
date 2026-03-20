@@ -72,14 +72,16 @@ process FLAG_TE_GENES {
 
     echo "Genes with >=${overlap_frac} repeat overlap: \$(wc -l < overlap_flagged_ids.txt)" >&2
 
-    # ── 2. Translate repeat library and build DIAMOND DB ──────────────────────
-    #   Use all 6 reading frames to capture TE ORFs
+    # ── 2. Translate repeat library to protein and build DIAMOND DB ───────────
+    #   Use all 6 frames to capture TE ORFs
+    seqkit translate -f 6 --min-len 30 ${repeat_lib} > repeat_lib_translated.fa
+
     diamond makedb \
-        --in ${repeat_lib} \
+        --in repeat_lib_translated.fa \
         --db repeat_lib_db \
         --threads ${task.cpus}
 
-    # ── 3. BLASTP predicted proteins against repeat library ───────────────────
+    # ── 3. BLASTP predicted proteins against translated repeat library ────────
     diamond blastp \
         --db repeat_lib_db \
         --query ${braker_proteins} \
