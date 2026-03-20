@@ -1,354 +1,289 @@
 /*
 ========================================================================================
-    FLAG TE-DERIVED GENES
+    FILTER GENE MODELS
 ========================================================================================
-    Identify and flag predicted gene models that are likely derived from
-    transposable elements rather than bona fide host genes.
+    Post-BRAKER quality filter to remove clearly artifactual gene predictions.
 
-    Evidence sources:
-      1. Genomic overlap: gene model is ≥50% covered by RepeatMasker annotations
-      2. Protein homology: predicted protein has significant BLASTP similarity
-         to known TE proteins (from the de novo repeat library, translated)
+    Without RNA-seq evidence, BRAKER protein-only mode tends to over-predict
+    genes — particularly short single-exon ORFs in repeat-derived regions and
+    gene models with impossibly short introns. This module removes predictions
+    that fail basic structural plausibility checks while preserving all
+    defensible gene models.
 
-    Flagged genes receive a Note=putative_TE_derived attribute in the GFF3.
-    They are NOT removed — downstream users can filter at their discretion.
+    Filters applied (gene is removed if ANY criterion is met):
+      1. Single-exon gene with CDS < min_cds_length bp (default: 300 bp / 100 aa)
+         → Likely TE ORFs or random predictions
+      2. Gene total span < min_gene_length bp (default: 200 bp)
+         → Too short to be a real gene
+      3. ALL introns in the gene are < min_intron_length bp (default: 10 bp)
+         → Structural artifacts from GeneMark
 
-    Also produces a summary TSV with per-gene evidence for the flag.
+    Removal is at the gene level: if a gene is flagged, all its children
+    (mRNA, exon, CDS, intron, start_codon, stop_codon) are also removed.
+
+    Also filters the BRAKER protein FASTA to match, so downstream tools
+    (BUSCO, OMArk, functional annotation) operate on the cleaned gene set.
 
     Inputs:
         - assembly_id:       Sample identifier
         - braker_gff3:       BRAKER3 gene models GFF3
         - braker_proteins:   BRAKER3 predicted proteins FASTA
-        - repeat_gff:        RepeatMasker GFF annotation
-        - repeat_lib:        De novo repeat library FASTA (pre-filter, includes
-                             all TE sequences for homology search)
 
     Outputs:
-        - flagged_gff3:      ${assembly_id}.te_flagged.gff3
-        - te_gene_report:    ${assembly_id}.te_gene_report.tsv
+        - filtered_gff3:     ${assembly_id}.filtered_genes.gff3
+        - filtered_proteins: ${assembly_id}.filtered_proteins.fa
+        - removed_gff3:      ${assembly_id}.removed_genes.gff3
+        - filter_report:     ${assembly_id}.gene_filter_report.tsv
 
-    Tools: bedtools, DIAMOND (blastp, makedb), Python 3 (stdlib only)
+    Tools: Python 3 (stdlib only)
 ========================================================================================
 */
 
-process FLAG_TE_GENES {
+process FILTER_GENE_MODELS {
     tag "${assembly_id}"
-    label 'flag_te_genes'
+    label 'mergeFiles'
     publishDir "${params.outdir}/structural_annotation", mode: params.publish_dir_mode
 
     input:
-    tuple val(assembly_id), path(braker_gff3), path(braker_proteins), path(repeat_gff)
-    tuple val(assembly_id), path(repeat_lib)
+    tuple val(assembly_id), path(braker_gff3), path(braker_proteins)
 
     output:
-    tuple val(assembly_id), path("${assembly_id}.te_flagged.gff3"),
-        emit: flagged_gff3
-    tuple val(assembly_id), path("${assembly_id}.te_gene_report.tsv"),
-        emit: te_gene_report
+    tuple val(assembly_id), path("${assembly_id}.filtered_genes.gff3"),
+        emit: filtered_gff3
+    tuple val(assembly_id), path("${assembly_id}.filtered_proteins.fa"),
+        emit: filtered_proteins
+    tuple val(assembly_id), path("${assembly_id}.removed_genes.gff3"),
+        emit: removed_gff3
+    tuple val(assembly_id), path("${assembly_id}.gene_filter_report.tsv"),
+        emit: filter_report
 
     script:
-    def overlap_frac = params.te_flag_overlap_frac ?: 0.5
-    def blastp_evalue = params.te_flag_evalue ?: 1e-10
+    def min_cds_length    = params.filter_min_cds_length   ?: 300
+    def min_gene_length   = params.filter_min_gene_length  ?: 200
+    def min_intron_length = params.filter_min_intron_length ?: 10
     """
-    set -euo pipefail
+    #!/usr/bin/env python3
+    import sys
+    from collections import defaultdict, OrderedDict
 
-    # ── 1. Find genes with ≥N% overlap with repeat annotations ────────────────
-    #   Extract gene features, sort, intersect with repeat GFF
-    awk '\$3 == "gene"' ${braker_gff3} | sort -k1,1 -k4,4n > genes.bed
+    MIN_CDS_LENGTH    = ${min_cds_length}
+    MIN_GENE_LENGTH   = ${min_gene_length}
+    MIN_INTRON_LENGTH = ${min_intron_length}
+    ASM = "${assembly_id}"
 
-    # bedtools intersect: -f = min fraction of gene covered by repeats
-    # -wo = write overlap bp
-    bedtools intersect \
-        -a genes.bed \
-        -b <(awk '!/^#/ && NF >= 9' ${repeat_gff} | sort -k1,1 -k4,4n) \
-        -f ${overlap_frac} \
-        -wo \
-        | awk '{
-            # Extract gene ID from attributes (col 9)
-            match(\$9, /ID=([^;]+)/, arr)
-            if (arr[1] != "") print arr[1]
-        }' \
-        | sort -u > overlap_flagged_ids.txt
+    # ── Parse GFF3 into gene trees ────────────────────────────────────────────
 
-    echo "Genes with >=${overlap_frac} repeat overlap: \$(wc -l < overlap_flagged_ids.txt)" >&2
-
-    # ── 2. Translate repeat library to protein and build DIAMOND DB ───────────
-    #   Use all 6 frames to capture TE ORFs
-    seqkit translate -f 6 --min-len 30 ${repeat_lib} > repeat_lib_translated.fa
-
-    diamond makedb \
-        --in repeat_lib_translated.fa \
-        --db repeat_lib_db \
-        --threads ${task.cpus}
-
-    # ── 3. BLASTP predicted proteins against translated repeat library ────────
-    diamond blastp \
-        --db repeat_lib_db \
-        --query ${braker_proteins} \
-        --out prot_vs_repeats.tsv \
-        --outfmt 6 qseqid sseqid pident length qlen slen evalue bitscore \
-        --evalue ${blastp_evalue} \
-        --max-target-seqs 1 \
-        --threads ${task.cpus} \
-        || true  # OK if no hits
-
-    # ── 4. Identify proteins with strong TE homology ──────────────────────────
-    #   Map protein IDs back to gene IDs and flag
-    python3 - <<'PYEOF'
-import re
-import sys
-from collections import defaultdict
-
-ASM = "${assembly_id}"
-OVERLAP_FRAC = ${overlap_frac}
-
-# ── Load overlap-flagged gene IDs ─────────────────────────────────────────
-overlap_genes = set()
-with open("overlap_flagged_ids.txt") as fh:
-    for line in fh:
-        overlap_genes.add(line.strip())
-
-# ── Parse BRAKER GFF3 to build mRNA→gene mapping ─────────────────────────
-mrna_to_gene = {}
-gene_ids = set()
-
-with open("${braker_gff3}") as fh:
-    for line in fh:
-        if line.startswith("#") or not line.strip():
-            continue
-        cols = line.strip().split("\\t")
-        if len(cols) < 9:
-            continue
-        ftype = cols[2]
-        attrs = {}
-        for token in cols[8].split(";"):
-            if "=" in token:
-                k, v = token.split("=", 1)
-                attrs[k.strip()] = v.strip()
-
-        if ftype == "gene":
-            gene_ids.add(attrs.get("ID", ""))
-        elif ftype in ("mRNA", "transcript"):
-            fid = attrs.get("ID", "")
-            parent = attrs.get("Parent", "")
-            mrna_to_gene[fid] = parent
-
-# ── Parse BLASTP results ──────────────────────────────────────────────────
-#   Protein IDs from BRAKER are typically mRNA IDs (gene_id.t1)
-blastp_genes = {}  # gene_id → best hit info
-
-with open("prot_vs_repeats.tsv") as fh:
-    for line in fh:
-        if line.startswith("#") or not line.strip():
-            continue
-        cols = line.strip().split("\\t")
-        if len(cols) < 8:
-            continue
-        prot_id = cols[0]
-        hit_id  = cols[1]
-        pident  = float(cols[2])
-        alnlen  = int(cols[3])
-        qlen    = int(cols[4])
-        evalue  = float(cols[6])
-        bitscore = float(cols[7])
-
-        # Query coverage
-        qcov = (alnlen / qlen * 100) if qlen > 0 else 0
-
-        # Map protein ID to gene ID
-        gene_id = mrna_to_gene.get(prot_id, "")
-        if not gene_id:
-            # Try stripping .t1 suffix
-            base = prot_id.rsplit(".", 1)[0] if "." in prot_id else prot_id
-            if base in gene_ids:
-                gene_id = base
-            else:
-                gene_id = mrna_to_gene.get(base, "")
-
-        if not gene_id:
-            continue
-
-        # Keep best hit per gene
-        if gene_id not in blastp_genes or bitscore > blastp_genes[gene_id]["bitscore"]:
-            blastp_genes[gene_id] = {
-                "prot_id": prot_id, "hit_id": hit_id,
-                "pident": pident, "qcov": qcov,
-                "evalue": evalue, "bitscore": bitscore,
-            }
-
-blastp_flagged = set(blastp_genes.keys())
-
-# ── Combine evidence ──────────────────────────────────────────────────────
-all_flagged = overlap_genes | blastp_flagged
-
-# Evidence categories
-both = overlap_genes & blastp_flagged
-overlap_only = overlap_genes - blastp_flagged
-blastp_only = blastp_flagged - overlap_genes
-
-print(f"TE-derived gene flags:", file=sys.stderr)
-print(f"  Repeat overlap only: {len(overlap_only)}", file=sys.stderr)
-print(f"  Protein homology only: {len(blastp_only)}", file=sys.stderr)
-print(f"  Both: {len(both)}", file=sys.stderr)
-print(f"  Total flagged: {len(all_flagged)}", file=sys.stderr)
-
-# ── Write gene-level report ───────────────────────────────────────────────
-with open(f"{ASM}.te_gene_report.tsv", "w") as out:
-    out.write("gene_id\\tflagged\\tevidence\\trepeat_overlap\\t"
-              "blastp_hit\\tbp_pident\\tbp_qcov\\tbp_evalue\\n")
-    for gid in sorted(gene_ids):
-        flagged = gid in all_flagged
-        evidence = []
-        if gid in overlap_genes:
-            evidence.append("repeat_overlap")
-        if gid in blastp_flagged:
-            evidence.append("protein_homology")
-
-        has_overlap = "yes" if gid in overlap_genes else "no"
-
-        bp = blastp_genes.get(gid, {})
-        bp_hit = bp.get("hit_id", "-")
-        bp_pident = f"{bp['pident']:.1f}" if bp else "-"
-        bp_qcov = f"{bp['qcov']:.1f}" if bp else "-"
-        bp_evalue = f"{bp['evalue']:.2e}" if bp else "-"
-
-        out.write(f"{gid}\\t{'yes' if flagged else 'no'}\\t"
-                  f"{';'.join(evidence) if evidence else '-'}\\t"
-                  f"{has_overlap}\\t{bp_hit}\\t{bp_pident}\\t{bp_qcov}\\t{bp_evalue}\\n")
-
-# ── Write flagged gene IDs for GFF3 annotation ───────────────────────────
-with open("all_flagged_ids.txt", "w") as out:
-    for gid in sorted(all_flagged):
-        out.write(gid + "\\n")
-
-# ── Build evidence strings per gene for GFF3 Note ─────────────────────────
-with open("flag_notes.tsv", "w") as out:
-    for gid in sorted(all_flagged):
-        parts = []
-        if gid in overlap_genes:
-            parts.append(f"repeat_overlap>={OVERLAP_FRAC:.0%}")
-        if gid in blastp_genes:
-            bp = blastp_genes[gid]
-            parts.append(f"TE_homology:{bp['hit_id']}:{bp['pident']:.0f}%id")
-        out.write(f"{gid}\\t{';'.join(parts)}\\n")
-
-PYEOF
-
-    # ── 5. Annotate GFF3 with TE flags ────────────────────────────────────────
-    python3 - <<'PYEOF2'
-import sys
-from collections import OrderedDict
-
-# Load flag notes
-flag_notes = {}
-with open("flag_notes.tsv") as fh:
-    for line in fh:
-        parts = line.strip().split("\\t", 1)
-        if len(parts) == 2:
-            flag_notes[parts[0]] = parts[1]
-
-# Load all flagged IDs (genes)
-flagged_ids = set()
-with open("all_flagged_ids.txt") as fh:
-    for line in fh:
-        flagged_ids.add(line.strip())
-
-# Build gene→flag mapping, then propagate to children
-# We need to know which genes are flagged, then flag all their children too
-gene_to_children = {}  # gene_id → set of descendant IDs
-parent_map = {}        # feature_id → parent_id
-
-# First pass: build parent map
-features = []
-with open("${braker_gff3}") as fh:
-    for line in fh:
-        if line.startswith("#") or not line.strip():
-            features.append(("comment", line))
-            continue
-        cols = line.rstrip("\\n").split("\\t")
-        if len(cols) != 9:
-            features.append(("comment", line))
-            continue
-
-        attrs = OrderedDict()
-        for token in cols[8].split(";"):
+    def parse_attrs(attr_str):
+        d = OrderedDict()
+        if not attr_str or attr_str == ".":
+            return d
+        for token in attr_str.split(";"):
             token = token.strip()
             if "=" in token:
                 k, v = token.split("=", 1)
-                attrs[k] = v
+                d[k.strip()] = v.strip()
+        return d
 
-        fid = attrs.get("ID", "")
-        parent = attrs.get("Parent", "")
-        if parent:
-            parent_map[fid] = parent
+    # Store all features grouped by gene
+    genes = OrderedDict()
+    gene_children = defaultdict(list)
+    feature_to_gene = {}
+    comments = []
 
-        features.append(("feature", cols[:8], attrs))
+    current_gene_id = None
 
-# Propagate: find all features whose ancestor gene is flagged
-def get_gene_ancestor(fid):
-    \"\"\"Walk up Parent chain to find gene-level ancestor.\"\"\"
-    visited = set()
-    current = fid
-    while current in parent_map and current not in visited:
-        visited.add(current)
-        current = parent_map[current]
-    return current
+    with open("${braker_gff3}") as fh:
+        for line in fh:
+            if line.startswith("#") or not line.strip():
+                comments.append(line)
+                continue
 
-flagged_features = set()
-for tag, *rest in features:
-    if tag != "feature":
-        continue
-    cols8, attrs = rest
-    fid = attrs.get("ID", "")
-    ancestor = get_gene_ancestor(fid)
-    if ancestor in flagged_ids:
-        flagged_features.add(fid)
-        flagged_features.add(ancestor)
+            cols = line.rstrip("\\n").split("\\t")
+            if len(cols) != 9:
+                comments.append(line)
+                continue
 
-# Second pass: write output with flags
-with open("${assembly_id}.te_flagged.gff3", "w") as out:
-    for item in features:
-        if item[0] == "comment":
-            out.write(item[1])
+            ftype = cols[2]
+            start = int(cols[3])
+            end = int(cols[4])
+            attrs = parse_attrs(cols[8])
+            fid = attrs.get("ID", "")
+            parent = attrs.get("Parent", "")
+
+            if ftype == "gene":
+                gene_id = fid
+                genes[gene_id] = {
+                    "line": line,
+                    "seqid": cols[0],
+                    "start": start,
+                    "end": end,
+                    "span": end - start + 1,
+                    "attrs": attrs,
+                }
+                feature_to_gene[gene_id] = gene_id
+                current_gene_id = gene_id
+
+            elif ftype in ("mRNA", "transcript"):
+                gene_id = parent if parent in genes else feature_to_gene.get(parent, current_gene_id)
+                feature_to_gene[fid] = gene_id
+                gene_children[gene_id].append({
+                    "line": line, "type": ftype,
+                    "start": start, "end": end, "parent": parent, "id": fid,
+                })
+
+            else:
+                gene_id = feature_to_gene.get(parent, current_gene_id)
+                if fid:
+                    feature_to_gene[fid] = gene_id
+                gene_children[gene_id].append({
+                    "line": line, "type": ftype,
+                    "start": start, "end": end, "parent": parent, "id": fid,
+                })
+
+    # ── Apply filters ─────────────────────────────────────────────────────────
+    removed_genes = {}
+
+    for gene_id, gene_info in genes.items():
+        children = gene_children.get(gene_id, [])
+
+        exons = [c for c in children if c["type"] == "exon"]
+        cds_features = [c for c in children if c["type"] == "CDS"]
+        introns = [c for c in children if c["type"] == "intron"]
+        mrnas = [c for c in children if c["type"] in ("mRNA", "transcript")]
+
+        gene_span = gene_info["span"]
+
+        # Count exons per mRNA
+        exons_per_mrna = defaultdict(int)
+        for e in exons:
+            exons_per_mrna[e["parent"]] += 1
+
+        total_cds_bp = sum(c["end"] - c["start"] + 1 for c in cds_features)
+
+        all_single_exon = all(
+            exons_per_mrna.get(m["id"], 1) == 1 for m in mrnas
+        ) if mrnas else (len(exons) <= 1)
+
+        intron_lengths = [c["end"] - c["start"] + 1 for c in introns]
+
+        # Filter 1: Short single-exon gene
+        if all_single_exon and total_cds_bp < MIN_CDS_LENGTH and total_cds_bp > 0:
+            removed_genes[gene_id] = f"single_exon_short_cds({total_cds_bp}bp<{MIN_CDS_LENGTH}bp)"
             continue
 
-        cols8, attrs = item[1], item[2]
-        fid = attrs.get("ID", "")
+        # Filter 2: Very short gene span
+        if gene_span < MIN_GENE_LENGTH:
+            removed_genes[gene_id] = f"short_gene_span({gene_span}bp<{MIN_GENE_LENGTH}bp)"
+            continue
 
-        if fid in flagged_features:
-            # Add/append TE flag to gene-level features
-            ancestor = get_gene_ancestor(fid)
-            note_text = flag_notes.get(ancestor, "TE_evidence")
+        # Filter 3: All introns impossibly short
+        if intron_lengths and all(il < MIN_INTRON_LENGTH for il in intron_lengths):
+            max_il = max(intron_lengths)
+            removed_genes[gene_id] = f"all_introns_short(max={max_il}bp<{MIN_INTRON_LENGTH}bp)"
+            continue
 
-            if cols8[2] == "gene":
-                existing = attrs.get("Note", "")
-                new_note = f"putative_TE_derived({note_text})"
-                attrs["Note"] = f"{existing};{new_note}" if existing else new_note
+    # ── Collect kept mRNA/transcript IDs for protein filtering ────────────────
+    kept_mrna_ids = set()
+    removed_mrna_ids = set()
 
-            # Add simpler flag to all child features
-            elif fid in flagged_features:
-                existing = attrs.get("Note", "")
-                flag = "parent_flagged_TE_derived"
-                attrs["Note"] = f"{existing};{flag}" if existing else flag
+    for gene_id in genes:
+        children = gene_children.get(gene_id, [])
+        mrna_ids = [c["id"] for c in children if c["type"] in ("mRNA", "transcript")]
 
-        # Serialize attributes
-        attr_str = ";".join(
-            f"{k}={v}" if v else k for k, v in attrs.items()
-        )
-        out.write("\\t".join(cols8 + [attr_str]) + "\\n")
+        if gene_id in removed_genes:
+            removed_mrna_ids.update(mrna_ids)
+        else:
+            kept_mrna_ids.update(mrna_ids)
 
-n_flagged_genes = len(flagged_ids)
-n_total_genes = sum(1 for item in features
-                    if item[0] == "feature" and item[1][2] == "gene")
-print(f"Flagged {n_flagged_genes}/{n_total_genes} genes as putative TE-derived",
-      file=sys.stderr)
+    # Also keep gene IDs themselves (BRAKER protein headers can use either)
+    kept_gene_ids = set(genes.keys()) - set(removed_genes.keys())
+    kept_ids = kept_mrna_ids | kept_gene_ids
 
-PYEOF2
+    # ── Write GFF3 outputs ────────────────────────────────────────────────────
+    with open(f"{ASM}.filtered_genes.gff3", "w") as kept_f, \\
+         open(f"{ASM}.removed_genes.gff3", "w") as removed_f:
+
+        for c in comments:
+            kept_f.write(c)
+
+        for gene_id, gene_info in genes.items():
+            target = removed_f if gene_id in removed_genes else kept_f
+            target.write(gene_info["line"])
+            for child in gene_children.get(gene_id, []):
+                target.write(child["line"])
+
+    # ── Filter protein FASTA ──────────────────────────────────────────────────
+    #   BRAKER protein headers typically use mRNA ID (e.g. g1.t1) or gene ID.
+    #   We keep a protein if its header ID matches any kept mRNA or gene ID.
+    n_prot_kept = 0
+    n_prot_removed = 0
+
+    with open(f"{ASM}.filtered_proteins.fa", "w") as out:
+        keep_current = False
+        with open("${braker_proteins}") as fh:
+            for line in fh:
+                if line.startswith(">"):
+                    prot_id = line.strip().split()[0][1:]
+                    # Check against kept IDs (try exact match first, then base)
+                    if prot_id in kept_ids:
+                        keep_current = True
+                    else:
+                        # Try stripping .t1 suffix for gene-level match
+                        base = prot_id.rsplit(".", 1)[0] if "." in prot_id else prot_id
+                        keep_current = base in kept_ids or prot_id in kept_ids
+
+                    if keep_current:
+                        n_prot_kept += 1
+                    else:
+                        n_prot_removed += 1
+
+                if keep_current:
+                    out.write(line)
+
+    # ── Write filter report ───────────────────────────────────────────────────
+    with open(f"{ASM}.gene_filter_report.tsv", "w") as out:
+        out.write("gene_id\\tseqid\\tstart\\tend\\tspan\\tn_exons\\tcds_bp\\t"
+                  "n_introns\\tmin_intron\\tstatus\\treason\\n")
+
+        for gene_id, gene_info in genes.items():
+            children = gene_children.get(gene_id, [])
+            exons = [c for c in children if c["type"] == "exon"]
+            cds_features = [c for c in children if c["type"] == "CDS"]
+            introns = [c for c in children if c["type"] == "intron"]
+
+            total_cds = sum(c["end"] - c["start"] + 1 for c in cds_features)
+            intron_lens = [c["end"] - c["start"] + 1 for c in introns]
+            min_intron = min(intron_lens) if intron_lens else 0
+
+            status = "removed" if gene_id in removed_genes else "kept"
+            reason = removed_genes.get(gene_id, "-")
+
+            out.write(f"{gene_id}\\t{gene_info['seqid']}\\t{gene_info['start']}\\t"
+                      f"{gene_info['end']}\\t{gene_info['span']}\\t{len(exons)}\\t"
+                      f"{total_cds}\\t{len(introns)}\\t{min_intron}\\t{status}\\t{reason}\\n")
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+    n_total = len(genes)
+    n_removed = len(removed_genes)
+    n_kept = n_total - n_removed
+
+    reasons = defaultdict(int)
+    for r in removed_genes.values():
+        key = r.split("(")[0]
+        reasons[key] += 1
+
+    print(f"Gene model filter: {n_total} total → {n_kept} kept, {n_removed} removed",
+          file=sys.stderr)
+    for reason, count in sorted(reasons.items(), key=lambda x: -x[1]):
+        print(f"  {reason}: {count}", file=sys.stderr)
+    print(f"Proteins: {n_prot_kept} kept, {n_prot_removed} removed", file=sys.stderr)
     """
 
     stub:
     """
-    touch ${assembly_id}.te_flagged.gff3
-    touch ${assembly_id}.te_gene_report.tsv
+    touch ${assembly_id}.filtered_genes.gff3
+    touch ${assembly_id}.filtered_proteins.fa
+    touch ${assembly_id}.removed_genes.gff3
+    touch ${assembly_id}.gene_filter_report.tsv
     """
 }
