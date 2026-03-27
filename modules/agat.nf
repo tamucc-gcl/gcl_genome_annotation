@@ -20,8 +20,11 @@ process AGAT {
     
     script:
     """
+    grep -P "\\t(gene|mRNA|exon|CDS|intron|start_codon|stop_codon|tRNA|rRNA)\\t" ${gff} \
+    > genes_only.gff3
+
     agat_sp_statistics.pl \
-        --gff ${gff} \
+        --gff genes_only.gff3 \
         -f ${assembly_path} \
         -d \
         --yaml \

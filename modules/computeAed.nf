@@ -43,7 +43,6 @@
 process COMPUTE_AED {
     tag "${assembly_id}"
     label 'computeAed'
-    conda "${projectDir}/environments/miniprot.yml"
     publishDir "${params.outdir}/structural_annotation", mode: params.publish_dir_mode
 
     input:
