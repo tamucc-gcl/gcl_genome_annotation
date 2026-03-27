@@ -50,10 +50,11 @@ def parse_omark_summary(text):
         if ls.startswith("A:") and "%" in ls: r["cons_line"] = ls
         if "selected clade was" in ll: r["clade"] = ls.split("was")[-1].strip()
         if "conserved hogs" in ll:
-            m = re.search(r"(\d[\d,]*)", ls)
+            m = re.search(r":\s*(\d[\d,]*)", ls)   # matches "is: 14633"
             if m: r["n_hogs"] = m.group(1)
+
         if "there are" in ll and "proteins" in ll:
-            m = re.search(r"(\d[\d,]*)\s+proteins", ls)
+            m = re.search(r"there are (\d[\d,]*) proteins", ls)
             if m: r["n_proteins"] = m.group(1)
     return r
 

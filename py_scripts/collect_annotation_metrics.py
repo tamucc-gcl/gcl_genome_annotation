@@ -86,6 +86,8 @@ def parse_functional(path):
             # Skip any non-protein rows (guards against junk in TSV)
             if not re.match(r'^g\d+\.t\d+$', row.get("protein_id", "")):
                 continue
+            if row.get("protein_length_aa", "-") == "-":
+                continue  # mRNA in GFF3 but no protein sequence = filtered-out gene
             n += 1
             if row.get("ipr_signatures", "-") != "-":
                 n_ipr += 1
@@ -154,33 +156,47 @@ def parse_busco(path):
 
 def parse_omark(path):
     text = open(path).read()
-    result = {k: 0 for k in [
+    result = {k: 0.0 for k in [
         "omark_single", "omark_duplicated", "omark_dup_unexpected",
         "omark_dup_expected", "omark_missing", "omark_consistent",
         "omark_inconsistent", "omark_contaminant", "omark_unknown",
         "omark_partial", "omark_fragmented", "omark_n_proteins",
     ]}
 
-    def extract_pct(text, pattern):
-        m = re.search(pattern, text)
-        return float(m.group(1)) if m else 0.0
+    for line in text.splitlines():
+        ls = line.strip()
 
-    def extract_int(text, pattern):
-        m = re.search(pattern, text)
-        return int(m.group(1).replace(",", "")) if m else 0
+        # Completeness line: S:59.13%,D:24.67%[U:24.57%,E:0.10%],M:16.20%
+        if ls.startswith("S:") and "D:" in ls and "M:" in ls and "%" in ls:
+            m = re.search(r"S:([\d.]+)%", ls)
+            if m: result["omark_single"] = float(m.group(1))
+            m = re.search(r"D:([\d.]+)%", ls)
+            if m: result["omark_duplicated"] = float(m.group(1))
+            m = re.search(r"\[U:([\d.]+)%", ls)
+            if m: result["omark_dup_unexpected"] = float(m.group(1))
+            m = re.search(r",E:([\d.]+)%\]", ls)
+            if m: result["omark_dup_expected"] = float(m.group(1))
+            m = re.search(r",M:([\d.]+)%", ls)
+            if m: result["omark_missing"] = float(m.group(1))
 
-    result["omark_n_proteins"]      = extract_int(text, r"Number of proteins in the whole proteome:\s*([\d,]+)")
-    result["omark_single"]          = extract_pct(text, r"Single:\s*\d+\s*\(([\d.]+)%\)")
-    result["omark_duplicated"]      = extract_pct(text, r"^Duplicated:\s*\d+\s*\(([\d.]+)%\)")
-    result["omark_dup_unexpected"]  = extract_pct(text, r"Duplicated, Unexpected:\s*\d+\s*\(([\d.]+)%\)")
-    result["omark_dup_expected"]    = extract_pct(text, r"Duplicated, Expected:\s*\d+\s*\(([\d.]+)%\)")
-    result["omark_missing"]         = extract_pct(text, r"^Missing:\s*\d+\s*\(([\d.]+)%\)", )
-    result["omark_consistent"]      = extract_pct(text, r"Total Consistent:\s*\d+\s*\(([\d.]+)%\)")
-    result["omark_inconsistent"]    = extract_pct(text, r"Total Inconsistent:\s*\d+\s*\(([\d.]+)%\)")
-    result["omark_contaminant"]     = extract_pct(text, r"Total Contaminants:\s*\d+\s*\(([\d.]+)%\)")
-    result["omark_unknown"]         = extract_pct(text, r"Total Unknown:\s*\d+\s*\(([\d.]+)%\)")
-    result["omark_partial"]         = extract_pct(text, r"Consistent, partial hits:\s*\d+\s*\(([\d.]+)%\)")
-    result["omark_fragmented"]      = extract_pct(text, r"Consistent, fragmented:\s*\d+\s*\(([\d.]+)%\)")
+        # Consistency line: A:85.34%[P:15.56%,F:10.99%],I:6.10%,C:0.00%,U:8.56%
+        if ls.startswith("A:") and "I:" in ls and "%" in ls:
+            m = re.search(r"A:([\d.]+)%", ls)
+            if m: result["omark_consistent"] = float(m.group(1))
+            m = re.search(r"\[P:([\d.]+)%", ls)
+            if m: result["omark_partial"] = float(m.group(1))
+            m = re.search(r",F:([\d.]+)%\]", ls)
+            if m: result["omark_fragmented"] = float(m.group(1))
+            m = re.search(r",I:([\d.]+)%", ls)
+            if m: result["omark_inconsistent"] = float(m.group(1))
+            m = re.search(r",C:([\d.]+)%", ls)
+            if m: result["omark_contaminant"] = float(m.group(1))
+            m = re.search(r",U:([\d.]+)%", ls)
+            if m: result["omark_unknown"] = float(m.group(1))
+
+        # Protein count
+        m = re.search(r"there are (\d+) proteins", ls)
+        if m: result["omark_n_proteins"] = int(m.group(1))
 
     return result
 
