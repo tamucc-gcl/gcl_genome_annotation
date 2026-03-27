@@ -20,6 +20,7 @@ process OMARK {
     tuple val(assembly_id), path("${assembly_id}.png"), emit: omark_plot
     tuple val(assembly_id), path("${assembly_id}_detailed.txt"), emit: omark_detailed
     tuple val(assembly_id), path("${assembly_id}.summary.txt"), emit: omark_summary
+    tuple val(assembly_id), path("${assembly_id}.ump"),          emit: omark_ump
     
     script:
     """
@@ -39,13 +40,15 @@ process OMARK {
     mv omark_output/${assembly_id}.png ${assembly_id}.png
     mv omark_output/${assembly_id}_detailed_summary.txt ${assembly_id}_detailed.txt
     mv omark_output/${assembly_id}.sum ${assembly_id}.summary.txt
+    mv omark_output/${assembly_id}.ump ${assembly_id}.ump
     """
     
     stub:
     """
     touch ${assembly_id}.png
-    touch ${assembly_id}_detailed_summary.txt
+    touch ${assembly_id}_detailed.txt
     touch ${assembly_id}.sum
+    touch ${assembly_id}.ump
     """
 }
 

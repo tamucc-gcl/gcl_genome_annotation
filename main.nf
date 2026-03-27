@@ -494,10 +494,10 @@ workflow {
         .join(BRAKER.out.braker_proteins)
         .join(FLAG_TE_GENES.out.flagged_gff3)
         .join(ch_assemblies_filtered)
-        .join(OMARK.out.omark_detailed)
+        .join(OMARK.out.omark_ump)
         .join(FILTER_GENE_MODELS.out.filtered_aed)
         // produces: [assembly_id, ipr_tsv, eggnog_tsv, diamond_tsv, kofam_tsv, deepsig_gff3,
-        //            proteins_fa, flagged_gff3, genome_fasta, omark_detailed]
+        //            proteins_fa, flagged_gff3, genome_fasta, omark_ump]
 
     MERGE_FUNCTIONAL_ANNOTATIONS(ch_func_merged)
 

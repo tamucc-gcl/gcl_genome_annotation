@@ -22,7 +22,7 @@
         - proteins_fasta:    BRAKER protein FASTA (for sequence integrity)
         - braker_gff3:       TE-flagged BRAKER GFF3 (for structural metrics)
         - genome_fasta:      Filtered genome assembly (for splice-site lookup)
-        - omark_detailed:    OMArk detailed summary (per-protein classification)
+        - omark_ump:         OMArk Unified Model Predictions (per-protein classification)
 
     Outputs:
         - merged_tsv:  ${assembly_id}.functional_annotations.tsv
@@ -46,7 +46,7 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
           path(proteins_fasta),
           path(braker_gff3),
           path(genome_fasta),
-          path(omark_detailed),
+          path(omark_ump),
           path(aed_scores) 
 
     output:
@@ -380,45 +380,21 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
             f"{k}:{v}" for k, v in sorted(class_counts.items()) if v > 0
         ) or "."
 
-    # ── 9. OMArk per-protein classification ──────────────────────────────────
-    #   Parses _detailed_summary.txt produced by omark.
-    #   Expected columns (flexible header parsing):
-    #     query / protein_id | hog_id / hog | tax_level | prediction / class
-    #   Classification values: Consistent, Partial, Fragmented,
-    #                          Inconsistent, Contaminant, Unknown
-    with open("${omark_detailed}") as fh:
-        headers = None
+    # ── 9. OMArk per-protein classification (.ump file) ──────────────────────
+    # Format: FASTA-style, proteins grouped under >Category_Subtype headers
+    # Top-level class: Consistent, Inconsistent, Contamination, Unknown
+    # Subtype: Full, Partial, Fragment (absent for Unknown)
+    current_class = None
+    with open("${omark_ump}") as fh:
         for line in fh:
-            line = line.rstrip("\\n")
-            if not line.strip():
+            line = line.strip()
+            if not line:
                 continue
-            if line.startswith("##"):
-                continue
-            if line.startswith("#"):
-                raw_h = line.lstrip("#").strip().split("\\t")
-                headers = [h.lower().strip() for h in raw_h]
-                continue
-            cols = line.split("\\t")
-            if not cols:
-                continue
-
-            if headers:
-                row = dict(zip(headers, cols))
-                pid = (row.get("query") or row.get("query_id") or
-                       row.get("protein_id") or (cols[0] if cols else "")).strip()
-                prediction = (row.get("prediction") or row.get("class") or
-                              row.get("sequence_quality") or "-").strip()
-                hog = (row.get("hog_id") or row.get("hog") or "-").strip()
-            else:
-                # Fallback positional: col0=query, col1=hog, col3=prediction
-                pid        = cols[0].strip() if len(cols) > 0 else ""
-                hog        = cols[1].strip() if len(cols) > 1 else "-"
-                prediction = cols[3].strip() if len(cols) > 3 else "-"
-
-            if pid:
-                rec = annot[pid]
-                rec["omark_class"] = prediction if prediction else "-"
-                rec["omark_hog"]   = hog if hog else "-"
+            if line.startswith(">"):
+                current_class = line[1:]  # e.g. "Consistent_Partial"
+            elif current_class is not None:
+                rec = annot[line]
+                rec["omark_class"] = current_class
 
     # ── 9b. AED scores ──────────────────────────────────────────────────────
     #   Read per-transcript AED from COMPUTE_AED output.
@@ -506,9 +482,12 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
                 flag = "WARN"
 
             omark = rec.get("omark_class", "-")
-            if omark in ("Fragmented", "Inconsistent"):
-                reasons.append(f"omark:{omark.lower()}")
-                flag = "WARN"
+            if omark is not None and (
+                omark.startswith("Inconsistent") or
+                omark.startswith("Contamination") or
+                omark == "Consistent_Fragment" or
+                omark == "Consistent_Partial"
+            ):
 
             pct_can_str = rec.get("pct_canonical_splice", ".")
             if pct_can_str not in (".", "-", None, ""):
@@ -546,7 +525,7 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
         "n_canonical_introns", "n_noncanonical_introns",
         "pct_canonical_splice", "donor_acceptor_summary",
         # OMArk
-        "omark_class", "omark_hog",
+        "omark_class",
         # AED
         "aed", "aed_best_hit", "aed_protein_identity", "aed_n_evidence_hits",
         # Quality

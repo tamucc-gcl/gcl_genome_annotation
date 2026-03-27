@@ -83,6 +83,9 @@ def parse_functional(path):
     with open(path) as fh:
         reader = csv.DictReader(fh, delimiter="\t")
         for row in reader:
+            # Skip any non-protein rows (guards against junk in TSV)
+            if not re.match(r'^g\d+\.t\d+$', row.get("protein_id", "")):
+                continue
             n += 1
             if row.get("ipr_signatures", "-") != "-":
                 n_ipr += 1
@@ -155,28 +158,30 @@ def parse_omark(path):
         "omark_single", "omark_duplicated", "omark_dup_unexpected",
         "omark_dup_expected", "omark_missing", "omark_consistent",
         "omark_inconsistent", "omark_contaminant", "omark_unknown",
-        "omark_partial", "omark_fragmented",
+        "omark_partial", "omark_fragmented", "omark_n_proteins",
     ]}
 
-    def extract(line, key):
-        m = re.search(re.escape(key) + r"([\d.]+)%", line)
+    def extract_pct(text, pattern):
+        m = re.search(pattern, text)
         return float(m.group(1)) if m else 0.0
 
-    for line in text.splitlines():
-        ls = line.strip().lstrip("#").strip()
-        if ls.startswith("S:") and "%" in ls:
-            result["omark_single"]          = extract(ls, "S:")
-            result["omark_duplicated"]       = extract(ls, "D:")
-            result["omark_dup_unexpected"]   = extract(ls, "U:")
-            result["omark_dup_expected"]     = extract(ls, "E:")
-            result["omark_missing"]          = extract(ls, "M:")
-        if ls.startswith("A:") and "%" in ls:
-            result["omark_consistent"]       = extract(ls, "A:")
-            result["omark_inconsistent"]     = extract(ls, "I:")
-            result["omark_contaminant"]      = extract(ls, "C:")
-            result["omark_unknown"]          = extract(ls, "U:")
-            result["omark_partial"]          = extract(ls, "P:")
-            result["omark_fragmented"]       = extract(ls, "F:")
+    def extract_int(text, pattern):
+        m = re.search(pattern, text)
+        return int(m.group(1).replace(",", "")) if m else 0
+
+    result["omark_n_proteins"]      = extract_int(text, r"Number of proteins in the whole proteome:\s*([\d,]+)")
+    result["omark_single"]          = extract_pct(text, r"Single:\s*\d+\s*\(([\d.]+)%\)")
+    result["omark_duplicated"]      = extract_pct(text, r"^Duplicated:\s*\d+\s*\(([\d.]+)%\)")
+    result["omark_dup_unexpected"]  = extract_pct(text, r"Duplicated, Unexpected:\s*\d+\s*\(([\d.]+)%\)")
+    result["omark_dup_expected"]    = extract_pct(text, r"Duplicated, Expected:\s*\d+\s*\(([\d.]+)%\)")
+    result["omark_missing"]         = extract_pct(text, r"^Missing:\s*\d+\s*\(([\d.]+)%\)", )
+    result["omark_consistent"]      = extract_pct(text, r"Total Consistent:\s*\d+\s*\(([\d.]+)%\)")
+    result["omark_inconsistent"]    = extract_pct(text, r"Total Inconsistent:\s*\d+\s*\(([\d.]+)%\)")
+    result["omark_contaminant"]     = extract_pct(text, r"Total Contaminants:\s*\d+\s*\(([\d.]+)%\)")
+    result["omark_unknown"]         = extract_pct(text, r"Total Unknown:\s*\d+\s*\(([\d.]+)%\)")
+    result["omark_partial"]         = extract_pct(text, r"Consistent, partial hits:\s*\d+\s*\(([\d.]+)%\)")
+    result["omark_fragmented"]      = extract_pct(text, r"Consistent, fragmented:\s*\d+\s*\(([\d.]+)%\)")
+
     return result
 
 
