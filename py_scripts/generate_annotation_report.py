@@ -52,7 +52,6 @@ def parse_omark_summary(text):
         if "conserved hogs" in ll:
             m = re.search(r":\s*(\d[\d,]*)", ls)   # matches "is: 14633"
             if m: r["n_hogs"] = m.group(1)
-
         if "there are" in ll and "proteins" in ll:
             m = re.search(r"there are (\d[\d,]*) proteins", ls)
             if m: r["n_proteins"] = m.group(1)
@@ -320,7 +319,6 @@ The **worst** flag across all transcripts determines the gene-level flag.
 **High-confidence** genes must have all transcripts flagged PASS and must not be TE-flagged.
 """)
 
-    # Cross-assembly quality flag table
     W.append("### Quality flag summary\n")
     W.append(metrics_table(aids, met, [
         ("pct_genes_pass",  "PASS (%)",  False),
@@ -331,7 +329,6 @@ The **worst** flag across all transcripts determines the gene-level flag.
     ]))
     W.append("")
 
-    # Protein sequence integrity
     W.append("### Protein sequence integrity\n")
     W.append(metrics_table(aids, met, [
         ("pct_mrnas_with_start_m",       "Has start Met (%)",       False),
@@ -346,7 +343,6 @@ The **worst** flag across all transcripts determines the gene-level flag.
 > Missing stop codons are common for genes near scaffold ends — usually benign.
 """)
 
-    # Splice site audit
     W.append("### Splice-site audit\n")
     W.append(metrics_table(aids, met, [
         ("pct_canonical_splice_sites", "Canonical splice sites (%)", False),
@@ -360,7 +356,6 @@ The **worst** flag across all transcripts determines the gene-level flag.
 > Both are strong indicators for filtering the gene set before downstream analysis.
 """)
 
-    # Evidence support (AED)
     W.append("### Evidence support (AED)\n")
     W.append("""\
 Annotation Edit Distance (AED) measures congruency between each BRAKER gene model
@@ -382,7 +377,6 @@ are considered well-supported; < 0.3 high-quality (Eilbeck et al. 2009).
     ]))
     W.append("")
 
-    # Gene structure statistics
     W.append("### Gene structure statistics\n")
     W.append(metrics_table(aids, met, [
         ("mean_exons_per_mrna",    "Mean exons/mRNA",    False),
@@ -396,26 +390,17 @@ are considered well-supported; < 0.3 high-quality (Eilbeck et al. 2009).
 > Higher single-exon rates often indicate TE contamination of the gene set.
 """)
 
-    # Per-assembly detail tables
     W.append("### Per-assembly detail\n")
     for aid in aids:
         q = sqc.get(aid, {})
         if not q:
             continue
         W.append(f"#### `{aid}`\n")
-
-        # OMArk class distribution breakdown
         omark_dist = q.get("omark_class_distribution", "-")
         if omark_dist and omark_dist != "-":
             W.append(f"**OMArk per-protein class distribution:** `{omark_dist}`\n")
-
-        # Splice-site class breakdown from functional TSV is not in sqc directly;
-        # the donor_acceptor_summary column in the TSV is per-mRNA. The aggregate
-        # is captured in pct_canonical_splice_sites already displayed above.
-
         W.append(f"> Full gene-level QC table: {link(f'qc/structural/{aid}.structural_qc_genes.tsv', 'per-gene TSV')}\n")
         W.append(f"> High-confidence gene list: {link(f'qc/structural/{aid}.high_confidence_genes.txt', 'gene list')}\n")
-
     W.append("")
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -533,15 +518,29 @@ are considered well-supported; < 0.3 high-quality (Eilbeck et al. 2009).
     W.append(f"> Full reports: {link('qc/omark/','OMArk output')}\n")
 
     W.append("\n### Structural statistics (AGAT)\n")
-    kp = [("number of gene","Genes"), ("number of mrna","mRNAs"),
-          ("number of exon","Exons"), ("number of cds","CDS features"),
-          ("number of intron","Introns"), ("number of single exon gene","Single-exon genes"),
-          ("mean gene length","Mean gene length (bp)"), ("mean mrna length","Mean mRNA length (bp)"),
-          ("mean cds length","Mean CDS length (bp)"), ("mean exon length","Mean exon length (bp)"),
-          ("mean intron length","Mean intron length (bp)"), ("mean exons per","Mean exons/mRNA"),
-          ("mean introns per","Mean introns/mRNA"), ("longest gene","Longest gene (bp)"),
-          ("shortest gene","Shortest gene (bp)"), ("total gene length","Total gene space (bp)"),
-          ("% of genome","% genome in genes")]
+    # Patterns with trailing spaces prevent substring matches against longer lines.
+    # e.g. "number of mrna " won't match "number of mrnas with at least one utr"
+    # e.g. "mean cds length " won't match "mean cds piece length"
+    # The after[0].isalpha() guard provides a secondary check.
+    kp = [
+        ("number of gene ",            "Genes"),
+        ("number of mrna ",            "mRNAs"),
+        ("number of exon ",            "Exons"),
+        ("number of cds ",             "CDS features"),
+        ("number of intron ",          "Introns"),
+        ("number of single exon gene", "Single-exon genes"),
+        ("mean gene length",           "Mean gene length (bp)"),
+        ("mean mrna length",           "Mean mRNA length (bp)"),
+        ("mean cds length ",           "Mean CDS length (bp)"),
+        ("mean exon length ",          "Mean exon length (bp)"),
+        ("mean intron length ",        "Mean intron length (bp)"),
+        ("mean exons per mrna",        "Mean exons/mRNA"),
+        ("mean introns per mrna",      "Mean introns/mRNA"),
+        ("longest gene",               "Longest gene (bp)"),
+        ("shortest gene",              "Shortest gene (bp)"),
+        ("total gene length",          "Total gene space (bp)"),
+        ("% of genome covered by gene ", "% genome in genes"),
+    ]
 
     ad = {}
     al = []
@@ -553,6 +552,10 @@ are considered well-supported; < 0.3 high-quality (Eilbeck et al. 2009).
             ll = line.lower().strip()
             for pat, label in kp:
                 if pat in ll:
+                    idx = ll.find(pat)
+                    after = ll[idx + len(pat):]
+                    if after and after[0].isalpha():
+                        continue  # substring match of a longer term, skip
                     nums = re.findall(r"[\d,.]+", line)
                     if nums:
                         ad[aid][label] = nums[-1]
@@ -627,21 +630,21 @@ are considered well-supported; < 0.3 high-quality (Eilbeck et al. 2009).
         row = met[aid]
         flags = []
         checks = [
-            ("pct_hypothetical",        50,   None, "High hypothetical rate ({v:.1f}%) — consider RNA-seq evidence or broader protein DBs."),
-            ("busco_complete",          None,  80,  "Low BUSCO completeness ({v:.1f}%) — check repeat masking, contiguity, or BRAKER3 rounds."),
-            ("omark_unknown",           25,   None, "High OMArk unknown rate ({v:.1f}%) — possible over-prediction. Consider TSEBRA."),
-            ("omark_fragmented",        10,   None, "High OMArk fragmented rate ({v:.1f}%) — many genes shorter than expected."),
-            ("omark_dup_unexpected",    15,   None, "High unexpected duplication ({v:.1f}%) — possible haplotig duplication."),
-            ("repeat_masked_pct",       None,  20,  "Low repeat masking ({v:.1f}%) — fish genomes typically 30–50%."),
-            ("pct_diamond",             None,  30,  "Low SwissProt coverage ({v:.1f}%) — consider TrEMBL/NR."),
-            ("pct_te_flagged",           5,   None, "TE-flagged genes at {v:.1f}% — consider filtering the gene set."),
-            ("pct_genes_fail",           5,   None, "FAIL quality flag at {v:.1f}% of genes — inspect internal stops and splice sites."),
-            ("pct_mrnas_with_internal_stop", 1, None, "Internal stop codons in {v:.1f}% of mRNAs — likely assembly or annotation errors."),
-            ("pct_canonical_splice_sites", None, 96, "Low canonical splice site rate ({v:.1f}%) — check assembly quality or repeat masking completeness."),
-            ("pct_single_exon_mrna",    35,   None, "High single-exon rate ({v:.1f}%) — possible TE over-prediction. Review repeat library."),
-            ("pct_high_confidence",     None,  50,  "Only {v:.1f}% of genes are high-confidence — consider tightening filtering thresholds."),
-            ("pct_aed_no_evidence",     20,   None, "High fraction ({v:.1f}%) of genes with no protein evidence (AED=1) — consider broader protein databases or RNA-seq."),
-            ("pct_aed_lt05",            None,  50,  "Only {v:.1f}% of genes have AED < 0.5 — gene models may be poorly supported by protein evidence."),
+            ("pct_hypothetical",             50,   None, "High hypothetical rate ({v:.1f}%) — consider RNA-seq evidence or broader protein DBs."),
+            ("busco_complete",               None,  80,  "Low BUSCO completeness ({v:.1f}%) — check repeat masking, contiguity, or BRAKER3 rounds."),
+            ("omark_unknown",                25,   None, "High OMArk unknown rate ({v:.1f}%) — possible over-prediction. Consider TSEBRA."),
+            ("omark_fragmented",             10,   None, "High OMArk fragmented rate ({v:.1f}%) — many genes shorter than expected."),
+            ("omark_dup_unexpected",         15,   None, "High unexpected duplication ({v:.1f}%) — possible haplotig duplication."),
+            ("repeat_masked_pct",            None,  20,  "Low repeat masking ({v:.1f}%) — fish genomes typically 30–50%."),
+            ("pct_diamond",                  None,  30,  "Low SwissProt coverage ({v:.1f}%) — consider TrEMBL/NR."),
+            ("pct_te_flagged",                5,   None, "TE-flagged genes at {v:.1f}% — consider filtering the gene set."),
+            ("pct_genes_fail",                5,   None, "FAIL quality flag at {v:.1f}% of genes — inspect internal stops and splice sites."),
+            ("pct_mrnas_with_internal_stop",  1,   None, "Internal stop codons in {v:.1f}% of mRNAs — likely assembly or annotation errors."),
+            ("pct_canonical_splice_sites",   None,  96,  "Low canonical splice site rate ({v:.1f}%) — check assembly quality or repeat masking completeness."),
+            ("pct_single_exon_mrna",         35,   None, "High single-exon rate ({v:.1f}%) — possible TE over-prediction. Review repeat library."),
+            ("pct_high_confidence",          None,  50,  "Only {v:.1f}% of genes are high-confidence — consider tightening filtering thresholds."),
+            ("pct_aed_no_evidence",          20,   None, "High fraction ({v:.1f}%) of genes with no protein evidence (AED=1) — consider broader protein databases or RNA-seq."),
+            ("pct_aed_lt05",                 None,  50,  "Only {v:.1f}% of genes have AED < 0.5 — gene models may be poorly supported by protein evidence."),
         ]
         for key, above, below, msg in checks:
             try:
