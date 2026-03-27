@@ -488,6 +488,8 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
                 omark == "Consistent_Fragment" or
                 omark == "Consistent_Partial"
             ):
+                reasons.append(f"omark:{omark.lower()}")
+                flag = "WARN"
 
             pct_can_str = rec.get("pct_canonical_splice", ".")
             if pct_can_str not in (".", "-", None, ""):
