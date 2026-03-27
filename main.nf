@@ -491,7 +491,7 @@ workflow {
         .join(MERGE_DIAMOND.out.merged)
         .join(MERGE_KOFAMSCAN.out.merged)
         .join(MERGE_DEEPSIG.out.merged_gff3)
-        .join(BRAKER.out.braker_proteins)
+        .join(FILTER_GENE_MODELS.out.filtered_proteins)
         .join(FLAG_TE_GENES.out.flagged_gff3)
         .join(ch_assemblies_filtered)
         .join(OMARK.out.omark_ump)

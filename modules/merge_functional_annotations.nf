@@ -484,9 +484,7 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
             omark = rec.get("omark_class", "-")
             if omark is not None and (
                 omark.startswith("Inconsistent") or
-                omark.startswith("Contamination") or
-                omark == "Consistent_Fragment" or
-                omark == "Consistent_Partial"
+                omark.startswith("Contamination")
             ):
                 reasons.append(f"omark:{omark.lower()}")
                 flag = "WARN"
