@@ -93,7 +93,7 @@ process REPEAT_MASK_BATCH {
         # Extract scaffold name and coordinates from header
         # Format: scaffold_name_start-end  (start and end are 1-based)
         # Find last underscore-delimited start-end range
-        if (match(hdr, "_[0-9]+-[0-9]+$")) {
+        if (match(hdr, "_[0-9]+-[0-9]+\\$")) {
             coord_part = substr(hdr, RSTART + 1)   # "start-end"
             scaff      = substr(hdr, 1, RSTART - 1)
             dash       = index(coord_part, "-")
