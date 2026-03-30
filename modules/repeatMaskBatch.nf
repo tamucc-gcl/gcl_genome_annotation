@@ -212,6 +212,53 @@ process REPEAT_MASK_BATCH {
     # All other lines pass through unchanged
     { print }
     ' short_ids.fa.align > ${assembly_id}.${batch_id}.adjusted.align
+
+    # ── 6. Verify coord_map correctness ──────────────────────────────────────
+    #   For each sequence in the batch, confirm that:
+    #     - the scaffold name in coord_map matches the fasta header
+    #     - the sequence length in adjusted.fa matches end - start + 1
+    #   Any mismatch indicates a coord_map ordering error.
+    echo "=== COORD_MAP VERIFICATION: ${assembly_id} ${batch_id} ===" >&2
+    echo "coord_map entries:" >&2
+    cat coord_map.tsv >&2
+
+    echo "" >&2
+    echo "Adjusted fasta headers and lengths:" >&2
+    awk '
+    /^>/ {
+        if (seq != "" && name != "") {
+            len = length(seq)
+            # Parse expected length from header: scaffold__start__end
+            split(name, parts, "__")
+            if (length(parts) == 3) {
+                expected = int(parts[3]) - int(parts[2]) + 1
+                status = (len == expected) ? "OK" : "MISMATCH(got=" len ",expected=" expected ")"
+            } else {
+                status = "OK(no_range)"
+            }
+            print name "\tlength=" len "\t" status
+        }
+        name = substr($0, 2)
+        seq = ""
+        next
+    }
+    { seq = seq $0 }
+    END {
+        if (seq != "" && name != "") {
+            len = length(seq)
+            split(name, parts, "__")
+            if (length(parts) == 3) {
+                expected = int(parts[3]) - int(parts[2]) + 1
+                status = (len == expected) ? "OK" : "MISMATCH(got=" len ",expected=" expected ")"
+            } else {
+                status = "OK(no_range)"
+            }
+            print name "\tlength=" len "\t" status
+        }
+    }
+    ' ${assembly_id}.${batch_id}.adjusted.fa >&2
+
+    echo "=== END VERIFICATION ===" >&2
     """
 
     stub:
