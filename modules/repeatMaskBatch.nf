@@ -92,18 +92,26 @@ process REPEAT_MASK_BATCH {
         if (colon > 0) hdr = substr(hdr, 1, colon - 1)
         # Extract scaffold name and coordinates from header
         # Format: scaffold_name_start-end  (start and end are 1-based)
-        # Find last underscore-delimited start-end range
-        if (match(hdr, "_[0-9]+-[0-9]+\\$")) {
-            coord_part = substr(hdr, RSTART + 1)   # "start-end"
-            scaff      = substr(hdr, 1, RSTART - 1)
-            dash       = index(coord_part, "-")
-            start1     = int(substr(coord_part, 1, dash - 1))
-            end_coord  = int(substr(coord_part, dash + 1))
-        } else {
-            # Fallback: whole sequence, no subrange in header
-            scaff      = hdr
-            start1     = 1
-            end_coord  = (scaff in scaff_len) ? scaff_len[scaff] : 0
+        # Walk backwards from end to find last _digits-digits pattern
+        scaff = hdr
+        start1 = 1
+        end_coord = (hdr in scaff_len) ? scaff_len[hdr] : 0
+        n_fields = split(hdr, parts, "_")
+        if (n_fields >= 2) {
+            last = parts[n_fields]
+            dash = index(last, "-")
+            if (dash > 0) {
+                left  = substr(last, 1, dash - 1)
+                right = substr(last, dash + 1)
+                if (left ~ /^[0-9]+$/ && right ~ /^[0-9]+$/) {
+                    end_coord  = int(right)
+                    start1     = int(left)
+                    # Rebuild scaffold name without the last _start-end part
+                    scaff = ""
+                    for (i = 1; i < n_fields; i++)
+                        scaff = (i == 1) ? parts[i] : scaff "_" parts[i]
+                }
+            }
         }
         slen = (scaff in scaff_len) ? scaff_len[scaff] : 0
         print short "\\t" scaff "\\t" start1 "\\t" end_coord "\\t" slen
