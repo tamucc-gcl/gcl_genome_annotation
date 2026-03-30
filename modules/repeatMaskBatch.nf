@@ -75,48 +75,198 @@ process REPEAT_MASK_BATCH {
     #   where start and end are 1-based coordinates.
     #
     #   We extract: short_id  scaffold_name  1-based_start  end  scaffold_length
-    awk -v lenfile="${seq_lengths}" '
+    python3 - << 'PYEOF'
+import re, sys
+
+slen = {}
+with open("${seq_lengths}") as fh:
+    for line in fh:
+        parts = line.strip().split("\t")
+        if len(parts) >= 2:
+            slen[parts[0]] = int(parts[1])
+
+n = 0
+with open("${batch_fasta}") as fh, open("coord_map.tsv", "w") as out:
+    for line in fh:
+        if not line.startswith(">"):
+            continue
+        short = f"seq_{n:04d}"
+        n += 1
+        # Header format: >scaffold_name_start-end:.
+        hdr = line[1:].split()[0]          # strip > and anything after space
+        hdr = hdr.split(":")[0]            # strip :. suffix
+        m = re.match(r'^(.+)_(\d+)-(\d+)
+
+    # ── 1. Run RepeatMasker ───────────────────────────────────────────────────
+    RepeatMasker \\
+        -parallel ${rm_threads} \\
+        -engine ncbi \\
+        ${speed_flag} \\
+        -cutoff 225 \\
+        -lib ${combined_lib} \\
+        -xsmall -small \\
+        -a \\
+        -gff \\
+        short_ids.fa
+
+    # ── 2. Adjust .out file ───────────────────────────────────────────────────
+    awk '
     BEGIN {
-        while ((getline line < lenfile) > 0) {
-            split(line, a, "\\t")
-            scaff_len[a[1]] = int(a[2])
+        FS = "\\t"
+        while ((getline < "coord_map.tsv") > 0) {
+            map_scaff[\$1]  = \$2
+            map_offset[\$1] = int(\$3) - 1   # offset = start1 - 1
+            map_end[\$1]    = int(\$4)
+            map_slen[\$1]   = int(\$5)
         }
-        close(lenfile)
+        close("coord_map.tsv")
+        FS = " "
     }
-    /^>/ {
-        short = sprintf("seq_%04d", n++)
-        # Strip leading > and trailing :. suffix
-        hdr = substr(\$1, 2)
-        # Remove everything from colon onwards (e.g. ":." suffix from seqkit)
-        colon = index(hdr, ":")
-        if (colon > 0) hdr = substr(hdr, 1, colon - 1)
-        # Extract scaffold name and coordinates from header
-        # Format: scaffold_name_start-end  (start and end are 1-based)
-        # Walk backwards from end to find last _digits-digits pattern
-        scaff = hdr
-        start1 = 1
-        end_coord = (hdr in scaff_len) ? scaff_len[hdr] : 0
-        n_fields = split(hdr, parts, "_")
-        if (n_fields >= 2) {
-            last = parts[n_fields]
-            dash = index(last, "-")
-            if (dash > 0) {
-                left  = substr(last, 1, dash - 1)
-                right = substr(last, dash + 1)
-                if (left ~ /^[0-9]+$/ && right ~ /^[0-9]+$/) {
-                    end_coord  = int(right)
-                    start1     = int(left)
-                    # Rebuild scaffold name without the last _start-end part
-                    scaff = ""
-                    for (i = 1; i < n_fields; i++)
-                        scaff = (i == 1) ? parts[i] : scaff "_" parts[i]
-                }
+
+    NR <= 3 { print; next }
+
+    {
+        sid = \$5
+
+        if (sid in map_scaff) {
+            \$5 = map_scaff[sid]
+            offset = map_offset[sid]
+            slen   = map_slen[sid]
+
+            \$6 = \$6 + offset
+            \$7 = \$7 + offset
+
+            if (slen > 0) {
+                \$8 = "(" slen - \$7 ")"
             }
         }
-        slen = (scaff in scaff_len) ? scaff_len[scaff] : 0
-        print short "\\t" scaff "\\t" start1 "\\t" end_coord "\\t" slen
+
+        print
     }
-    ' ${batch_fasta} > coord_map.tsv
+    ' short_ids.fa.out > ${assembly_id}.${batch_id}.adjusted.out
+
+    # ── 3. Restore original names in masked FASTA ─────────────────────────────
+    #   Headers become: >scaffold_name__start1__end
+    #   (double-underscore delimited for MERGE_RM_RESULTS to parse)
+    awk '
+    BEGIN {
+        while ((getline < "coord_map.tsv") > 0) {
+            split(\$0, a, "\\t")
+            fa_hdr[a[1]] = a[2] "__" a[3] "__" a[4]
+        }
+        close("coord_map.tsv")
+    }
+    /^>/ {
+        short = substr(\$1, 2)
+        if (short in fa_hdr) print ">" fa_hdr[short]
+        else print
+        next
+    }
+    { print }
+    ' short_ids.fa.masked > ${assembly_id}.${batch_id}.adjusted.fa
+
+    # ── 5. Adjust .align file ─────────────────────────────────────────────────
+    awk '
+    BEGIN {
+        while ((getline < "coord_map.tsv") > 0) {
+            split(\$0, a, "\\t")
+            map_scaff[a[1]]  = a[2]
+            map_offset[a[1]] = int(a[3]) - 1
+            map_slen[a[1]]   = int(a[5])
+        }
+        close("coord_map.tsv")
+    }
+
+    # Summary/annotation lines start with a number (SW score)
+    /^[[:space:]]*[0-9]/ && NF >= 14 {
+        sid = \$5
+        if (sid in map_scaff) {
+            \$5 = map_scaff[sid]
+            offset = map_offset[sid]
+            slen   = map_slen[sid]
+
+            \$6 = \$6 + offset
+            \$7 = \$7 + offset
+
+            if (slen > 0) {
+                \$8 = "(" slen - \$7 ")"
+            }
+        }
+        print
+        next
+    }
+
+    # All other lines pass through unchanged
+    { print }
+    ' short_ids.fa.align > ${assembly_id}.${batch_id}.adjusted.align
+
+    # ── 6. Verify coord_map correctness ──────────────────────────────────────
+    #   For each sequence in the batch, confirm that:
+    #     - the scaffold name in coord_map matches the fasta header
+    #     - the sequence length in adjusted.fa matches end - start + 1
+    #   Any mismatch indicates a coord_map ordering error.
+    echo "=== COORD_MAP VERIFICATION: ${assembly_id} ${batch_id} ===" >&2
+    echo "coord_map entries:" >&2
+    cat coord_map.tsv >&2
+
+    echo "" >&2
+    echo "Adjusted fasta headers and lengths:" >&2
+    awk '
+    /^>/ {
+        if (seq != "" && name != "") {
+            len = length(seq)
+            # Parse expected length from header: scaffold__start__end
+            split(name, parts, "__")
+            if (length(parts) == 3) {
+                expected = int(parts[3]) - int(parts[2]) + 1
+                status = (len == expected) ? "OK" : "MISMATCH(got=" len ",expected=" expected ")"
+            } else {
+                status = "OK(no_range)"
+            }
+            print name "\tlength=" len "\t" status
+        }
+        name = substr($0, 2)
+        seq = ""
+        next
+    }
+    { seq = seq $0 }
+    END {
+        if (seq != "" && name != "") {
+            len = length(seq)
+            split(name, parts, "__")
+            if (length(parts) == 3) {
+                expected = int(parts[3]) - int(parts[2]) + 1
+                status = (len == expected) ? "OK" : "MISMATCH(got=" len ",expected=" expected ")"
+            } else {
+                status = "OK(no_range)"
+            }
+            print name "\tlength=" len "\t" status
+        }
+    }
+    ' ${assembly_id}.${batch_id}.adjusted.fa >&2
+
+    echo "=== END VERIFICATION ===" >&2
+    """
+
+    stub:
+    """
+    touch ${assembly_id}.${batch_id}.adjusted.out
+    touch ${assembly_id}.${batch_id}.adjusted.fa
+    touch ${assembly_id}.${batch_id}.adjusted.align
+    """
+}
+, hdr)
+        if m:
+            scaff     = m.group(1)
+            start1    = int(m.group(2))
+            end_coord = int(m.group(3))
+        else:
+            scaff     = hdr
+            start1    = 1
+            end_coord = slen.get(hdr, 0)
+        scaffold_len = slen.get(scaff, 0)
+        out.write(f"{short}\t{scaff}\t{start1}\t{end_coord}\t{scaffold_len}\n")
+PYEOF
 
     # ── 1. Run RepeatMasker ───────────────────────────────────────────────────
     RepeatMasker \\
