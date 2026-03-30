@@ -95,7 +95,7 @@ with open("${batch_fasta}") as fh, open("coord_map.tsv", "w") as out:
         # Header format: >scaffold_name_start-end:.
         hdr = line[1:].split()[0]          # strip > and anything after space
         hdr = hdr.split(":")[0]            # strip :. suffix
-        m = re.match(r'^(.+)_(\d+)-(\d+)
+        m = re.match(r'^(.+)_([0-9]+)-([0-9]+)
 
     # ── 1. Run RepeatMasker ───────────────────────────────────────────────────
     RepeatMasker \\
