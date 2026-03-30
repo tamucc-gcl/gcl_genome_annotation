@@ -5,18 +5,17 @@
     Run RepeatMasker on a single batch chunk, then adjust coordinates back to
     global genomic positions.
 
-    The BED file from PREP_RM_BATCHES is the authoritative source for the
-    mapping between batch sequences and original genomic coordinates.
-    Scaffold names in the input assembly may contain colons, dashes, and
-    underscores, making header parsing unreliable. Instead we use the BED
-    file order (which matches the FASTA order from seqkit subseq --bed)
-    to build a positional mapping: sequence N in the batch → BED line N.
+    seqkit subseq --bed outputs sequences in genome fasta order, NOT in BED
+    file order. The coordinate mapping is therefore built by parsing the actual
+    FASTA headers produced by seqkit (format: >scaffold_name_start-end:.)
+    rather than assuming BED line N corresponds to FASTA sequence N.
 
     RepeatMasker enforces a 50-character limit on FASTA identifiers.
     Because the encoded names can exceed this, we:
       0. Rename sequences to short temp IDs and keep a mapping file
+         (built from actual fasta header order, not BED line order)
       1. Run RepeatMasker on the short-named FASTA
-      2. Map short IDs back to original scaffold + offset via BED
+      2. Map short IDs back to original scaffold + offset via header-derived map
       3. Adjust coordinates in .out and .masked files
 
     Inputs:
@@ -57,7 +56,7 @@ process REPEAT_MASK_BATCH {
     set -euo pipefail
 
     # ── 0. Rename sequences to short IDs (RepeatMasker max ID = 50 chars) ─────
-    #   Also record the order (seq_0000, seq_0001, ...) which matches BED line order
+    #   Assigns seq_0000, seq_0001, ... in the order sequences appear in the fasta
     awk '
     /^>/ {
         short = sprintf("seq_%04d", n++)
@@ -67,12 +66,15 @@ process REPEAT_MASK_BATCH {
     { print }
     ' ${batch_fasta} > short_ids.fa
 
-    # ── Build coordinate mapping from BED ─────────────────────────────────────
-    #   BED lines are in the same order as FASTA sequences produced by seqkit.
-    #   BED format: scaffold_name  0-based_start  end
-    #   We create: short_id  scaffold_name  1-based_start  end
+    # ── Build coordinate mapping from FASTA headers ───────────────────────────
+    #   seqkit subseq --bed outputs sequences in genome fasta order, NOT BED
+    #   file order. We therefore parse the actual headers from batch_fasta to
+    #   build the short_id → scaffold/coordinates mapping.
     #
-    #   Also load scaffold lengths for recalculating the (left) column.
+    #   seqkit subseq --bed header format: >scaffold_name_start-end:.
+    #   where start and end are 1-based coordinates.
+    #
+    #   We extract: short_id  scaffold_name  1-based_start  end  scaffold_length
     awk -v lenfile="${seq_lengths}" '
     BEGIN {
         while ((getline line < lenfile) > 0) {
@@ -81,15 +83,27 @@ process REPEAT_MASK_BATCH {
         }
         close(lenfile)
     }
-    {
-        short = sprintf("seq_%04d", NR - 1)
-        scaff = \$1
-        start1 = int(\$2) + 1   # Convert 0-based BED start to 1-based
-        end_coord = int(\$3)
+    /^>/ {
+        short = sprintf("seq_%04d", n++)
+        # Strip leading > and trailing :. suffix
+        hdr = substr(\$1, 2)
+        sub(/:.*$/, "", hdr)
+        # Extract scaffold name and coordinates from header
+        # Format: scaffold_name_start-end  (start and end are 1-based)
+        if (match(hdr, /^(.+)_([0-9]+)-([0-9]+)$/, arr)) {
+            scaff      = arr[1]
+            start1     = int(arr[2])
+            end_coord  = int(arr[3])
+        } else {
+            # Fallback: whole sequence, no subrange in header
+            scaff      = hdr
+            start1     = 1
+            end_coord  = (scaff in scaff_len) ? scaff_len[scaff] : 0
+        }
         slen = (scaff in scaff_len) ? scaff_len[scaff] : 0
         print short "\\t" scaff "\\t" start1 "\\t" end_coord "\\t" slen
     }
-    ' ${batch_bed} > coord_map.tsv
+    ' ${batch_fasta} > coord_map.tsv
 
     # ── 1. Run RepeatMasker ───────────────────────────────────────────────────
     RepeatMasker \\
@@ -160,10 +174,6 @@ process REPEAT_MASK_BATCH {
     ' short_ids.fa.masked > ${assembly_id}.${batch_id}.adjusted.fa
 
     # ── 5. Adjust .align file ─────────────────────────────────────────────────
-    #   .align has summary lines that mirror .out format with scaffold names
-    #   and coordinates. We replace short IDs and adjust coordinates on lines
-    #   that start with a score (numeric first field) similar to .out format.
-    #   Other lines (alignments, blank lines, headers) pass through unchanged.
     awk '
     BEGIN {
         while ((getline < "coord_map.tsv") > 0) {
