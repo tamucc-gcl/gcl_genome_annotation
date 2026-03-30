@@ -87,13 +87,18 @@ process REPEAT_MASK_BATCH {
         short = sprintf("seq_%04d", n++)
         # Strip leading > and trailing :. suffix
         hdr = substr(\$1, 2)
-        sub(/:.*$/, "", hdr)
+        # Remove everything from colon onwards (e.g. ":." suffix from seqkit)
+        colon = index(hdr, ":")
+        if (colon > 0) hdr = substr(hdr, 1, colon - 1)
         # Extract scaffold name and coordinates from header
         # Format: scaffold_name_start-end  (start and end are 1-based)
-        if (match(hdr, /^(.+)_([0-9]+)-([0-9]+)$/, arr)) {
-            scaff      = arr[1]
-            start1     = int(arr[2])
-            end_coord  = int(arr[3])
+        # Find last underscore-delimited start-end range
+        if (match(hdr, "_[0-9]+-[0-9]+$")) {
+            coord_part = substr(hdr, RSTART + 1)   # "start-end"
+            scaff      = substr(hdr, 1, RSTART - 1)
+            dash       = index(coord_part, "-")
+            start1     = int(substr(coord_part, 1, dash - 1))
+            end_coord  = int(substr(coord_part, dash + 1))
         } else {
             # Fallback: whole sequence, no subrange in header
             scaff      = hdr
