@@ -17,6 +17,10 @@ workflow REPEAT_MASK_PARALLEL {
 
     main:
 
+    // At the top of the workflow, create channels for the scripts
+    ch_build_script  = Channel.fromPath("${projectDir}/py_scripts/build_coord_map.py")
+    ch_verify_script = Channel.fromPath("${projectDir}/py_scripts/verify_coord_map.py")
+
     // ── Split input channel ──────────────────────────────────────────────────
     ch_assemblies = ch_mask_input.map { id, assembly, repeats -> tuple(id, assembly) }
     ch_curated    = ch_mask_input.map { id, assembly, repeats -> tuple(id, repeats) }
@@ -59,7 +63,9 @@ workflow REPEAT_MASK_PARALLEL {
         .combine(PREP_RM_BATCHES.out.seq_lengths, by: 0)
     */
 
-    REPEAT_MASK_BATCH(ch_batch_full)
+    REPEAT_MASK_BATCH(ch_batch_full,
+                        ch_build_script.collect(),
+                        ch_verify_script.collect())
 
     // ── Step 5: Group by assembly and merge ──────────────────────────────────
     ch_merge = REPEAT_MASK_BATCH.out.batch_results

@@ -41,6 +41,8 @@ process REPEAT_MASK_BATCH {
     input:
     tuple val(assembly_id), val(batch_id), path(batch_fasta), path(batch_bed),
           path(combined_lib), path(seq_lengths)
+    path(build_coord_map_script)
+    path(verify_coord_map_script)
 
     output:
     tuple val(assembly_id), val(batch_id),
@@ -65,7 +67,7 @@ process REPEAT_MASK_BATCH {
     #   seqkit subseq --bed header format: >scaffold_name_start-end:.
     #   We parse these directly to get the correct seq_N → scaffold mapping,
     #   since seqkit outputs in genome order not BED order.
-    python3 ${projectDir}/py_scripts/build_coord_map.py ${batch_fasta} ${seq_lengths} coord_map.tsv
+    python3 ${build_coord_map_script} ${batch_fasta} ${seq_lengths} coord_map.tsv
 
     # ── 1. Run RepeatMasker ───────────────────────────────────────────────────
     RepeatMasker \\
@@ -154,7 +156,7 @@ process REPEAT_MASK_BATCH {
     ' short_ids.fa.align > ${assembly_id}.${batch_id}.adjusted.align
 
     # ── 5. Verify coord_map correctness ──────────────────────────────────────
-    python3 ${projectDir}/py_scripts/verify_coord_map.py ${assembly_id}.${batch_id}.adjusted.fa >&2
+    python3 ${verify_coord_map_script} ${assembly_id}.${batch_id}.adjusted.fa >&2
     """
 
     stub:
