@@ -236,7 +236,7 @@ def main():
     W.append("## Annotation Outputs\n")
     out_files = [
         ("Annotated GFF3",         "{aid}.annotated.gff3"),
-        ("Protein sequences",      "{aid}.proteins.fa"),
+        ("Protein sequences",      "{aid}.filtered_proteins.fa"),
         ("CDS sequences",          "{aid}.cds.fa"),
         ("Transcript sequences",   "{aid}.transcripts.fa"),
         ("tRNA sequences",         "{aid}.tRNA.fa"),
@@ -292,6 +292,9 @@ def main():
         ("unique_go_terms",      "Unique GO terms",         True),
         ("unique_kegg_kos",      "Unique KEGG KOs",         True),
     ]))
+    W.append("> **Note:** mRNA transcript and protein counts reflect all isoforms; "
+         "gene count reflects unique loci. "
+         f"Multi-isoform loci produce multiple transcripts per gene.\n")
     W.append("")
 
     # ═══════════════════════════════════════════════════════════════════════
