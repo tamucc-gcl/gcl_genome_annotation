@@ -43,8 +43,7 @@ process MERGE_RM_RESULTS {
     publishDir "${params.outdir}/repeats", mode: params.publish_dir_mode
 
     input:
-    tuple val(assembly_id), path(out_files), path(fasta_files), path(align_files)
-    tuple val(assembly_id), path(seq_lengths)
+    tuple val(assembly_id), path(out_files), path(fasta_files), path(align_files), path(seq_lengths)
 
     output:
     tuple val(assembly_id), path("${assembly_id}.masked.fasta"),         emit: masked_fasta

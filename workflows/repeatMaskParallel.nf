@@ -75,8 +75,9 @@ workflow REPEAT_MASK_PARALLEL {
             tuple(assembly_id, out_file, fasta_file, align_file)
         }
         .groupTuple(size: params.n_rm_chunks)
+        .join(PREP_RM_BATCHES.out.seq_lengths, by: 0)
 
-    MERGE_RM_RESULTS(ch_merge, PREP_RM_BATCHES.out.seq_lengths)
+    MERGE_RM_RESULTS(ch_merge)
 
     emit:
     masked_fasta    = MERGE_RM_RESULTS.out.masked_fasta
