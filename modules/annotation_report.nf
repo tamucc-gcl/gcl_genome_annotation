@@ -114,16 +114,16 @@ process ANNOTATION_REPORT {
     # ── 2. Generate plots with R ──────────────────────────────────────────────
     Rscript ${projectDir}/r_scripts/annotation_report_plots.R \
         --metrics annotation_metrics.tsv \
-        --gff3s ${annotated_gff3s} \
-        --gene_summaries ${gene_summaries} \
-        --functional_tsvs ${functional_tsvs} \
-        --busco_txts ${busco_txts} \
-        --omark_summaries ${omark_summaries} \
-        --trnascan_tsvs ${trnascan_tsvs} \
-        --infernal_tblouts ${infernal_tblouts} \
-        --telomere_gff3s ${telomere_gff3s} \
-        --telomere_tsvs ${telomere_tsvs} \
-        --centromere_gff3s ${centromere_gff3s} \
+        --gff3s "${annotated_gff3s}" \
+        --gene_summaries "${gene_summaries}" \
+        --functional_tsvs "${functional_tsvs}" \
+        --busco_txts "${busco_txts}" \
+        --omark_summaries "${omark_summaries}" \
+        --trnascan_tsvs "${trnascan_tsvs}" \
+        --infernal_tblouts "${infernal_tblouts}" \
+        --telomere_gff3s "${telomere_gff3s}" \
+        --telomere_tsvs "${telomere_tsvs}" \
+        --centromere_gff3s "${centromere_gff3s}" \
         --outdir annotation_report_plots
 
     # ── 3. Assemble Markdown report ───────────────────────────────────────────
