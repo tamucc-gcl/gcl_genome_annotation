@@ -359,11 +359,10 @@ workflow {
     ch_flag_input = FILTER_GENE_MODELS.out.filtered_gff3
         .join(FILTER_GENE_MODELS.out.filtered_proteins)
         .join(REPEAT_MASK.out.repeat_gff)
+        .join(RECLASSIFY_REPEATS.out.reclassified_lib)
         // produces: [assembly_id, braker_gff3, braker_proteins, repeat_gff]
 
-    FLAG_TE_GENES(
-        ch_flag_input,
-        RECLASSIFY_REPEATS.out.reclassified_lib)
+    FLAG_TE_GENES(ch_flag_input)
     //   ↑ Use the PRE-filter repeat library here — we want all TE sequences
     //     for homology detection, including ones removed from masking library
 

@@ -37,8 +37,8 @@ process FLAG_TE_GENES {
     publishDir "${params.outdir}/structural_annotation", mode: params.publish_dir_mode
 
     input:
-    tuple val(assembly_id), path(braker_gff3), path(braker_proteins), path(repeat_gff)
-    tuple val(assembly_id), path(repeat_lib)
+    tuple val(assembly_id), path(braker_gff3), path(braker_proteins),
+        path(repeat_gff), path(repeat_lib)
 
     output:
     tuple val(assembly_id), path("${assembly_id}.te_flagged.gff3"),
