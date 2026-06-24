@@ -3,7 +3,7 @@
     MERGE FUNCTIONAL ANNOTATIONS
 ========================================================================================
     Combine per-assembly results from InterProScan, eggNOG, DIAMOND, KofamScan,
-    DeepSig, and OMArk into a single unified TSV keyed on protein ID.
+    DeepSig, and OMArk into a single unified TSV keyed on the final renamed protein ID.
 
     Also computes per-protein quality metrics:
       - Protein sequence integrity (start M, internal stops, length)
@@ -19,8 +19,8 @@
         - diamond_tsv:       Merged DIAMOND TSV (with header)
         - kofamscan_tsv:     Merged KofamScan TSV
         - deepsig_gff3:      Merged DeepSig GFF3
-        - proteins_fasta:    BRAKER protein FASTA (for sequence integrity)
-        - braker_gff3:       TE-flagged BRAKER GFF3 (for structural metrics)
+        - proteins_fasta:    renamed protein FASTA (for sequence integrity)
+        - braker_gff3:       renamed protein-coding GFF3 (for structural metrics)
         - genome_fasta:      Filtered genome assembly (for splice-site lookup)
         - omark_ump:         OMArk Unified Model Predictions (per-protein classification)
 
@@ -60,8 +60,18 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
     import csv, re, sys, statistics
     from collections import defaultdict, OrderedDict
 
-    # ── Storage: protein_id → dict of annotation fields ──────────────────────
+    # ── Storage: final renamed protein_id → dict of annotation fields ─────────
     annot = defaultdict(lambda: {})
+
+    def parse_gff_attrs(attr_str):
+        attrs = {}
+        if not attr_str or attr_str == ".":
+            return attrs
+        for tok in attr_str.split(";"):
+            if "=" in tok:
+                k, v = tok.split("=", 1)
+                attrs[k.strip()] = v.strip()
+        return attrs
 
     # ── 1. InterProScan (headerless TSV, 11-15 columns) ─────────────────────
     #   Col layout (0-indexed):
@@ -177,30 +187,50 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
                 rec["deepsig_score"] = score
                 rec["deepsig_attr"]  = attributes
 
-    # ── 6. Pre-populate annot from GFF3 to ensure all mRNAs are represented ──
+    # ── 6. Pre-populate annot from renamed GFF3 ──────────────────────────────
     #   Proteins with no functional tool hits still need structural metrics.
+    #   The renamed GFF3 is the canonical coordinate/ID source.
+    gff_mrna_ids = set()
+    gff_gene_ids = set()
+    mrna_to_gene = {}
+
     with open("${braker_gff3}") as fh:
         for line in fh:
             if line.startswith("#") or not line.strip():
                 continue
-            cols = line.rstrip("\\n").split("\\t")
-            if len(cols) < 9 or cols[2] not in ("mRNA", "transcript"):
+            cols = line.rstrip("\n").split("\t")
+            if len(cols) < 9:
                 continue
-            attrs = {}
-            for tok in cols[8].split(";"):
-                if "=" in tok:
-                    k, v = tok.split("=", 1)
-                    attrs[k.strip()] = v.strip()
-            fid = attrs.get("ID", "")
+
+            ftype = cols[2]
+            attrs = parse_gff_attrs(cols[8])
+
+            if ftype == "gene":
+                gid = attrs.get("ID", "").strip()
+                if gid:
+                    gff_gene_ids.add(gid)
+
+            if ftype not in ("mRNA", "transcript"):
+                continue
+
+            fid = attrs.get("ID", "").strip()
+            parent = attrs.get("Parent", "").strip()
+
             if fid:
-                _ = annot[fid]   # ensure entry exists
+                gff_mrna_ids.add(fid)
+                mrna_to_gene[fid] = parent
+                rec = annot[fid]
+                rec["gene_id"] = parent if parent else "-"
 
     # ── 7. Protein sequence metrics ──────────────────────────────────────────
     #   For each protein: length, start Met, internal stops, terminal stop.
-    #   BRAKER protein FASTA headers: >g1.t1 [optional description]
+    #   Renamed protein FASTA headers: >{assembly_id}_g1.t1 [optional description]
+    protein_fasta_ids = set()
+
     def _process_prot(pid, seq):
         if not seq or not pid:
             return
+        protein_fasta_ids.add(pid)
         rec = annot[pid]
         rec["protein_length_aa"] = len(seq.rstrip("*"))
         rec["has_start_M"] = "Y" if seq and seq[0] == "M" else "N"
@@ -385,6 +415,7 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
     # Top-level class: Consistent, Inconsistent, Contamination, Unknown
     # Subtype: Full, Partial, Fragment (absent for Unknown)
     current_class = None
+    skipped_omark = 0
     with open("${omark_ump}") as fh:
         for line in fh:
             line = line.strip()
@@ -393,8 +424,17 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
             if line.startswith(">"):
                 current_class = line[1:]  # e.g. "Consistent_Partial"
             elif current_class is not None:
-                rec = annot[line]
-                rec["omark_class"] = current_class
+                if line in annot:
+                    rec = annot[line]
+                    rec["omark_class"] = current_class
+                else:
+                    skipped_omark += 1
+
+    if skipped_omark:
+        raise SystemExit(
+            f"ERROR: skipped {skipped_omark} OMArk protein IDs not present in renamed GFF. "
+            "This usually means OMArk was run on pre-renaming protein IDs."
+        )
 
     # ── 9b. AED scores ──────────────────────────────────────────────────────
     #   Read per-transcript AED from COMPUTE_AED output.
@@ -409,6 +449,38 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
                 annot[tid]["aed_best_hit"]         = row.get("best_protein_hit", ".")
                 annot[tid]["aed_protein_identity"] = row.get("protein_identity", ".")
                 annot[tid]["aed_n_evidence_hits"]  = row.get("n_evidence_hits", ".")
+
+    # ── 9c. Validate final ID consistency ────────────────────────────────────
+    #   At this point, all functional tools should have used the renamed protein
+    #   FASTA, so every observed protein ID should exist as an mRNA/transcript ID
+    #   in the renamed GFF3.
+    extra_tool_ids = sorted(set(annot.keys()) - gff_mrna_ids)
+    missing_tool_ids = sorted(gff_mrna_ids - set(annot.keys()))
+    proteins_not_in_gff = sorted(protein_fasta_ids - gff_mrna_ids)
+    gff_not_in_proteins = sorted(gff_mrna_ids - protein_fasta_ids)
+
+    if proteins_not_in_gff or gff_not_in_proteins:
+        raise SystemExit(
+            "ERROR: renamed protein FASTA IDs do not match renamed GFF mRNA/transcript IDs. "
+            f"Protein IDs not in GFF: {len(proteins_not_in_gff)}; "
+            f"GFF mRNA IDs not in proteins: {len(gff_not_in_proteins)}. "
+            "First protein-only examples: " + ", ".join(proteins_not_in_gff[:10]) + "; "
+            "first GFF-only examples: " + ", ".join(gff_not_in_proteins[:10])
+        )
+
+    if extra_tool_ids:
+        raise SystemExit(
+            "ERROR: functional annotation IDs are not all present in the renamed GFF. "
+            f"Extra IDs: {len(extra_tool_ids)}. First examples: "
+            + ", ".join(extra_tool_ids[:20])
+        )
+
+    if missing_tool_ids:
+        raise SystemExit(
+            "ERROR: renamed GFF mRNA/transcript IDs are missing from annotation table. "
+            f"Missing IDs: {len(missing_tool_ids)}. First examples: "
+            + ", ".join(missing_tool_ids[:20])
+        )
 
     # ── 10. Quality flags ────────────────────────────────────────────────────
     #   FAIL: internal stop codon | very short protein (<30 aa) |
@@ -505,6 +577,7 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
     # ── Build output ─────────────────────────────────────────────────────────
     out_columns = [
         "protein_id",
+        "gene_id",
         # InterProScan
         "ipr_signatures", "ipr_accessions", "ipr_descriptions", "ipr_go",
         # eggNOG
@@ -533,11 +606,12 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
     ]
 
     with open("${assembly_id}.functional_annotations.tsv", "w") as out:
-        out.write("\\t".join(out_columns) + "\\n")
+        out.write("\t".join(out_columns) + "\n")
 
-        for pid in sorted(annot.keys()):
+        # Write one row per renamed GFF mRNA/transcript ID.
+        for pid in sorted(gff_mrna_ids):
             rec = annot[pid]
-            vals = [pid]
+            vals = [pid, rec.get("gene_id", "-")]
 
             # InterProScan — collapse accumulated lists/sets
             vals.append("; ".join(rec.get("ipr_signatures", ["-"])))
@@ -545,22 +619,23 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
             vals.append("; ".join(sorted(rec.get("ipr_descriptions", {"-"}))))
             vals.append("; ".join(sorted(rec.get("ipr_go", {"-"}))))
 
-            # All scalar fields
-            for col in out_columns[5:]:
+            # All scalar fields after ipr_go
+            for col in out_columns[6:]:
                 vals.append(str(rec.get(col, "-")))
 
-            out.write("\\t".join(str(v) for v in vals) + "\\n")
+            out.write("\t".join(str(v) for v in vals) + "\n")
 
     # ── Stats ─────────────────────────────────────────────────────────────────
-    total  = len(annot)
-    n_ipr  = sum(1 for r in annot.values() if "ipr_signatures" in r)
-    n_egg  = sum(1 for r in annot.values() if "eggnog_OGs" in r)
-    n_dia  = sum(1 for r in annot.values() if "diamond_hit" in r)
-    n_kof  = sum(1 for r in annot.values() if "kofam_KO" in r)
-    n_sig  = sum(1 for r in annot.values() if "deepsig_type" in r)
-    n_pass = sum(1 for r in annot.values() if r.get("quality_flag") == "PASS")
-    n_warn = sum(1 for r in annot.values() if r.get("quality_flag") == "WARN")
-    n_fail = sum(1 for r in annot.values() if r.get("quality_flag") == "FAIL")
+    total  = len(gff_mrna_ids)
+    rows_for_stats = [annot[pid] for pid in gff_mrna_ids]
+    n_ipr  = sum(1 for r in rows_for_stats if "ipr_signatures" in r)
+    n_egg  = sum(1 for r in rows_for_stats if "eggnog_OGs" in r)
+    n_dia  = sum(1 for r in rows_for_stats if "diamond_hit" in r)
+    n_kof  = sum(1 for r in rows_for_stats if "kofam_KO" in r)
+    n_sig  = sum(1 for r in rows_for_stats if "deepsig_type" in r)
+    n_pass = sum(1 for r in rows_for_stats if r.get("quality_flag") == "PASS")
+    n_warn = sum(1 for r in rows_for_stats if r.get("quality_flag") == "WARN")
+    n_fail = sum(1 for r in rows_for_stats if r.get("quality_flag") == "FAIL")
     print(f"Merged {total} proteins: IPR={n_ipr} eggNOG={n_egg} "
           f"DIAMOND={n_dia} KofamScan={n_kof} DeepSig={n_sig}", file=sys.stderr)
     print(f"Quality flags: PASS={n_pass} WARN={n_warn} FAIL={n_fail}", file=sys.stderr)

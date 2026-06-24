@@ -4,7 +4,8 @@
 ========================================================================================
     Merge structural (BRAKER), tRNAscan, Infernal, telomere, centromere, and
     repeat GFF3 annotations into a single unified GFF3 with:
-      - Consistent ID namespacing ({assembly_id}_g{N}, _tRNA{N}, _ncRNA{N})
+      - Protein-coding IDs are preserved from the renamed input GFF3
+      - Consistent namespacing for non-protein-coding features (_tRNA{N}, _ncRNA{N})
       - Functional attributes (Dbxref, product, Ontology_term, Note) on
         protein-coding mRNA features from the merged functional table
       - Product name hierarchy:
@@ -15,7 +16,7 @@
 
     Inputs:
         - assembly_id:          Sample identifier
-        - braker_gff3:          BRAKER3 gene models GFF3
+        - braker_gff3:          renamed protein-coding gene models GFF3
         - trnascan_gff3:        tRNAscan-SE predictions GFF3
         - infernal_gff3:        Infernal/Rfam ncRNA predictions GFF3
         - telomere_gff3:        tidk telomere annotations GFF3
@@ -62,7 +63,7 @@ process ANNOTATE_GFF3 {
     Merge BRAKER, tRNAscan, Infernal, telomere, centromere, and repeat GFF3s
     into a single annotated GFF3.
 
-    1. Parse & renumber BRAKER features  → {asm}_g{N}, mRNA → {asm}_g{N}.t{M}
+    1. Parse renamed protein-coding GFF3 features without changing IDs
     2. Parse & renumber tRNAscan features → {asm}_tRNA{N}
     3. Parse & renumber Infernal features → {asm}_ncRNA{N}
     4. Parse telomere GFF3               → {asm}_telo{N}
@@ -112,75 +113,44 @@ process ANNOTATE_GFF3 {
         return (rec[0], int(rec[3]))
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # 1. Parse BRAKER GFF3 — renumber genes and propagate new IDs to children
+    # 1. Parse renamed protein-coding GFF3 — do not rename again
     # ═══════════════════════════════════════════════════════════════════════════
 
     braker_records = []
-    braker_id_map = {}
     braker_gene_counter = 0
-    braker_mrna_counters = defaultdict(int)
+    braker_mrna_counter = 0
 
-    raw_braker = []
+    # Build mRNA→gene parent mapping for product propagation later.
+    mrna_to_gene = {}
+
     with open("${braker_gff3}") as fh:
         for line in fh:
             if line.startswith("#") or not line.strip():
                 continue
-            cols = line.rstrip("\\n").split("\\t")
+            cols = line.rstrip("\n").split("\t")
             if len(cols) != 9:
                 continue
+
             attrs = parse_attributes(cols[8])
-            raw_braker.append((cols[:8], attrs))
+            ftype = cols[2]
 
-    # Pass 1a: assign new gene IDs
-    for cols8, attrs in raw_braker:
-        ftype = cols8[2]
-        old_id = attrs.get("ID", "")
-        if ftype == "gene":
-            braker_gene_counter += 1
-            new_id = f"{ASM}_g{braker_gene_counter}"
-            braker_id_map[old_id] = new_id
-            attrs["ID"] = new_id
+            if ftype == "gene":
+                braker_gene_counter += 1
+                gene_id = attrs.get("ID", "")
+                if gene_id and not gene_id.startswith(f"{ASM}_g"):
+                    print(
+                        f"WARNING: protein-coding gene ID does not start with expected prefix {ASM}_g: {gene_id}",
+                        file=sys.stderr
+                    )
 
-    # Pass 1b: assign new mRNA/transcript IDs and update Parent refs
-    for cols8, attrs in raw_braker:
-        ftype = cols8[2]
-        old_id = attrs.get("ID", "")
-        parent = attrs.get("Parent", "")
-        if ftype in ("mRNA", "transcript"):
-            new_parent = braker_id_map.get(parent, parent)
-            braker_mrna_counters[new_parent] += 1
-            new_id = f"{new_parent}.t{braker_mrna_counters[new_parent]}"
-            braker_id_map[old_id] = new_id
-            attrs["ID"] = new_id
-            attrs["Parent"] = new_parent
+            if ftype in ("mRNA", "transcript"):
+                braker_mrna_counter += 1
+                mrna_id = attrs.get("ID", "")
+                parent = attrs.get("Parent", "")
+                if mrna_id:
+                    mrna_to_gene[mrna_id] = parent
 
-    # Pass 1c: update all child features (exon, CDS, etc.) Parent references
-    for cols8, attrs in raw_braker:
-        ftype = cols8[2]
-        if ftype in ("gene", "mRNA", "transcript"):
-            continue
-        parent = attrs.get("Parent", "")
-        if parent in braker_id_map:
-            attrs["Parent"] = braker_id_map[parent]
-        old_id = attrs.get("ID", "")
-        if old_id:
-            new_parent = attrs.get("Parent", parent)
-            attrs["ID"] = f"{new_parent}.{ftype}{old_id[-1] if old_id[-1].isdigit() else '1'}"
-
-    for cols8, attrs in raw_braker:
-        braker_records.append(cols8 + [attrs])
-
-    # Build mRNA→gene parent mapping for product propagation later
-    mrna_to_gene = {}
-    for cols8, attrs in raw_braker:
-        ftype = cols8[2]
-        if ftype in ("mRNA", "transcript"):
-            mrna_to_gene[attrs["ID"]] = attrs.get("Parent", "")
-
-    old_mrna_to_new = {}
-    for old_id, new_id in braker_id_map.items():
-        if any(new_id.endswith(f".t{i}") for i in range(1, 100)):
-            old_mrna_to_new[old_id] = new_id
+            braker_records.append(cols[:8] + [attrs])
 
     # ═══════════════════════════════════════════════════════════════════════════
     # 2. Parse tRNAscan GFF3 — renumber
@@ -470,23 +440,11 @@ process ANNOTATE_GFF3 {
             if ftype not in ("mRNA", "transcript"):
                 continue
 
-            new_mrna_id = attrs["ID"]
+            mrna_id = attrs["ID"]
 
-            func_rec = None
-            for old_id, new_id in braker_id_map.items():
-                if new_id == new_mrna_id:
-                    if old_id in func:
-                        func_rec = func[old_id]
-                        break
-                    for suffix in ("", ".t1", "_t1"):
-                        candidate = old_id + suffix
-                        if candidate in func:
-                            func_rec = func[candidate]
-                            break
-                    base = old_id.rsplit(".", 1)[0] if "." in old_id else old_id
-                    if base in func:
-                        func_rec = func[base]
-                    break
+            # The functional table is now keyed directly by final renamed
+            # mRNA/protein IDs, so no old→new lookup is needed here.
+            func_rec = func.get(mrna_id)
 
             if not func_rec:
                 continue
@@ -529,7 +487,7 @@ process ANNOTATE_GFF3 {
             if aed_val and aed_val not in (".", "-", ""):
                 attrs["_AED"] = aed_val
 
-            parent_gene = mrna_to_gene.get(new_mrna_id, "")
+            parent_gene = mrna_to_gene.get(mrna_id, "")
             if parent_gene:
                 current = gene_products.get(parent_gene, "hypothetical protein")
                 if current == "hypothetical protein" or product != "hypothetical protein":

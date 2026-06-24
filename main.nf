@@ -151,6 +151,7 @@ include { BRAKER } from './modules/braker.nf'
 include { COMPUTE_AED; AED_STUB } from './modules/computeAed.nf'
 include { FILTER_GENE_MODELS } from './modules/filterGeneModels.nf'
 include { FLAG_TE_GENES } from './modules/flagTeGenes.nf'
+include { RENAME_GENE_MODELS } from './modules/renameGeneModels.nf'
 include { AGAT } from './modules/agat.nf'
 include { BUSCO; DOWNLOAD_BUSCO_DB } from './modules/busco.nf'
 include { OMARK; DOWNLOAD_OMARK_DB } from './modules/omark.nf'
@@ -350,7 +351,7 @@ workflow {
     FILTER_GENE_MODELS(
         BRAKER.out.braker_gff3
             .join(BRAKER.out.braker_proteins)
-            .join(COMPUTE_AED.out.aed_scores)
+            .join(ch_aed_scores)
             // → (assembly_id, gff3, proteins, aed_scores)
         )
 
@@ -366,22 +367,31 @@ workflow {
     //   ↑ Use the PRE-filter repeat library here — we want all TE sequences
     //     for homology detection, including ones removed from masking library
 
+    // ── Rename retained protein-coding gene models ──────────────────────────────
+    // This is the canonical ID boundary.
+    // After this point, all downstream protein-coding IDs are final IDs.
+
+    ch_rename_input = FLAG_TE_GENES.out.flagged_gff3
+        .join(FILTER_GENE_MODELS.out.filtered_proteins)
+        .join(FILTER_GENE_MODELS.out.filtered_aed)
+
+    RENAME_GENE_MODELS(ch_rename_input)
 
     // ── Step 6: Get descriptive stats for annotations (per genome) ─────────────
     ch_agat_inputs = ch_assemblies_filtered
-        .join(FLAG_TE_GENES.out.flagged_gff3, by: 0)
+        .join(RENAME_GENE_MODELS.out.renamed_gff3, by: 0)
         .map { id, assembly_path, gff_path -> tuple(id, assembly_path, gff_path) }
 
     AGAT(ch_agat_inputs)
 
     // ── Step 7: Run BUSCO on protein predictions (per genome) ─────────────
     BUSCO(
-        FILTER_GENE_MODELS.out.filtered_proteins,
+        RENAME_GENE_MODELS.out.renamed_proteins,
         DOWNLOAD_BUSCO_DB.out.db)
 
     // ── Step 8: Run OMArk on protein predictions (per genome) ─────────────
     OMARK(
-        FILTER_GENE_MODELS.out.filtered_proteins,
+        RENAME_GENE_MODELS.out.renamed_proteins,
         DOWNLOAD_OMARK_DB.out.omamer_db,
         DOWNLOAD_OMARK_DB.out.taxa_db)
 
@@ -406,7 +416,7 @@ workflow {
 
     // ── Step 11: Split proteins into chunks ─────────────
     CHUNK_PROTEINS(
-        FILTER_GENE_MODELS.out.filtered_proteins)
+        RENAME_GENE_MODELS.out.renamed_proteins)
 
     // ch_chunks: (assembly_id, chunk_id, chunk_file)
     ch_chunks = CHUNK_PROTEINS.out.chunks
@@ -490,18 +500,18 @@ workflow {
         .join(MERGE_DIAMOND.out.merged)
         .join(MERGE_KOFAMSCAN.out.merged)
         .join(MERGE_DEEPSIG.out.merged_gff3)
-        .join(FILTER_GENE_MODELS.out.filtered_proteins)
-        .join(FLAG_TE_GENES.out.flagged_gff3)
+        .join(RENAME_GENE_MODELS.out.renamed_proteins)
+        .join(RENAME_GENE_MODELS.out.renamed_gff3)
         .join(ch_assemblies_filtered)
         .join(OMARK.out.omark_ump)
-        .join(FILTER_GENE_MODELS.out.filtered_aed)
+        .join(RENAME_GENE_MODELS.out.renamed_aed)
         // produces: [assembly_id, ipr_tsv, eggnog_tsv, diamond_tsv, kofam_tsv, deepsig_gff3,
-        //            proteins_fa, flagged_gff3, genome_fasta, omark_ump]
+        //            renamed_proteins_fa, renamed_gff3, genome_fasta, omark_ump, renamed_aed]
 
     MERGE_FUNCTIONAL_ANNOTATIONS(ch_func_merged)
 
     // ── Step 18: Merge all GFF3s and decorate with functional annotations ───────
-    ch_annotate_input = FLAG_TE_GENES.out.flagged_gff3
+    ch_annotate_input = RENAME_GENE_MODELS.out.renamed_gff3
         .join(tRNASCAN.out.trnascan_gff3)
         .join(INFERNAL.out.infernal_gff3)
         .join(TELOMERE_ANNOTATION.out.telomere_gff3)
@@ -515,7 +525,7 @@ workflow {
 
     // ── Step 18b: Structural QC per assembly ─────────────────────────
     ch_structural_qc_in = MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv
-        .join(FLAG_TE_GENES.out.flagged_gff3)
+        .join(RENAME_GENE_MODELS.out.renamed_gff3)
 
     STRUCTURAL_QC(ch_structural_qc_in)
 
