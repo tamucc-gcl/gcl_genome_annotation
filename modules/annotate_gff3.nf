@@ -57,7 +57,7 @@ process ANNOTATE_GFF3 {
           emit: gene_summary
 
     script:
-    """
+    """\
     #!/usr/bin/env python3
     \"\"\"
     Merge BRAKER, tRNAscan, Infernal, telomere, centromere, and repeat GFF3s
@@ -127,7 +127,7 @@ process ANNOTATE_GFF3 {
         for line in fh:
             if line.startswith("#") or not line.strip():
                 continue
-            cols = line.rstrip("\n").split("\t")
+            cols = line.rstrip("\\n").split("\\t")
             if len(cols) != 9:
                 continue
 
@@ -596,7 +596,7 @@ process ANNOTATE_GFF3 {
           f"{centro_counter} centromere features, "
           f"{repeat_counter} repeat features", file=sys.stderr)
     print(f"Functional annotation: {n_annotated} named, {n_hypo} hypothetical", file=sys.stderr)
-    """
+    """.stripIndent()
 
     stub:
     """

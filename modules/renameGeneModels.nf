@@ -27,7 +27,7 @@ process RENAME_GENE_MODELS {
           emit: id_map
 
     script:
-    """
+    """\
     #!/usr/bin/env python3
 
     import csv
@@ -426,7 +426,7 @@ process RENAME_GENE_MODELS {
         f"Skipped {n_aed_skipped} AED rows not present after filtering.",
         file=sys.stderr
     )
-    """
+    """.stripIndent()
 
     stub:
     """

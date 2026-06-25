@@ -55,7 +55,7 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
           emit: merged_tsv
 
     script:
-    """
+    """\
     #!/usr/bin/env python3
     import csv, re, sys, statistics
     from collections import defaultdict, OrderedDict
@@ -198,7 +198,7 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
         for line in fh:
             if line.startswith("#") or not line.strip():
                 continue
-            cols = line.rstrip("\n").split("\t")
+            cols = line.rstrip("\\n").split("\\t")
             if len(cols) < 9:
                 continue
 
@@ -606,7 +606,7 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
     ]
 
     with open("${assembly_id}.functional_annotations.tsv", "w") as out:
-        out.write("\t".join(out_columns) + "\n")
+        out.write("\\t".join(out_columns) + "\\n")
 
         # Write one row per renamed GFF mRNA/transcript ID.
         for pid in sorted(gff_mrna_ids):
@@ -623,7 +623,7 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
             for col in out_columns[6:]:
                 vals.append(str(rec.get(col, "-")))
 
-            out.write("\t".join(str(v) for v in vals) + "\n")
+            out.write("\\t".join(str(v) for v in vals) + "\\n")
 
     # ── Stats ─────────────────────────────────────────────────────────────────
     total  = len(gff_mrna_ids)
@@ -639,7 +639,7 @@ process MERGE_FUNCTIONAL_ANNOTATIONS {
     print(f"Merged {total} proteins: IPR={n_ipr} eggNOG={n_egg} "
           f"DIAMOND={n_dia} KofamScan={n_kof} DeepSig={n_sig}", file=sys.stderr)
     print(f"Quality flags: PASS={n_pass} WARN={n_warn} FAIL={n_fail}", file=sys.stderr)
-    """
+    """.stripIndent()
 
     stub:
     """
