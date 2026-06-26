@@ -1,7 +1,7 @@
 process RENAME_GENE_MODELS {
     tag "${assembly_id}"
     label 'rename_gene_models'
-    publishDir "${params.outdir}/intermediate/renamed_gene_models", mode: params.publish_dir_mode
+    //publishDir "${params.outdir}/intermediate/renamed_gene_models", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id),
