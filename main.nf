@@ -296,7 +296,7 @@ workflow {
         Telomere Annotation
     ========================================================================================
     */
-    TELOMERE_ANNOTATION(ch_assemblies)
+    TELOMERE_ANNOTATION(ch_assemblies_filtered)
 
     /*
     ========================================================================================
@@ -309,7 +309,7 @@ workflow {
     //   that RepeatMasker soft-masks, so centroAnno must see the original
     //   sequence to detect them via k-mer frequency analysis.
     //   No dependency on repeat pipeline — starts immediately.
-    CENTROMERE_ANNOTATION(ch_assemblies)
+    CENTROMERE_ANNOTATION(ch_assemblies_filtered)
 
     // ── Step: Convert centroAnno output to GFF3 ──────────────────────────────
     ch_centroanno_gff_input = CENTROMERE_ANNOTATION.out.monomer_csv
