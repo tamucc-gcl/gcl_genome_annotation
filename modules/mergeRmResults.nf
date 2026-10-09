@@ -61,9 +61,9 @@ process MERGE_RM_RESULTS {
     set -euo pipefail
 
     # Preserve linked fragments while renumbering IDs across batches.
-    python ${helper} merge-out --lengths '${seq_lengths}' --output ${assembly_id}.out --files ${out_files}
+    python3 ${helper} merge-out --lengths '${seq_lengths}' --output ${assembly_id}.out --files ${out_files}
     # Reconstruct in reference order; wrap sequence lines only, never FASTA headers.
-    python ${helper} merge-fasta --lengths '${seq_lengths}' --output ${assembly_id}.masked.fasta --files ${fasta_files}
+    python3 ${helper} merge-fasta --lengths '${seq_lengths}' --output ${assembly_id}.masked.fasta --files ${fasta_files}
 
     # ── 3. Generate GFF3 from .out with proper SO feature types ──────────────
     python3 - ${assembly_id}.out ${assembly_id}.repeat.gff3 <<'PYEOF'

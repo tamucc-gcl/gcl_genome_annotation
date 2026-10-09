@@ -29,7 +29,7 @@ process CURATE_DFAM {
     famdb.py -i '${dfam_dir}' info > ${source_key}/famdb_info.txt
     famdb.py -i '${dfam_dir}' families --format fasta_name --include-class-in-name \
         --ancestors --descendants '${taxa_name}' > ${source_key}/dfam_subset.lib
-    python - <<'PY'
+    python3 - <<'PY'
     import hashlib, json, re
     from pathlib import Path
     folder = Path('${source_key}')

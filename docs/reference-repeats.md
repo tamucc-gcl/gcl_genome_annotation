@@ -118,6 +118,10 @@ That anchor now uses Python's `\Z` end-of-string form. A static interpolation au
 passed across all 13 imported process modules; a regression check now covers the
 stage's include tree. No scientific tasks ran in that attempt, and corrected
 Nextflow execution remains pending.
+The second attempt reached the masking merge but failed because its TEtools
+container provides `python3`, not `python`. Merge helper calls and the Dfam
+extraction validator now use `python3`; other TEtools stage tasks were checked
+for the same mismatch. Corrected cluster execution remains pending.
 Run from the consuming project root after syncing the pipeline:
 
 ```bash
