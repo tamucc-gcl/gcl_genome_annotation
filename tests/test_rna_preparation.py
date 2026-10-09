@@ -64,20 +64,22 @@ class RnaTests(unittest.TestCase):
     def test_disabled_trimming_is_passthrough(self):
         raw = self.raw()
         clean = self.base / 'clean'
-        result = rna.trim('R', {'trim_adapters': False, 'trim_quality': False}, raw, clean, 1)
+        result = rna.trim('R', {'trim_adapters': False, 'trim_quality': False}, raw, clean, 1, self.inputs)
         self.assertEqual(result['retained_fraction'], 1)
-        self.assertTrue((clean / 'R1.fastq.gz').is_symlink())
+        self.assertTrue(result['passthrough'])
+        self.assertEqual(list(clean.iterdir()), [clean / 'rna.json'])
+        self.assertEqual(list(raw.iterdir()), [raw / 'rna.json'])
         self.assertEqual(result['sha256'], rna.read_json(raw / 'rna.json')['sha256'])
 
     def test_fastp_switches_are_explicit(self):
         raw = self.raw()
         settings = {'trim_adapters': True, 'trim_quality': True, 'quality': 20, 'window': 4, 'min_length': 30, 'max_n': 5}
-        command, files = rna.fastp_command(raw, settings, self.base, 4)
+        command, files = rna.fastp_command(raw, settings, self.base, 4, self.inputs)
         for flag in ('--detect_adapter_for_pe', '--cut_tail', '--disable_trim_poly_g', '--disable_quality_filtering'):
             self.assertIn(flag, command)
         self.assertNotIn('--dedup', command)
         self.assertEqual(len(files), 2)
-        command, _ = rna.fastp_command(raw, {**settings, 'trim_adapters': False, 'trim_quality': False}, self.base, 1)
+        command, _ = rna.fastp_command(raw, {**settings, 'trim_adapters': False, 'trim_quality': False}, self.base, 1, self.inputs)
         self.assertIn('--disable_adapter_trimming', command)
         self.assertNotIn('--cut_tail', command)
 
@@ -85,8 +87,8 @@ class RnaTests(unittest.TestCase):
         raw = self.raw()
         settings = {'subset_fraction': 0.5, 'subset_seed': 42}
         first, second = self.base / 'first', self.base / 'second'
-        a = rna.subset('R', settings, raw, first)
-        b = rna.subset('R', settings, raw, second)
+        a = rna.subset('R', settings, raw, first, self.inputs)
+        b = rna.subset('R', settings, raw, second, self.inputs)
         self.assertEqual(a['status'], 'ready')
         self.assertEqual(a['read_units'], b['read_units'])
         self.assertGreater(a['read_units'], 0)
@@ -96,8 +98,8 @@ class RnaTests(unittest.TestCase):
                              list(rna.records(second / f'R{mate}.fastq.gz')))
         self.assertEqual(rna.inspect(self.inputs, 'paired')['read_units'], 100)
         full = self.base / 'full'
-        self.assertEqual(rna.subset('R', {**settings, 'subset_fraction': 1}, raw, full)['read_units'], 100)
-        self.assertTrue((full / 'R1.fastq.gz').is_symlink())
+        self.assertEqual(rna.subset('R', {**settings, 'subset_fraction': 1}, raw, full, self.inputs)['read_units'], 100)
+        self.assertEqual(list(full.iterdir()), [full / 'rna.json'])
 
     def test_failed_source_blocks_only_its_consumers_and_auto_strand_remains_pending(self):
         plan = {'readsets': [{'readset_id': rid, 'library_id': rid, 'strandedness': 'auto'} for rid in ('bad', 'good')],

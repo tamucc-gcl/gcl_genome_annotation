@@ -154,13 +154,12 @@ def acquire(spec, inputs, outdir, threads):
         files = []
         for mate, original in enumerate(inputs, 1):
             original = Path(original)
-            suffix = '.fastq.gz' if compressed(original) or accession else '.fastq'
-            target = outdir / f'R{mate}{suffix}'
             if accession:
+                target = outdir / f'R{mate}.fastq.gz'
                 with original.open('rb') as source, gzip.open(target, 'wb') as destination:
                     shutil.copyfileobj(source, destination, 1024 * 1024)
             else:
-                target.symlink_to(original.resolve())
+                target = original  # Nextflow already staged this declared input.
             files.append(target)
         result.update(inspect(files, spec['layout']), layout=spec['layout'], status='ready',
                       quality_encoding='Phred+33 expected; printable-range validation only')
@@ -177,14 +176,19 @@ def acquire(spec, inputs, outdir, threads):
     return result
 
 
-def fastp_command(raw, settings, outdir, threads):
-    metadata = read_json(Path(raw) / 'rna.json')
-    files = [Path(raw) / name for name in metadata['files']]
+def metadata(path):
+    path = Path(path)
+    return read_json(path / 'rna.json' if path.is_dir() else path)
+
+
+def fastp_command(raw, settings, outdir, threads, reads):
+    data = metadata(raw)
+    files = [Path(path) for path in reads]
     outputs = [Path(outdir) / f'R{mate}.fastq.gz' for mate in range(1, len(files) + 1)]
     command = ['fastp', '--in1', str(files[0]), '--out1', str(outputs[0]), '--thread', str(threads),
-               '--json', str(Path(outdir) / (metadata['readset_id'] + '_fastp.json')),
-               '--html', str(Path(outdir) / (metadata['readset_id'] + '_fastp.html')),
-               '--report_title', metadata['readset_id'], '--disable_trim_poly_g',
+               '--json', str(Path(outdir) / (data['readset_id'] + '_fastp.json')),
+               '--html', str(Path(outdir) / (data['readset_id'] + '_fastp.html')),
+               '--report_title', data['readset_id'], '--disable_trim_poly_g',
                '--disable_quality_filtering', '--length_required', str(settings['min_length']),
                '--n_base_limit', str(settings['max_n'])]
     if len(files) == 2:
@@ -199,52 +203,46 @@ def fastp_command(raw, settings, outdir, threads):
     return command, outputs
 
 
-def trim(rid, settings, raw, outdir, threads):
+def trim(rid, settings, raw, outdir, threads, reads):
     outdir = Path(outdir)
     result = bundle_result({'readset_id': rid, **settings}, outdir, 'processed')
     try:
-        metadata = read_json(Path(raw) / 'rna.json')
+        data = metadata(raw)
         if not settings['trim_adapters'] and not settings['trim_quality']:
-            files = []
-            for name in metadata['files']:
-                target = outdir / name
-                target.symlink_to((Path(raw) / name).resolve())
-                files.append(target)
-            result.update({key: metadata[key] for key in
-                           ('read_units', 'read_count', 'bases_by_mate', 'sha256', 'files', 'layout')},
-                          status='ready', raw_read_units=metadata['read_units'], raw_sha256=metadata['sha256'],
+            result.update({key: data[key] for key in
+                           ('read_units', 'read_count', 'bases_by_mate', 'sha256', 'layout')},
+                          files=[Path(path).name for path in reads], passthrough=True,
+                          status='ready', raw_read_units=data['read_units'], raw_sha256=data['sha256'],
                           retained_fraction=1.0, processing='passthrough: trimming disabled')
             write_json(outdir / 'rna.json', result)
             return result
-        command, files = fastp_command(raw, settings, outdir, threads)
+        command, files = fastp_command(raw, settings, outdir, threads, reads)
         write_json(outdir / 'command.json', command)
         version = subprocess.run(['fastp', '--version'], check=True, capture_output=True, text=True)
         result['fastp_version'] = (version.stdout + version.stderr).strip()
         tool(command, outdir, 'fastp.log')
-        result.update(inspect(files, metadata['layout']), layout=metadata['layout'], status='ready',
-                      raw_read_units=metadata['read_units'], raw_sha256=metadata['sha256'])
-        result['retained_fraction'] = result['read_units'] / metadata['read_units']
+        result.update(inspect(files, data['layout']), layout=data['layout'], status='ready',
+                      raw_read_units=data['read_units'], raw_sha256=data['sha256'])
+        result['retained_fraction'] = result['read_units'] / data['read_units']
     except (ValueError, OSError, EOFError, UnicodeError, subprocess.CalledProcessError) as exc:
         result['reason'] = str(exc)
     write_json(outdir / 'rna.json', result)
     return result
 
 
-def subset(rid, settings, clean, outdir):
+def subset(rid, settings, clean, outdir, reads):
     outdir = Path(outdir)
     result = bundle_result({'readset_id': rid, **settings}, outdir, 'selected')
     try:
-        metadata = read_json(Path(clean) / 'rna.json')
-        inputs = [Path(clean) / name for name in metadata['files']]
+        data = metadata(clean)
+        inputs = [Path(path) for path in reads]
         fraction, seed = float(settings['subset_fraction']), int(settings['subset_seed'])
         if not math.isfinite(fraction) or not 0 < fraction <= 1 or seed < 0:
             raise ValueError('Invalid RNA subset settings')
         if fraction == 1:
-            outputs = [outdir / path.name for path in inputs]
-            for original, target in zip(inputs, outputs):
-                target.symlink_to(original.resolve())
-            stats = {key: metadata[key] for key in ('read_units', 'read_count', 'bases_by_mate', 'sha256')}
-            stats['files'] = [path.name for path in outputs]
+            result['passthrough'] = True
+            stats = {key: data[key] for key in ('read_units', 'read_count', 'bases_by_mate', 'sha256')}
+            stats['files'] = [path.name for path in inputs]
         else:
             outputs = [outdir / f'R{mate}.fastq.gz' for mate in range(1, len(inputs) + 1)]
             # Select both mates together by read ID; stable across file ordering and runs.
@@ -259,10 +257,10 @@ def subset(rid, settings, clean, outdir):
             finally:
                 for handle in handles:
                     handle.close()
-            stats = inspect(outputs, metadata['layout'])
-        result.update(stats, layout=metadata['layout'], status='ready', clean_read_units=metadata['read_units'],
-                      clean_sha256=metadata['sha256'], selection='sha256(seed + NUL + read_id), first 64 bits')
-        result['processing'] = {key: metadata.get(key) for key in
+            stats = inspect(outputs, data['layout'])
+        result.update(stats, layout=data['layout'], status='ready', clean_read_units=data['read_units'],
+                      clean_sha256=data['sha256'], selection='sha256(seed + NUL + read_id), first 64 bits')
+        result['processing'] = {key: data.get(key) for key in
                                 ('request', 'raw_read_units', 'read_units', 'retained_fraction', 'fastp_version')}
     except (ValueError, OSError, EOFError, UnicodeError) as exc:
         result['reason'] = str(exc)
@@ -270,27 +268,15 @@ def subset(rid, settings, clean, outdir):
     return result
 
 
-def qc(rid, stage, bundle, outdir, threads):
+def qc(rid, stage, reads, outdir, threads):
     outdir = Path(outdir)
     outdir.mkdir()
-    links = outdir / 'inputs'
-    links.mkdir()
-    inputs = []
-    for mate, name in enumerate(read_json(Path(bundle) / 'rna.json')['files'], 1):
-        original = Path(bundle) / name
-        suffix = '.fastq.gz' if compressed(original) else '.fastq'
-        target = links / f'{rid}_{stage}_R{mate}{suffix}'
-        target.symlink_to(original.resolve())
-        inputs.append(str(target))
-    command = ['fastqc', '--threads', str(threads), '--outdir', str(outdir), *inputs]
+    # Nextflow supplies readset/stage-prefixed input names through stageAs.
+    command = ['fastqc', '--threads', str(threads), '--outdir', str(outdir), *map(str, reads)]
     write_json(outdir / 'command.json', command)
     version = subprocess.run(['fastqc', '--version'], check=True, capture_output=True, text=True)
     (outdir / 'version.txt').write_text(version.stdout + version.stderr)
     tool(command, outdir, 'fastqc.log')
-    # QC outputs retain native HTML and ZIP, without publishing extra read links.
-    for path in links.iterdir():
-        path.unlink()
-    links.rmdir()
 
 
 def main():
@@ -304,16 +290,17 @@ def main():
     parser.add_argument('--threads', type=int, default=1)
     args = parser.parse_args()
     spec = json.loads(base64.b64decode(args.request))
+    inputs = json.loads(base64.b64decode(args.inputs))
     if args.action == 'plan':
         plan(read_json(args.manifest), spec, args.outdir)
     elif args.action == 'acquire':
-        acquire(spec, json.loads(base64.b64decode(args.inputs)), args.outdir, args.threads)
+        acquire(spec, inputs, args.outdir, args.threads)
     elif args.action == 'trim':
-        trim(spec['readset_id'], spec, args.bundle, args.outdir, args.threads)
+        trim(spec['readset_id'], spec, args.bundle, args.outdir, args.threads, inputs)
     elif args.action == 'subset':
-        subset(spec['readset_id'], spec, args.bundle, args.outdir)
+        subset(spec['readset_id'], spec, args.bundle, args.outdir, inputs)
     else:
-        qc(spec['readset_id'], spec['stage'], args.bundle, args.outdir, args.threads)
+        qc(spec['readset_id'], spec['stage'], inputs, args.outdir, args.threads)
 
 
 if __name__ == '__main__':

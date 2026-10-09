@@ -36,16 +36,11 @@ process PUBLISH_FAILED_PROTEIN_SOURCE {
     tag "${source_id}"
     publishDir "${params.outdir}/protein_sources", mode: 'symlink', overwrite: true
     input:
-    tuple val(source_id), path(bundle, stageAs: 'incoming/*')
+    tuple val(source_id), path(bundle, stageAs: "${source_id}")
     output:
-    tuple val(source_id), path("${source_id}"), emit: source
+    tuple val(source_id), path("${source_id}", includeInputs: true), emit: source
     script:
-    """
-    python - <<'PY'
-    from pathlib import Path
-    Path('${source_id}').symlink_to(Path('${bundle}').resolve(), target_is_directory=True)
-    PY
-    """
+    'true'
 }
 
 // Only successful acquisitions reach this process; failed bundles are never stored.
@@ -54,20 +49,19 @@ process STORE_PROTEIN_SOURCE {
     storeDir "${store_directory}"
     publishDir "${params.outdir}/protein_sources", mode: 'symlink', overwrite: true
     input:
-    tuple val(source_id), val(store_directory), path(bundle, stageAs: 'incoming/*')
+    tuple val(source_id), val(store_directory), path(bundle, stageAs: "${source_id}")
     output:
-    tuple val(source_id), path("${source_id}"), emit: source
+    tuple val(source_id), path("${source_id}", includeInputs: true), emit: source
     script:
     """
     python - <<'PY'
-    import json, shutil
+    import json
     from pathlib import Path
     # storeDir destinations can be new nested paths. Create the parent before
     # Nextflow's stage-out move; otherwise the script can succeed without a stored bundle.
     Path('${store_directory}').mkdir(parents=True, exist_ok=True)
     source = Path('${bundle}')
     assert json.loads((source / 'source.json').read_text())['status'] == 'ready'
-    shutil.copytree(source, '${source_id}')
     Path('${source_id}/STORE_READY.json').write_text('{"status":"ready","normalization_version":1}\\n')
     PY
     """

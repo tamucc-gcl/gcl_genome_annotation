@@ -31,18 +31,42 @@ workflow {
     } }
     ACQUIRE_RNA_READSET(acquisition, helper)
     def raw = splitStatus(ACQUIRE_RNA_READSET.out.bundle)
-    QC_RNA_RAW(raw.ready.map { rid, bundle -> tuple(rid, encode([readset_id: rid, stage: 'raw']), bundle) }, helper)
-    def trimming = raw.ready.join(readsets).map { rid, bundle, row ->
-        tuple(rid, encode([readset_id: rid] + row.trim_request), bundle)
+    // Keep real reads as path inputs. Local validation and passthrough stages emit
+    // metadata only; Nextflow stages the original reads directly for each consumer.
+    def rawReads = raw.ready.join(readsets).map { rid, bundle, row ->
+        def metadata = new groovy.json.JsonSlurper().parse(new File("${bundle}/rna.json"))
+        def paths = row.raw_request.run_accession ? metadata.files.collect { file("${bundle}/${it}") } :
+            [row.fastq_1, row.fastq_2].findAll { it }.collect { file(it) }
+        tuple(rid, file("${bundle}/rna.json"), paths)
+    }
+    def qcInput = { stage, rid, manifest, reads ->
+        def suffixes = reads.collect { it.name.endsWith('.gz') ? '.fastq.gz' : '.fastq' }
+        tuple(rid, encode([readset_id: rid, stage: stage]), suffixes + ['.fastq'], reads[0], reads.size() == 2 ? reads[1] : [])
+    }
+    QC_RNA_RAW(rawReads.map { rid, manifest, reads -> qcInput('raw', rid, manifest, reads) }, helper)
+    def trimming = rawReads.join(readsets).map { rid, manifest, reads, row ->
+        tuple(rid, encode([readset_id: rid] + row.trim_request), manifest, reads)
     }
     TRIM_RNA_READSET(trimming, helper)
     def clean = splitStatus(TRIM_RNA_READSET.out.bundle)
-    QC_RNA_PROCESSED(clean.ready.map { rid, bundle -> tuple(rid, encode([readset_id: rid, stage: 'processed']), bundle) }, helper)
-    def selecting = clean.ready.join(readsets).map { rid, bundle, row ->
-        tuple(rid, encode([readset_id: rid] + row.subset_request), bundle)
+    def resolveReads = { rid, bundle, priorManifest, priorReads ->
+        def metadata = new groovy.json.JsonSlurper().parse(new File("${bundle}/rna.json"))
+        tuple(rid, file("${bundle}/rna.json"), metadata.passthrough ? priorReads :
+            (metadata.status == 'ready' ? metadata.files.collect { file("${bundle}/${it}") } : []))
+    }
+    def cleanReads = clean.ready.join(rawReads).map(resolveReads)
+    QC_RNA_PROCESSED(cleanReads.map { rid, manifest, reads -> qcInput('processed', rid, manifest, reads) }, helper)
+    def selecting = cleanReads.join(readsets).map { rid, manifest, reads, row ->
+        tuple(rid, encode([readset_id: rid] + row.subset_request), manifest, reads)
     }
     SUBSET_RNA_READSET(selecting, helper)
-    def finalResults = SUBSET_RNA_READSET.out.bundle.mix(raw.failed, clean.failed).map { rid, bundle -> bundle }.toList()
+    def selectedReads = SUBSET_RNA_READSET.out.bundle.join(cleanReads).map(resolveReads)
+    def failedReads = raw.failed.mix(clean.failed).map { rid, bundle -> tuple(rid, file("${bundle}/rna.json"), []) }
+    def finalStates = selectedReads.mix(failedReads).toList()
+    def finalResults = finalStates.map { rows -> rows.collect { it[1] } }
+    def readPaths = finalStates.map { rows -> encode(rows.collectEntries { rid, manifest, reads ->
+        [rid, reads.collect { it.toString() }]
+    }) }
     // Stage individual ZIPs so MultiQC does not need to traverse linked directories.
     def qcResults = QC_RNA_RAW.out.qc.mix(QC_RNA_PROCESSED.out.qc).flatMap { rid, bundle ->
         def reports = file("${bundle}/*_fastqc.zip", checkIfExists: true)
@@ -52,7 +76,7 @@ workflow {
         def report = file("${bundle}/${rid}_fastp.json")
         report.exists() ? [report] : []
     }.toList()
-    REPORT_RNA_PREPARATION(PLAN_RNA_PREPARATION.out.bundle, finalResults, qcResults, fastpReports,
+    REPORT_RNA_PREPARATION(PLAN_RNA_PREPARATION.out.bundle, finalResults, readPaths, qcResults, fastpReports,
         file("${projectDir}/py_scripts/report_rna_preparation.py"))
     ASSERT_RNA_PREPARATION(REPORT_RNA_PREPARATION.out.status)
 }

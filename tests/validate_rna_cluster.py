@@ -12,7 +12,7 @@ from validate_preflight_cluster import fixtures, table
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def run_case(root, inputs, name, sheet, expected, resume=False, fraction=None):
+def run_case(root, inputs, name, sheet, expected, resume=False, fraction=None, passthrough=False):
     case = root / name
     case.mkdir(exist_ok=True)
     output = case / 'results'
@@ -26,6 +26,8 @@ def run_case(root, inputs, name, sheet, expected, resume=False, fraction=None):
         command.append('-resume')
     if fraction:
         command += ['--subset_fraction', str(fraction)]
+    if passthrough:
+        command += ['--trim_adapters', 'false', '--trim_quality', 'false']
     print(f'Running RNA {name} ({suffix})...', flush=True)
     with (case / f'{suffix}.console.log').open('w') as log:
         process = subprocess.run(command, cwd=case, stdout=log, stderr=subprocess.STDOUT)
@@ -43,11 +45,19 @@ def run_case(root, inputs, name, sheet, expected, resume=False, fraction=None):
             assert len(row['read_paths']) == (2 if row['layout'] == 'paired' else 1)
             assert all((output / 'rna' / name).is_file() for name in row['read_paths'])
             rid = row['readset_id']
+            # Local validation and all-read selection must publish metadata only.
+            assert not list((output / f'rna/raw/{rid}').glob('*.f*q*'))
+            if not fraction:
+                assert not list((output / f'rna/selected/{rid}').glob('*.f*q*'))
+            if passthrough:
+                assert not list((output / f'rna/processed/{rid}').glob('*.f*q*'))
+                request = json.loads((output / f'rna/raw/{rid}/rna.json').read_text())['request']
+                assert row['read_paths'] == [request[key] for key in ('fastq_1', 'fastq_2') if request.get(key)]
             for stage in ('raw', 'processed'):
                 assert list((output / f'rna/qc/{stage}/{rid}_{stage}').glob('*_fastqc.zip'))
     with (output / 'pipeline/pipeline_trace.txt').open() as handle:
         trace = list(csv.DictReader(handle, delimiter='\t'))
-    if name == 'ready':
+    if name in ('ready', 'passthrough'):
         for task in ('ACQUIRE_RNA_READSET', 'QC_RNA_RAW', 'TRIM_RNA_READSET', 'QC_RNA_PROCESSED', 'SUBSET_RNA_READSET'):
             jobs = [row for row in trace if row['name'].startswith(task)]
             assert len(jobs) == 2, f'{task}: shared readsets were duplicated/missing'
@@ -105,6 +115,8 @@ def main():
         summary['checks'].append(run_case(root, inputs, 'ready', 'ready_rna.csv', expected))
         summary['checks'].append(run_case(root, inputs, 'ready', 'ready_rna.csv', expected, resume=True))
         summary['checks'].append(run_case(root, inputs, 'ready', 'ready_rna.csv', expected, resume=True, fraction=0.5))
+        summary['checks'].append(run_case(root, inputs, 'passthrough', 'ready_rna.csv', expected, passthrough=True))
+        summary['checks'].append(run_case(root, inputs, 'passthrough', 'ready_rna.csv', expected, resume=True, passthrough=True))
         summary['checks'].append(run_case(root, inputs, 'blocked', 'blocked_rna.csv',
                                          {'A': 'blocked', 'B': 'blocked', 'C': 'ready'}))
         summary['checks'].append(run_case(root, inputs, 'none', 'no_rna.csv', {'none': 'not_requested'}))

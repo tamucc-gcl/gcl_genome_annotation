@@ -1,4 +1,4 @@
-# RNA acquisition and preparation (cluster validation pending)
+# RNA acquisition and preparation (native-staging cleanup awaiting cluster validation)
 
 The real protein pilot and its stored-source rerun completed on 9 October 2026.
 The next increment is `rna_preparation.nf`: input preflight, acquisition, FASTQ
@@ -58,7 +58,7 @@ conservative 3-prime tail trimming when enabled:
 | `subset_seed` | 42 |
 
 RNA-sheet boolean overrides take precedence over global defaults. With both
-trimming flags false, cleaned reads are unchanged links and no fastp filtering
+trimming flags false, consumers reuse the existing reads and no fastp filtering
 runs. With either enabled, the configured minimum-length and maximum-N
 filter apply. General percentage-of-low-quality filtering and automatic polyG
 trimming are explicitly disabled. No deduplication, merging, orphan-read rescue,
@@ -69,7 +69,7 @@ The optional subset follows cleaned-read QC and uses a deterministic SHA256
 selection on seed and read ID. Both mates are selected together. The fraction is
 an expected fraction rather than an exact count; duplicate read IDs receive the
 same decision. Full cleaned reads are retained regardless of subset fraction.
-Fraction 1 links those files without writing another copy. A subset producing no
+Fraction 1 passes the existing read paths onward with metadata only. A subset producing no
 reads blocks its consumers rather than silently supplying empty alignment input.
 
 Strandedness is preserved as supplied (`unstranded`, `forward`, `reverse`) or
@@ -83,18 +83,24 @@ status is not permission to bypass strand inference in the future prediction sta
 <outdir>/rna/
     README.md
     rna_status.json
-    raw/<readset_id>/rna.json and raw reads/source logs
-    processed/<readset_id>/rna.json and full cleaned reads/fastp reports
-    selected/<readset_id>/rna.json and selected alignment inputs
+    raw/<readset_id>/rna.json; downloaded reads/source logs for accessions only
+    processed/<readset_id>/rna.json; newly cleaned reads/fastp reports when trimming
+    selected/<readset_id>/rna.json; newly selected reads when fraction < 1
     qc/raw/<readset_id>_raw/ native FastQC reports
     qc/processed/<readset_id>_processed/ native FastQC reports
     multiqc/multiqc_report.html and data/logs
 ```
 
-Large read bundles are published as links to retained Nextflow work, avoiding
+Newly produced read bundles are published by Nextflow as links to retained work, avoiding
 copies for every consuming assembly. Preserve that work/cache and original local
 FASTQ inputs. RNA data is project evidence, not a general database; it uses native
 `-resume`, rather than the general-database shared `storeDir` policy.
+Local FASTQs remain direct path inputs. Helpers do not create pass-through links
+or read copies. FastQC input names are assigned through Nextflow staging, and the
+report stages small manifests/QC outputs rather than read bundles. Read paths in
+`rna_status.json` identify the actual selected inputs; preserve their source/work
+locations. Processing tasks inherit scratch and staging settings from the root
+configuration. See [Nextflow input staging](https://docs.seqera.io/nextflow/process).
 Expected acquisition/content/trimming/subset failures become explicit readset
 failures. Dependent assemblies are blocked, independent readsets can finish, and
 the final assertion exits non-success after reporting. QC-tool or infrastructure
@@ -138,3 +144,16 @@ reference/repeat integrity, followed by reference-specific alignment and strand
 resolution before prediction integration.
 
 First cluster attempt on 9 October 2026: the unit suite passed, then Nextflow stopped while creating the acquisition Conda environment before publishing the RNA report. Local inputs now use Python alone; only run-accession inputs install SRA Toolkit. RNA tool environments use version pins with conda-forge ahead of bioconda, and explicit channel overrides exclude inherited/default channels. See [Bioconda setup](https://bioconda.github.io/). The corrected cluster solve and actual-tool acceptance remain pending; use testing/rna_contracts_02 for the next attempt.
+
+Cluster acceptance passed on 9 October 2026 in testing/rna_contracts_02 (user-supplied acceptance.json): unit tests; fresh paired/single/shared-readset preparation with actual QC/trimming tools; unchanged resume; subset_fraction=0.5 changing only selection; shared failed-readset isolation (expected exit 1); and no-RNA routing. The corrected Conda environments solved and ran successfully. Real paired-end RNA preparation and real network accession acquisition remain pending. Automatic strandedness remains deferred to reference-specific alignment.
+
+Subsequent cleanup removes helper-created local/passthrough links and stages actual
+FASTQs as Nextflow path inputs. Processing tasks inherit configured scratch/staging;
+reporting stages metadata rather than FASTQs. Python syntax checks passed; this
+changed wiring requires cluster acceptance again, including the added disabled-trim
+and all-read passthrough checks:
+
+```bash
+python gcl_genome_annotation/tests/validate_rna_cluster.py \
+  --outdir testing/rna_contracts_03
+```

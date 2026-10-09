@@ -13,6 +13,17 @@ Optional checkpoint stop/import interfaces are deferred until the normal run and
 native resume work reliably. Preserve useful stage manifests and expensive outputs
 without implementing a second orchestration system.
 
+Nextflow owns input staging, scratch directories, output transfers, publication,
+and task caching. Pipeline helpers perform scientific validation and transformations;
+they must not add file links/copies solely to pass existing inputs between tasks.
+Local RNA validation and disabled transformations emit metadata while consumers
+receive the existing FASTQs as declared path inputs.
+
+Reuse the original pre-rework downstream modules and helpers wherever compatible.
+Adapt their interfaces to the new input/evidence contracts and fix demonstrated
+correctness issues; do not replace working repeat, prediction, filtering, or
+functional annotation implementations simply because the orchestration is changing.
+
 Filter-only changes must reuse prediction and unaffected evidence/search results.
 Final selection, affected output projections, QC and reports may rerun. Changes to
 scientific prediction inputs correctly invalidate prediction and its descendants.
@@ -73,3 +84,14 @@ Protein real-data acceptance: user confirmed the first run succeeded and supplie
 RNA acquisition/preparation is implemented with local and accession paired/single routes, full FASTQ integrity checks, raw/processed FastQC, conservative fastp trimming, pair-preserving deterministic subsets and MultiQC. All settings remain in the root config. Automatic strandedness is pending reference alignment, never silently unstranded. RNA Python syntax checks passed; unit/Nextflow cluster acceptance and the real RNA pilot remain pending. See docs/rna-preparation.md.
 
 RNA first cluster attempt: unit_tests passed; acquisition environment solve failed before actual RNA process acceptance. Corrected Conda channel order/overrides and conditional acquisition environment (Python-only local reads; SRA tools only for accession reads). Tool pins are retained; corrected cluster acceptance remains pending.
+
+RNA synthetic cluster acceptance passed on 9 October 2026 in testing/rna_contracts_02: unit tests, fresh paired/single/shared RNA processing, unchanged resume, subset-only rerun frontier, shared-readset failure isolation with expected exit 1, and no-RNA routing. Conda solve/runtime corrections are validated. Next is the real paired-end RNA pilot; accession network acquisition and reference-specific strand inference remain unvalidated.
+
+Subsequent native-staging cleanup: local/passthrough RNA steps emit metadata only;
+real reads are declared path inputs. FastQC naming uses native staging; reporting
+stages manifests rather than read bundles. Protein store/publication handoffs use
+native input/output staging instead of helper copytree/symlink operations. Actual
+processing inherits configured scratch; shared-path planners remain outside scratch.
+Python syntax checks passed. Updated RNA and protein handoffs await cluster validation;
+prior acceptance applies to the preceding implementation. Original downstream
+modules remain unchanged and are the starting point for subsequent integration.
