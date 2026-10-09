@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "release": "odb12",
+  "catalogue_url": "https://bioinf.uni-greifswald.de/bioinf/partitioned_odb12/",
+  "partitions": {
+    "Metazoa": "b594d3044921ede2680eb65526dae662",
+    "Vertebrata": "f91cbc7da91ce64c3c3278357e41e836",
+    "Viridiplantae": "34c1f027a1a7b10f225b69fbd5500587",
+    "Arthropoda": "02c9a5cc4efb9d4d5957f6bd2017a03a",
+    "Fungi": "df3a892610c115dc1459bea6666809fc",
+    "Alveolata": "96eb7cbce73db770c0c6b071b4b790a4",
+    "Stramenopiles": "865c11dd3d538db46a54a7b0f2f17f66",
+    "Amoebozoa": "1c2a52daa3637f4a3ef085adb26559e1",
+    "Euglenozoa": "a64bfecfa1b33aee24ffe543368d26ee",
+    "Eukaryota": "f356006a608f30e413cfcf1ab55698cb"
+  }
+}

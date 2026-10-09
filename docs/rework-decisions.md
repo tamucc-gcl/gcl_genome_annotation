@@ -52,7 +52,16 @@ The preflight currently resolves settings and file presence only; the legacy
 annotation entry point has not been migrated. Real pilot inputs and personal
 submission scripts are maintained separately in the consuming project repository.
 
-Next: finish cluster input-contract acceptance, protein-source preparation, RNA
+Step 1 input-contract acceptance passed on 9 October 2026 under Nextflow 23.10.1:
+24 Python tests plus ready, blocked and malformed Nextflow fixtures passed.
+This supplements the successful real-data preflight. Read contents, source
+acquisition and biological stages remain outside this acceptance scope.
+
+Protein-source preparation is now implemented as a separate entry point, with
+cluster acceptance pending. See [protein evidence](protein-evidence.md) for tests
+and the real-download pilot. Next after acceptance: RNA
 preparation, reference/repeat integrity, four-route prediction, model/evidence assessment, final filtering
 and functional/release integration. The native resume dependency checks remain
 required before declaring settings iteration reliable.
+
+All pipeline parameter defaults, process environments/resources, execution profiles and reports now live in the root nextflow.config. Stage-specific config files have been removed. Species-dependent defaults are unset for taxonomy resolution; the preflight contig default is 1,000 bp. The legacy main.nf entry now reads its defaults from that same config; legacy runs must explicitly provide species settings because that entry does not yet consume the taxonomy-resolved manifest. Configuration consolidation still requires cluster acceptance.

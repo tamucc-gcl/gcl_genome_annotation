@@ -5,7 +5,7 @@
     GENOME ANNOTATION PIPELINE
 ========================================================================================
     Repeat modeling, curation, and masking pipeline
- 
+
     Usage:
         nextflow run main.nf \
             --sample_sheet samples.csv \
@@ -18,93 +18,7 @@
 
 nextflow.enable.dsl = 2
 
-// ── Parameter defaults ───────────────────────────────────────────────────────
-params.sample_sheet   = null
-params.outdir         = "${launchDir}/results"
-params.publish_dir_mode = 'link'
-params.min_contig_length = 50000
-
-// Dfam
-params.dfam_version = '39'
-params.dfam_database  = null
-params.taxa_name      = null
-
-// Repeat modeller
-params.repModel_rounds = 3
-
-// Repeat curation
-params.min_repeat_length = 100
-params.cluster_pct       = 0.95   // set to 0 or null to skip clustering
-
-// Repeat reclassification (Terrier)
-params.terrier_threshold = 0.7    // min probability for Terrier classification
-
-// Repeat library filtering
-params.repeat_filter_pident = 25     // min % identity to flag as gene-derived
-params.repeat_filter_evalue = 1e-10  // max e-value for repeat library BLASTX
-
-// RepeatMasker
-params.job_speed = 's'            // null, 's', 'q', 'qq'
-params.n_rm_chunks = 8          // number of chunks to split genome into for parallel RepeatMasker runs. Adjust based on genome size and available resources.
-
-// Telomere annotation
-params.telomere_motif       = 'TTAGGG'   // vertebrate canonical motif
-params.telomere_window      = 1000      // tidk window size (bp)
-params.telomere_min_count   = 2          // min repeat hits per window to call telomeric
-params.telomere_end_window  = 50000      // classify as terminal if within this distance of scaffold end
-
-// Infernal
-params.n_infernal_chunks = 7 // number of chunks to split genome into for parallel Infernal runs. Adjust based on genome size and available resources.
-params.rfam_database = null // path to Rfam database directory (contains Rfam.cm and Rfam.clanin files)
-params.rfam_version = 'CURRENT' // only one version
-
-// Braker Params
-params.braker_rounds     = 8
-params.braker_ab_initio  = false
-params.orthodb_database  = null  // permanent store for OrthoDB
-params.orthodb_clade     = 'Vertebrata'                       // OrthoDB clade to download set to null to skip and not include orthoDB
-params.ref_proteome_accession = null  // NCBI accession for close relative (e.g. 'GCF_900700415.2' for Clupea harengus)
-
-// Post-BRAKER gene model filtering
-params.filter_max_aed = 0.7   // null = no AED filter; set e.g. 0.7 to remove unsupported genes
-params.filter_min_cds_length    = 300   // min CDS bp for single-exon genes (100 aa)
-params.filter_min_gene_length   = 200   // min gene span bp
-params.filter_min_intron_length = 10    // genes with ALL introns below this are removed
-
-// Structural QC
-params.busco_lineage = 'actinopterygii_odb10'
-params.busco_database = '/work/birdlab/databases/busco' 
-params.oma_db_name = 'LUCA'   //https://omabrowser.org/oma/current/ see here for names
-params.omark_database = '/work/birdlab/databases/omark' 
-params.ncbi_speciesID = null
-
-// TE gene flagging
-params.te_flag_overlap_frac = 0.5    // min fraction of gene covered by repeats
-params.te_flag_evalue       = 1e-10  // max e-value for protein-vs-TE BLASTP
-
-// Functional Annotations
-params.n_chunks = 8 // number of chunks to split proteins into for parallel processing in InterProScan, Diamond, eggNOG. Adjust based on size of proteome and available resources.
-
-params.interproscan_database = null //'/work/birdlab/databases/interproscan_datasets'
-params.interproscan_version = '5.77-108.0' //'5.77-108.0'
-
-params.eggnog_database = null //'/work/birdlab/databases/eggnog_datasets'
-params.eggnog_version = '5.0.2' //'5.0.2'
-params.eggnog_evalue = 0.001
-params.eggnog_sensemode = 'sensitive' //{fast,mid-sensitive,sensitive,more-sensitive,very-sensitive,ultra-sensitive}
-params.eggnog_taxid = 'none' // set to specific NCBI taxid (e.g. 7898 for Actinopterygii) to restrict to that lineage, or 'none' for no restriction
-params.eggnog_target_orthologs = 'all'
-params.eggnog_goEvidence = "non-electronic"
-
-params.diamond_database = null // path to diamond database (e.g. nr or custom db)
-params.diamond_version = 'swissprot' //only swissprot download enabled. Will get most recent version available at time of pipeline run. To use custom diamond database, set --diamond_database to path of database and set --diamond_version to custom
-params.diamond_sensitivity = 'sensitive' // {fast, sensitive, more-sensitive, very-sensitive, ultra-sensitive}
-params.diamond_maxHits = 1
-params.diamond_evalue = 1e-5
-params.diamond_qcov = 70
-
-params.kofamscan_database = null // path to kofamscan database directory (contains profiles and ko_list)
-params.kofamscan_version = 'latest' // only one version
+// Parameter defaults and process resources are defined in nextflow.config.
 
 // ── Parameter validation ─────────────────────────────────────────────────────
 if (!params.sample_sheet) { error "Please provide --sample_sheet" }
@@ -234,7 +148,7 @@ workflow {
     // ── Step 0: Download KoFamScan database (runs once) ─────────────────────────────
     DOWNLOAD_KOFAMSCAN_DB(params.kofamscan_version)
 
-    // ── Step 0: Extract repeat peptides (runs once) ───────────────────────────── 
+    // ── Step 0: Extract repeat peptides (runs once) ─────────────────────────────
     EXTRACT_REPEAT_PEPS()
 
     /*
@@ -254,11 +168,11 @@ workflow {
     */
 
     // ── Step 0: Extract Dfam library (runs once) ─────────────────────────────
-    CURATE_DFAM(DOWNLOAD_DFAM_DB.out.dfam_db_dir, 
+    CURATE_DFAM(DOWNLOAD_DFAM_DB.out.dfam_db_dir,
                 params.taxa_name)
 
     // ── Step 1: De novo repeat modeling (per genome) ─────────────────────────
-    REPEAT_MODEL(ch_assemblies_filtered, 
+    REPEAT_MODEL(ch_assemblies_filtered,
                 CURATE_DFAM.out.dfam_lib.collect())
 
     // ── Step 2: Curate de novo repeats (per genome) ──────────────────────────
@@ -288,7 +202,7 @@ workflow {
         .join(FILTER_REPEAT_LIBRARY.out.filtered_lib)
         // produces: [assembly_id, assembly_path, filtered_repeats]
 
-    REPEAT_MASK(ch_mask_input, 
+    REPEAT_MASK(ch_mask_input,
                 CURATE_DFAM.out.dfam_lib.collect())
 
     /*
@@ -338,7 +252,7 @@ workflow {
         .map { aid, gff, fa -> tuple(aid, fa, gff) }
 
     if (params.orthodb_clade || params.ref_proteome_accession) {
-        COMPUTE_AED(ch_braker_for_aed, 
+        COMPUTE_AED(ch_braker_for_aed,
                 PREPARE_PROTEIN_DB.out.combined_proteins.collect())
         ch_aed_scores = COMPUTE_AED.out.aed_scores
     } else {
@@ -405,7 +319,7 @@ workflow {
     tRNASCAN(REPEAT_MASK.out.masked_fasta)
 
     // ─ Step 10: Run Infernal on SoftMasked genome (per genome) ─────────────
-    INFERNAL(REPEAT_MASK.out.masked_fasta, 
+    INFERNAL(REPEAT_MASK.out.masked_fasta,
             DOWNLOAD_RFAM_DB.out.rfam_db_dir)
 
     /*
