@@ -101,7 +101,8 @@ process REPORT_RNA_PREPARATION {
     path plan
     path results, stageAs: 'results/rna??.json'
     val read_paths
-    path qc, stageAs: 'qc/*'
+    path raw_qc, stageAs: 'raw_qc/*'
+    path processed_qc, stageAs: 'processed_qc/*'
     path fastp_reports, stageAs: 'fastp/*'
     path helper
     output:
@@ -110,7 +111,7 @@ process REPORT_RNA_PREPARATION {
     path 'multiqc', emit: qc
     script:
     """
-    python ${helper} --plan ${plan}/plan.json --results results --read-paths '${read_paths}' --qc qc --fastp fastp --outdir .
+    python ${helper} --plan ${plan}/plan.json --results results --read-paths '${read_paths}' --raw-qc raw_qc --processed-qc processed_qc --fastp fastp --outdir .
     """
 }
 

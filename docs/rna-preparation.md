@@ -1,4 +1,4 @@
-# RNA acquisition and preparation (native-staging cleanup awaiting cluster validation)
+# RNA acquisition and preparation (synthetic cluster acceptance passed)
 
 The real protein pilot and its stored-source rerun completed on 9 October 2026.
 The next increment is `rna_preparation.nf`: input preflight, acquisition, FASTQ
@@ -88,13 +88,19 @@ status is not permission to bypass strand inference in the future prediction sta
     selected/<readset_id>/rna.json; newly selected reads when fraction < 1
     qc/raw/<readset_id>_raw/ native FastQC reports
     qc/processed/<readset_id>_processed/ native FastQC reports
-    multiqc/multiqc_report.html and data/logs
+    multiqc/raw/multiqc_report.html and data/logs (before filtering)
+    multiqc/filtered/multiqc_report.html and data/logs (after filtering + fastp)
 ```
 
 Newly produced read bundles are published by Nextflow as links to retained work, avoiding
 copies for every consuming assembly. Preserve that work/cache and original local
 FASTQ inputs. RNA data is project evidence, not a general database; it uses native
 `-resume`, rather than the general-database shared `storeDir` policy.
+Two MultiQC reports separate raw FastQC from processed FastQC; the processed report
+also includes fastp statistics when trimming ran. Explicitly requested modules use
+`--require-logs`, so missing expected module results fail report generation rather
+than silently disappearing. No-RNA runs emit a clearly labelled no-input page for
+each stage. These reports describe full raw/cleaned reads before optional subsetting.
 Local FASTQs remain direct path inputs. Helpers do not create pass-through links
 or read copies. FastQC input names are assigned through Nextflow staging, and the
 report stages small manifests/QC outputs rather than read bundles. Read paths in
@@ -149,11 +155,29 @@ Cluster acceptance passed on 9 October 2026 in testing/rna_contracts_02 (user-su
 
 Subsequent cleanup removes helper-created local/passthrough links and stages actual
 FASTQs as Nextflow path inputs. Processing tasks inherit configured scratch/staging;
-reporting stages metadata rather than FASTQs. Python syntax checks passed; this
-changed wiring requires cluster acceptance again, including the added disabled-trim
-and all-read passthrough checks:
+reporting stages metadata rather than FASTQs. The first cleanup acceptance attempt
+stopped at module parsing; dynamic input path declarations corrected that error.
+The corrected cleanup passed cluster acceptance on 9 October 2026 in
+`testing/rna_contracts_04` (user-supplied acceptance.json): unit tests, fresh paired/
+single/shared processing, unchanged resume, subset-only reruns, disabled-trim and
+all-read passthrough fresh/resume, expected blocked failure (exit 1), and no-RNA
+routing. This validates RNA native staging and configured scratch operation;
+the separate changed protein handoffs still require protein acceptance. Real RNA
+preparation, real accession downloads, and reference-specific strand inference
+remain pending.
+
+Accepted cluster command:
 
 ```bash
 python gcl_genome_annotation/tests/validate_rna_cluster.py \
-  --outdir testing/rna_contracts_03
+  --outdir testing/rna_contracts_04
 ```
+
+The real local pilot subsequently reported ready for both readsets: 58,267,066
+selected pairs for IBC1_S123_L006 and 58,769,470 for IBC2_S124_L006. The uploaded
+combined MultiQC HTML contains all eight raw/processed FastQC samples and fastp
+results; the user confirmed it displays correctly. Report generation now produces
+separate raw/filtered pages. Python syntax checks passed; the split reports and
+updated report-content acceptance checks await cluster validation. Resume the
+existing real run to regenerate reports from cached processing, or run the cluster
+acceptance script with a new empty output directory such as testing/rna_contracts_05.

@@ -46,7 +46,8 @@ def summarize(plan, results, outdir, read_paths=None):
     lines += ['', '| Assembly | Status | Requested readsets |', '|---|---|---|']
     for row in assemblies:
         lines.append(f"| {row['assembly_id']} | {row['status']} | {', '.join(row['rna_readsets']) or 'none'} |")
-    lines += ['', '[Raw/processed QC and trimming report](multiqc/multiqc_report.html)',
+    lines += ['', '[Before filtering: raw-read QC](multiqc/raw/multiqc_report.html)',
+              '[After filtering: cleaned-read QC and trimming](multiqc/filtered/multiqc_report.html)',
               '[Resolved settings and read identities](rna_status.json)', '',
               'Actual alignment inputs are listed in `rna_status.json`. Local and passthrough reads reuse their existing paths.',
               'Downloaded reads and newly produced cleaned/subset reads are published in the corresponding stage directory.',
@@ -55,28 +56,43 @@ def summarize(plan, results, outdir, read_paths=None):
     return result
 
 
+def make_qc_report(qc_inputs, fastp_inputs, outdir, title):
+    outdir = Path(outdir)
+    outdir.mkdir(parents=True)
+    qc_files = list(Path(qc_inputs).glob('*_fastqc.zip'))
+    fastp_files = list(Path(fastp_inputs).glob('*.json')) if fastp_inputs else []
+    if not qc_files and not fastp_files:
+        (outdir / 'multiqc_report.html').write_text(
+            '<!doctype html><title>RNA QC</title><p>No successful RNA inputs for this stage.</p>')
+        return
+    command = ['multiqc', qc_inputs]
+    if fastp_inputs:
+        command.append(fastp_inputs)
+    command += ['--force', '--outdir', str(outdir), '--filename', 'multiqc_report.html',
+                '--title', title, '--require-logs']
+    if qc_files:
+        command += ['--module', 'fastqc']
+    if fastp_files:
+        command += ['--module', 'fastp']
+    with (outdir / 'multiqc.log').open('w') as log:
+        subprocess.run(command, check=True, stdout=log, stderr=subprocess.STDOUT)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ('plan', 'results', 'qc', 'fastp', 'outdir'):
+    for name in ('plan', 'results', 'raw-qc', 'processed-qc', 'fastp', 'outdir'):
         parser.add_argument('--' + name, required=True)
     parser.add_argument('--read-paths', required=True)
     args = parser.parse_args()
     outdir = Path(args.outdir)
     outdir.mkdir(exist_ok=True)
-    for directory in (args.results, args.qc, args.fastp):
+    for directory in (args.results, args.raw_qc, args.processed_qc, args.fastp):
         Path(directory).mkdir(exist_ok=True)
     plan = json.loads(Path(args.plan).read_text())
     results = [json.loads(path.read_text()) for path in Path(args.results).glob('*.json')]
     summarize(plan, results, outdir, json.loads(base64.b64decode(args.read_paths)))
-    qc = outdir / 'multiqc'
-    qc.mkdir()
-    if any(Path(args.qc).glob('*')) or any(Path(args.fastp).glob('*')):
-        command = ['multiqc', args.qc, args.fastp, '--force', '--outdir', str(qc),
-                   '--filename', 'multiqc_report.html']
-        with (qc / 'multiqc.log').open('w') as log:
-            subprocess.run(command, check=True, stdout=log, stderr=subprocess.STDOUT)
-    else:
-        (qc / 'multiqc_report.html').write_text('<!doctype html><title>RNA QC</title><p>No successful RNA inputs to report.</p>')
+    make_qc_report(args.raw_qc, None, outdir / 'multiqc/raw', 'RNA before filtering')
+    make_qc_report(args.processed_qc, args.fastp, outdir / 'multiqc/filtered', 'RNA after filtering')
 
 
 if __name__ == '__main__':

@@ -100,3 +100,18 @@ The rna_contracts_03 cluster attempt stopped at module parsing: dynamic stageAs
 option strings referenced rid before task inputs were bound. Replaced those
 options with native dynamic path declarations for RNA QC and protein handoffs.
 No RNA tasks ran in that attempt; corrected Nextflow execution remains pending.
+
+RNA native-staging cleanup acceptance passed on 9 October 2026 in
+testing/rna_contracts_04 (user-supplied acceptance.json): unit tests, fresh
+paired/single/shared processing, unchanged resume, subset-only reruns, metadata-only
+passthrough fresh/resume, expected blocked exit 1, and no-RNA routing. RNA staging
+and scratch changes are accepted. Next is the real RNA pilot. The separately changed
+protein store/publication handoffs, real accession acquisition, and reference strand
+inference remain pending validation.
+
+Real RNA local pilot: user supplied ready manifests for both libraries and confirmed
+the combined MultiQC report displays correctly. It contains eight raw/processed
+FastQC samples and fastp results. Split reporting now gives separate raw and filtered
+MultiQC pages; filtered includes fastp when trimming runs. Report-content acceptance
+checks now verify expected sample identities and stage separation. These reporting
+changes await cluster validation; acquisition/trimming/subsetting code is unchanged.

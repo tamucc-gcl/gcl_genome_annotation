@@ -68,15 +68,17 @@ workflow {
         [rid, reads.collect { it.toString() }]
     }) }
     // Stage individual ZIPs so MultiQC does not need to traverse linked directories.
-    def qcResults = QC_RNA_RAW.out.qc.mix(QC_RNA_PROCESSED.out.qc).flatMap { rid, bundle ->
+    def collectQc = { channel -> channel.flatMap { rid, bundle ->
         def reports = file("${bundle}/*_fastqc.zip", checkIfExists: true)
         reports instanceof Collection ? reports : [reports]
-    }.toList()
+    }.toList() }
+    def rawQcResults = collectQc(QC_RNA_RAW.out.qc)
+    def processedQcResults = collectQc(QC_RNA_PROCESSED.out.qc)
     def fastpReports = clean.ready.flatMap { rid, bundle ->
         def report = file("${bundle}/${rid}_fastp.json")
         report.exists() ? [report] : []
     }.toList()
-    REPORT_RNA_PREPARATION(PLAN_RNA_PREPARATION.out.bundle, finalResults, readPaths, qcResults, fastpReports,
+    REPORT_RNA_PREPARATION(PLAN_RNA_PREPARATION.out.bundle, finalResults, readPaths, rawQcResults, processedQcResults, fastpReports,
         file("${projectDir}/py_scripts/report_rna_preparation.py"))
     ASSERT_RNA_PREPARATION(REPORT_RNA_PREPARATION.out.status)
 }

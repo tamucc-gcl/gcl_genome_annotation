@@ -38,7 +38,21 @@ def run_case(root, inputs, name, sheet, expected, resume=False, fraction=None, p
     data = json.loads(path.read_text())
     assert {row['assembly_id']: row['status'] for row in data['assemblies']} == expected
     assert (process.returncode == 0) == all(value != 'blocked' for value in expected.values())
-    assert (output / 'rna/multiqc/multiqc_report.html').is_file()
+    for report_stage, read_stage in (('raw', 'raw'), ('filtered', 'processed')):
+        report_dir = output / f'rna/multiqc/{report_stage}'
+        assert (report_dir / 'multiqc_report.html').is_file()
+        ready = [row for row in data['readsets'] if row['status'] == 'ready']
+        if ready:
+            with (report_dir / 'multiqc_data/multiqc_fastqc.txt').open() as handle:
+                samples = {row['Sample'] for row in csv.DictReader(handle, delimiter='\t')}
+            for row in ready:
+                expected_samples = {f"{row['readset_id']}_{read_stage}_R{mate}" for mate in
+                                    range(1, 3 if row['layout'] == 'paired' else 2)}
+                assert expected_samples <= samples, f'{report_stage}: missing FastQC samples'
+            other_stage = 'processed' if read_stage == 'raw' else 'raw'
+            assert not any(f'_{other_stage}_R' in name for name in samples), 'QC stages mixed'
+            if report_stage == 'filtered' and not passthrough:
+                assert (report_dir / 'multiqc_data/multiqc_fastp.txt').is_file()
     for row in data['readsets']:
         if row['status'] == 'ready':
             assert row['read_units'] > 0
