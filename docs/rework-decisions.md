@@ -114,4 +114,16 @@ the combined MultiQC report displays correctly. It contains eight raw/processed
 FastQC samples and fastp results. Split reporting now gives separate raw and filtered
 MultiQC pages; filtered includes fastp when trimming runs. Report-content acceptance
 checks now verify expected sample identities and stage separation. These reporting
-changes await cluster validation; acquisition/trimming/subsetting code is unchanged.
+changes were confirmed working in the real local RNA pilot by the user;
+acquisition/trimming/subsetting code is unchanged. Updated synthetic report-content
+checks have not been rerun on the cluster.
+
+Reference/repeat preparation is implemented in reference_repeats.nf, using existing
+discovery/classification/filter/masking modules with corrected per-assembly reference
+contracts, record-safe repeat filtering, whole-contig batches, exact reconstruction,
+linkage/GFF integrity and overlap-aware coverage. Existing Dfam 3.9 partitions,
+SwissProt DIAMOND and RepeatPeps are reused; taxon subsets and derived RepeatPeps
+indices use shared stores. Tool pins, including the repaired Terrier environment,
+are described in docs/reference-repeats.md. Static checks are complete. Actual
+RepeatMasker fixture acceptance and the full real-data discovery pilot remain
+pending; no scientific acceptance is claimed from implementation or syntax checks.

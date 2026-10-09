@@ -21,16 +21,17 @@
 process COMBINE_REPEAT_LIBS {
     tag "${assembly_id}"
     label 'combine_libs'
+    publishDir "${params.outdir}/repeats/libraries", mode: params.publish_dir_mode
 
     input:
-    tuple val(assembly_id), path(curated_repeats)
-    path dfam_lib
+    tuple val(assembly_id), path(curated_repeats), path(dfam_lib)
 
     output:
     tuple val(assembly_id), path("${assembly_id}_combined_repeats.fa"), emit: combined_lib
 
     script:
     """
+    set -euo pipefail
     cat ${curated_repeats} ${dfam_lib} > ${assembly_id}_combined_repeats.fa
     """
 

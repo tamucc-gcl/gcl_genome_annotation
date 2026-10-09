@@ -163,7 +163,7 @@ single/shared processing, unchanged resume, subset-only reruns, disabled-trim an
 all-read passthrough fresh/resume, expected blocked failure (exit 1), and no-RNA
 routing. This validates RNA native staging and configured scratch operation;
 the separate changed protein handoffs still require protein acceptance. Real RNA
-preparation, real accession downloads, and reference-specific strand inference
+accession downloads and reference-specific strand inference
 remain pending.
 
 Accepted cluster command:
@@ -177,7 +177,7 @@ The real local pilot subsequently reported ready for both readsets: 58,267,066
 selected pairs for IBC1_S123_L006 and 58,769,470 for IBC2_S124_L006. The uploaded
 combined MultiQC HTML contains all eight raw/processed FastQC samples and fastp
 results; the user confirmed it displays correctly. Report generation now produces
-separate raw/filtered pages. Python syntax checks passed; the split reports and
-updated report-content acceptance checks await cluster validation. Resume the
-existing real run to regenerate reports from cached processing, or run the cluster
-acceptance script with a new empty output directory such as testing/rna_contracts_05.
+separate raw/filtered pages, which the user also confirmed working. The real local
+RNA pilot is accepted. Updated synthetic report-content acceptance checks have not
+been rerun; run the cluster acceptance script with a new empty output directory
+such as testing/rna_contracts_05 when validating those assertions.

@@ -19,4 +19,10 @@ All stages share the root [nextflow.config](nextflow.config), which contains par
 
 General database downloads use persistent shared stores; spike-in proteins use a project store. The real protein stored-source rerun passed; broader fresh-project reuse fixtures remain unconfirmed.
 
-[RNA preparation](docs/rna-preparation.md) is implemented in rna_preparation.nf with paired/single FASTQ validation, raw/processed QC, conservative trimming and reproducible subsets. Synthetic cluster acceptance passed including native staging, passthrough, resume and subset-only reruns. The real RNA pilot remains pending. It stops before alignment/repeats.
+[RNA preparation](docs/rna-preparation.md) is implemented in rna_preparation.nf with paired/single FASTQ validation, raw/processed QC, conservative trimming and reproducible subsets. Synthetic cluster acceptance passed including native staging, passthrough, resume and subset-only reruns. The real local RNA pilot and separate raw/filtered MultiQC reports were confirmed by the user. It stops before alignment/repeats.
+
+[Reference and repeat preparation](docs/reference-repeats.md) is implemented in
+reference_repeats.nf, reusing the existing scientific modules with reference identity,
+record-safe curation, shared database reuse and whole-contig masking repairs. Static
+checks are complete; cluster fixture acceptance and the real discovery/masking pilot
+remain pending. This entry stops before alignment and prediction.

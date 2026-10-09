@@ -3,8 +3,9 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python >=3.9,<3.12
+  - python=3.11.9
   - pip
   - pip:
-    - torch >=2.0,<2.6
-    - bio-terrier
+    - torch==2.6.0
+    - lightning==2.6.1
+    - bio-terrier==0.4.0

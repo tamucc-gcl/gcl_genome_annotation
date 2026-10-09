@@ -38,6 +38,7 @@ include { parseSampleSheet } from './functions/parse_sample_sheet.nf'
 ========================================================================================
 */
 
+include { COMBINE_REPEAT_LIBS } from './modules/combineRepeatLibs.nf'
 include { FILTER_ASSEMBLY } from './modules/filterAssembly.nf'
 
 // ── Database ─────────────────────────────
@@ -48,7 +49,7 @@ include { REPEAT_MODEL  } from './modules/repeatModel.nf'
 include { CURATE_REPEATS } from './modules/curateRepeats.nf'
 include { CLASSIFY_REPEATS } from './modules/classifyRepeats.nf'
 include { RECLASSIFY_REPEATS } from './modules/reclassifyRepeats.nf'
-include { EXTRACT_REPEAT_PEPS; FILTER_REPEAT_LIBRARY } from './modules/filterRepeatLibrary.nf'
+include { EXTRACT_REPEAT_PEPS; INDEX_REPEAT_PEPS; FILTER_REPEAT_LIBRARY } from './modules/filterRepeatLibrary.nf'
 //include { REPEAT_MASK   } from './modules/repeatMask.nf'
 include { REPEAT_MASK_PARALLEL as REPEAT_MASK } from './workflows/repeatMaskParallel.nf'
 
@@ -150,6 +151,9 @@ workflow {
 
     // ── Step 0: Extract repeat peptides (runs once) ─────────────────────────────
     EXTRACT_REPEAT_PEPS()
+    INDEX_REPEAT_PEPS(EXTRACT_REPEAT_PEPS.out.repeat_peps.map { path ->
+        tuple('repeat_peps_' + java.security.MessageDigest.getInstance('SHA-256').digest(path.bytes).encodeHex().toString(), path)
+    })
 
     /*
     ========================================================================================
@@ -157,9 +161,13 @@ workflow {
     ========================================================================================
     */
 
-    FILTER_ASSEMBLY(ch_assemblies)
-
-    ch_assemblies_filtered = FILTER_ASSEMBLY.out.filtered_assembly
+    def reference_helper = file("${projectDir}/py_scripts/reference_repeats.py", checkIfExists: true)
+    FILTER_ASSEMBLY(ch_assemblies.map { aid, fa -> tuple(aid, fa, params.min_contig_length) }, reference_helper)
+    ch_assemblies_filtered = FILTER_ASSEMBLY.out.bundle.map { aid, folder ->
+        def state = new groovy.json.JsonSlurper().parse(new File("${folder}/${aid}.reference.json"))
+        if (state.status != 'ready') error "Reference preparation failed for ${aid}: ${state.reason}"
+        tuple(aid, file("${folder}/${aid}.filtered.fasta"))
+    }
 
     /*
     ========================================================================================
@@ -168,15 +176,17 @@ workflow {
     */
 
     // ── Step 0: Extract Dfam library (runs once) ─────────────────────────────
-    CURATE_DFAM(DOWNLOAD_DFAM_DB.out.dfam_db_dir,
-                params.taxa_name)
+    def legacy_taxon_key = 'taxon_' + java.security.MessageDigest.getInstance('SHA-256')
+        .digest(params.taxa_name.toString().getBytes('UTF-8')).encodeHex().toString().substring(0, 20)
+    CURATE_DFAM(DOWNLOAD_DFAM_DB.out.dfam_db_dir.map { folder -> tuple(legacy_taxon_key, params.taxa_name, folder) })
+    ch_dfam_library = CURATE_DFAM.out.bundle.map { key, folder -> file("${folder}/dfam_subset.lib") }.first()
+    ch_dfam_source = CURATE_DFAM.out.bundle.map { key, folder -> file("${folder}/dfam_subset.source.json") }.first()
 
     // ── Step 1: De novo repeat modeling (per genome) ─────────────────────────
-    REPEAT_MODEL(ch_assemblies_filtered,
-                CURATE_DFAM.out.dfam_lib.collect())
+    REPEAT_MODEL(ch_assemblies_filtered.combine(ch_dfam_source), params.repeat_seed)
 
     // ── Step 2: Curate de novo repeats (per genome) ──────────────────────────
-    CURATE_REPEATS(REPEAT_MODEL.out.families_fa)
+    CURATE_REPEATS(REPEAT_MODEL.out.families_fa, reference_helper)
 
     // ── Step 3: Classify de novo repeats (per genome) ──────────────────────────
     CLASSIFY_REPEATS(CURATE_REPEATS.out.clustered_repeats)
@@ -193,17 +203,14 @@ workflow {
     //   Repeats hitting only SwissProt above threshold → gene-derived → removed
     FILTER_REPEAT_LIBRARY(
         RECLASSIFY_REPEATS.out.reclassified_lib,
-        DOWNLOAD_DIAMOND_DB.out.diamond_db,
-        EXTRACT_REPEAT_PEPS.out.repeat_peps)
+        DOWNLOAD_DIAMOND_DB.out.diamond_db.first(),
+        EXTRACT_REPEAT_PEPS.out.repeat_peps.first(),
+        INDEX_REPEAT_PEPS.out.index.map { key, db, source -> db }.first())
 
     // ── Step 5: Mask genome with combined libraries (per genome) ─────────────
     // Join assembly path back with filtered repeats on assembly_id
-    ch_mask_input = ch_assemblies_filtered
-        .join(FILTER_REPEAT_LIBRARY.out.filtered_lib)
-        // produces: [assembly_id, assembly_path, filtered_repeats]
-
-    REPEAT_MASK(ch_mask_input,
-                CURATE_DFAM.out.dfam_lib.collect())
+    COMBINE_REPEAT_LIBS(FILTER_REPEAT_LIBRARY.out.filtered_lib.combine(ch_dfam_library))
+    REPEAT_MASK(ch_assemblies_filtered.join(COMBINE_REPEAT_LIBS.out.combined_lib), params.n_rm_chunks)
 
     /*
     ========================================================================================
@@ -456,7 +463,7 @@ workflow {
     ========================================================================================
     */
     ANNOTATION_REPORT(
-        FILTER_ASSEMBLY.out.assembly_stats.map { id, f -> f }.collect(),
+        FILTER_ASSEMBLY.out.bundle.map { id, folder -> file("${folder}/${id}.assembly_stats.tsv") }.collect(),
         ANNOTATE_GFF3.out.annotated_gff3.map { id, f -> f }.collect(),
         ANNOTATE_GFF3.out.gene_summary.map { id, f -> f }.collect(),
         MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv.map { id, f -> f }.collect(),

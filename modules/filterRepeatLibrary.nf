@@ -68,6 +68,32 @@ process EXTRACT_REPEAT_PEPS {
 }
 
 
+// Share the derived TE-protein index across assemblies/projects, keyed by input content.
+process INDEX_REPEAT_PEPS {
+    tag "${source_key}"
+    label 'repeat_peps_index'
+    storeDir "${params.dfam_database}/indices/diamond-${params.repeat_diamond_version}"
+    input:
+    tuple val(source_key), path(repeat_peps)
+    output:
+    tuple val(source_key), path("${source_key}.dmnd"), path("${source_key}.source.json"), emit: index
+    script:
+    """
+    set -euo pipefail
+    diamond makedb --in '${repeat_peps}' --db '${source_key}' --threads ${task.cpus}
+    python - <<'PY'
+    import hashlib, json
+    from pathlib import Path
+    Path('${params.dfam_database}/indices/diamond-${params.repeat_diamond_version}').mkdir(parents=True, exist_ok=True)
+    Path('${source_key}.source.json').write_text(json.dumps({
+        'input_sha256': hashlib.sha256(Path('${repeat_peps}').read_bytes()).hexdigest(),
+        'diamond_version': '${params.repeat_diamond_version}',
+        'index_sha256': hashlib.sha256(Path('${source_key}.dmnd').read_bytes()).hexdigest()
+    }, indent=2) + '\\n')
+    PY
+    """
+}
+
 process FILTER_REPEAT_LIBRARY {
     tag "${assembly_id}"
     label 'filter_repeat_lib'
@@ -77,6 +103,7 @@ process FILTER_REPEAT_LIBRARY {
     tuple val(assembly_id), path(repeat_lib)
     path diamond_db
     path repeat_peps
+    path repeat_peps_db
 
     output:
     tuple val(assembly_id), path("${assembly_id}_repeats_filtered.fa"),
@@ -85,31 +112,27 @@ process FILTER_REPEAT_LIBRARY {
         emit: removed_lib
     tuple val(assembly_id), path("${assembly_id}_repeat_filter_report.tsv"),
         emit: filter_report
+    tuple val(assembly_id), path("${assembly_id}.repeat_vs_tepeps.tsv"), path("${assembly_id}.repeat_vs_prot.tsv"), emit: hits
+    tuple val(assembly_id), path("${assembly_id}.repeat_filter_sources.json"), emit: provenance
 
     script:
-    def max_evalue = params.repeat_filter_evalue ?: 1e-10
-    def min_pident = params.repeat_filter_pident ?: 25
+    def max_evalue = params.repeat_filter_evalue != null ? params.repeat_filter_evalue : 1e-10
+    def min_pident = params.repeat_filter_pident != null ? params.repeat_filter_pident : 25
     """
     set -euo pipefail
-
-    # ── 1. Build DIAMOND DB from RepeatPeps (curated TE proteins) ─────────────
-    #   RepeatPeps.lib is extracted from the TEtools container by
-    #   EXTRACT_REPEAT_PEPS and passed as an input path.
-    diamond makedb \
-        --in ${repeat_peps} \
-        --db repeat_peps_db \
-        --threads ${task.cpus}
+    if [ ! -s '${repeat_lib}' ]; then
+        touch repeat_vs_tepeps.tsv repeat_vs_prot.tsv
+    else
 
     # ── 2. BLASTX repeats against RepeatPeps (TE protein database) ────────────
     diamond blastx \
-        --db repeat_peps_db \
+        --db ${repeat_peps_db} \
         --query ${repeat_lib} \
         --out repeat_vs_tepeps.tsv \
         --outfmt 6 qseqid sseqid stitle pident length qlen slen evalue bitscore \
         --evalue ${max_evalue} \
         --max-target-seqs 1 \
-        --threads ${task.cpus} \
-        || true  # OK if no hits
+        --threads ${task.cpus}
 
     # ── 3. BLASTX repeats against general protein DB (e.g. SwissProt) ─────────
     diamond blastx \
@@ -119,12 +142,13 @@ process FILTER_REPEAT_LIBRARY {
         --outfmt 6 qseqid sseqid stitle pident length qlen slen evalue bitscore \
         --evalue ${max_evalue} \
         --max-target-seqs 1 \
-        --threads ${task.cpus} \
-        || true  # OK if no hits
+        --threads ${task.cpus}
+    fi
 
     # ── 4. Classify using two-database logic ──────────────────────────────────
     python3 - <<'PYEOF'
-import sys
+import sys, hashlib, json
+from pathlib import Path
 
 MIN_PIDENT = ${min_pident}
 
@@ -175,6 +199,10 @@ report_rows = []
 
 # All repeat IDs that had any hit
 all_query_ids = set(te_hits.keys()) | set(prot_hits.keys())
+library_ids = {line[1:].split()[0] for line in Path('${repeat_lib}').read_text().splitlines() if line.startswith('>')}
+if not all_query_ids <= library_ids:
+    raise ValueError('DIAMOND hits reference an unknown repeat-library ID')
+all_query_ids |= library_ids
 
 for qid in sorted(all_query_ids):
     has_te = qid in te_hits
@@ -212,6 +240,21 @@ for qid in sorted(all_query_ids):
             verdict,
         ))
 
+    else:
+        report_rows.append((qid, '-', '-', '-', '-', '-', '-', '-', '-', 'KEEP_no_protein_hit'))
+
+def sha(path):
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+Path('${assembly_id}.repeat_filter_sources.json').write_text(json.dumps({
+    'repeat_library_sha256': sha('${repeat_lib}'), 'general_database_sha256': sha('${diamond_db}'),
+    'repeat_peps_sha256': sha('${repeat_peps}'), 'minimum_identity': MIN_PIDENT,
+    'maximum_evalue': ${max_evalue}}, indent=2) + '\\n')
+
 # ── Write report ──────────────────────────────────────────────────────────
 with open("${assembly_id}_repeat_filter_report.tsv", "w") as out:
     out.write("repeat_id\\t"
@@ -247,8 +290,10 @@ PYEOF
     fi
 
     # ── 6. Summary ────────────────────────────────────────────────────────────
-    n_before=\$(grep -c '^>' ${repeat_lib})
-    n_after=\$(grep -c '^>' ${assembly_id}_repeats_filtered.fa)
+    mv repeat_vs_tepeps.tsv ${assembly_id}.repeat_vs_tepeps.tsv
+    mv repeat_vs_prot.tsv ${assembly_id}.repeat_vs_prot.tsv
+    n_before=\$(grep -c '^>' ${repeat_lib} || true)
+    n_after=\$(grep -c '^>' ${assembly_id}_repeats_filtered.fa || true)
     n_removed=\$((n_before - n_after))
     echo "Repeat library: \${n_before} → \${n_after} sequences (\${n_removed} gene-derived removed)" >&2
     """
@@ -258,5 +303,7 @@ PYEOF
     touch ${assembly_id}_repeats_filtered.fa
     touch ${assembly_id}_repeats_removed.fa
     touch ${assembly_id}_repeat_filter_report.tsv
+    touch ${assembly_id}.repeat_vs_tepeps.tsv ${assembly_id}.repeat_vs_prot.tsv
+    touch ${assembly_id}.repeat_filter_sources.json
     """
 }

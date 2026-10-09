@@ -46,7 +46,8 @@ with open(batch_fasta) as fh, open(output_tsv, "w") as out:
         hdr = line[1:].split()[0]
         hdr = hdr.split(":")[0]
         # Match scaffold_name_start-end pattern
-        m = re.match(r'^(.+)_([0-9]+)-([0-9]+)$', hdr)
+        # A real normalized ID may itself end with _100-500. Prefer exact IDs.
+        m = None if hdr in slen else re.match(r'^(.+)_([0-9]+)-([0-9]+)$', hdr)
         if m:
             scaff     = m.group(1)
             start1    = int(m.group(2))
@@ -56,6 +57,8 @@ with open(batch_fasta) as fh, open(output_tsv, "w") as out:
             start1    = 1
             end_coord = slen.get(hdr, 0)
         scaffold_len = slen.get(scaff, 0)
+        if not scaffold_len or not 1 <= start1 <= end_coord <= scaffold_len:
+            raise ValueError(f'Invalid/unmapped batch FASTA header: {hdr}')
         out.write(f"{short}\t{scaff}\t{start1}\t{end_coord}\t{scaffold_len}\n")
 
 print(f"coord_map.tsv: {n} sequences mapped", file=sys.stderr)

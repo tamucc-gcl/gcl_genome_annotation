@@ -44,6 +44,7 @@ process MERGE_RM_RESULTS {
 
     input:
     tuple val(assembly_id), path(out_files), path(fasta_files), path(align_files), path(seq_lengths)
+    path helper
 
     output:
     tuple val(assembly_id), path("${assembly_id}.masked.fasta"),         emit: masked_fasta
@@ -59,77 +60,15 @@ process MERGE_RM_RESULTS {
     """
     set -euo pipefail
 
-    # ── 1. Merge .out files with globally renumbered IDs ──────────────────────
-    head -3 \$(ls -1 ${out_files} | sort -V | head -1) > merged_raw.out
-
-    ls -1 ${out_files} | sort -V | while read -r f; do
-        tail -n +4 "\$f" >> merged_raw.out
-    done
-
-    # Renumber linkage IDs (column 15) and recompute (left) column (column 8)
-    # using authoritative scaffold lengths to eliminate cross-batch inconsistencies
-    awk -v lenfile="${seq_lengths}" '
-    BEGIN {
-        while ((getline line < lenfile) > 0) {
-            split(line, a, "\\t")
-            slen[a[1]] = int(a[2])
-        }
-        close(lenfile)
-    }
-    NR <= 3 { print; next }
-    {
-        sid = \$5
-        if (sid in slen) {
-            \$8 = "(" slen[sid] - \$7 ")"
-        }
-        \$15 = ++counter
-        print
-    }
-    ' merged_raw.out > ${assembly_id}.out
-
-    # ── 2. Reassemble masked FASTA ───────────────────────────────────────────
-    > chunk_index.tsv
-    for fa in ${fasta_files}; do
-        grep "^>" "\$fa" | while read -r hdr; do
-            name=\${hdr#>}
-            scaffold=\$(echo "\$name" | sed 's/__[0-9]*__[0-9]*\$//')
-            start=\$(echo "\$name" | grep -oP '__\\K[0-9]+(?=__[0-9]+\$)')
-            echo -e "\${scaffold}\\t\${start}\\t\${fa}\\t\${name}"
-        done
-    done >> chunk_index.tsv
-
-    sort -k1,1 -k2,2n chunk_index.tsv > chunk_index_sorted.tsv
-
-    > ${assembly_id}.masked.fasta
-    current_scaffold=""
-    while IFS=\$'\\t' read -r scaffold start fa seqname; do
-        if [ "\$scaffold" != "\$current_scaffold" ]; then
-            if [ -n "\$current_scaffold" ]; then
-                echo "" >> ${assembly_id}.masked.fasta
-            fi
-            echo ">\${scaffold}" >> ${assembly_id}.masked.fasta
-            current_scaffold="\$scaffold"
-        fi
-        awk -v target=">\${seqname}" '
-            BEGIN { found=0 }
-            /^>/ { found = (\$0 == target) ? 1 : 0; next }
-            found { printf "%s", \$0 }
-        ' "\$fa" >> ${assembly_id}.masked.fasta
-    done < chunk_index_sorted.tsv
-    echo "" >> ${assembly_id}.masked.fasta
-
-    # Reformat to standard FASTA line width
-    awk '
-    /^>/ { if (NR > 1) print ""; print; next }
-    { printf "%s", \$0 }
-    END { print "" }
-    ' ${assembly_id}.masked.fasta \\
-    | fold -w 60 > tmp_wrapped.fa
-    mv tmp_wrapped.fa ${assembly_id}.masked.fasta
+    # Preserve linked fragments while renumbering IDs across batches.
+    python ${helper} merge-out --lengths '${seq_lengths}' --output ${assembly_id}.out --files ${out_files}
+    # Reconstruct in reference order; wrap sequence lines only, never FASTA headers.
+    python ${helper} merge-fasta --lengths '${seq_lengths}' --output ${assembly_id}.masked.fasta --files ${fasta_files}
 
     # ── 3. Generate GFF3 from .out with proper SO feature types ──────────────
     python3 - ${assembly_id}.out ${assembly_id}.repeat.gff3 <<'PYEOF'
 import sys, re
+from urllib.parse import quote
 
 out_file, gff_file = sys.argv[1], sys.argv[2]
 
@@ -191,14 +130,17 @@ with open(out_file) as fin, open(gff_file, "w") as fout:
             target_start = fields[13]
             target_end   = fields[12]
 
+        escaped_name = quote(repeat_name, safe="-._~")
+        escaped_class = quote(class_fam, safe="-._~/")
         attrs = (
-            f"ID=repeat_{hit_id};"
-            f"Name={repeat_name};"
-            f"class={class_fam};"
+            f"ID=repeat_{hit_id}_fragment_{i};"
+            f"repeat_linkage_id={hit_id};"
+            f"Name={escaped_name};"
+            f"class={escaped_class};"
             f"pctdiv={perc_div};"
             f"pctdel={perc_del};"
             f"pctins={perc_ins};"
-            f"Target={repeat_name} {target_start} {target_end} {strand}"
+            f"Target={escaped_name} {target_start} {target_end} {strand}"
         )
 
         fout.write(f"{scaffold}\\tRepeatMasker\\t{so_type}\\t{qstart}\\t{qend}\\t{sw_score}\\t{strand}\\t.\\t{attrs}\\n")
@@ -264,6 +206,7 @@ PYEOF
     my \$pct = sub { \$total_len > 0 ? (\$_[0]/\$total_len)*100 : 0 };
 
     printf "==================================================\\n";
+    printf "NOTE: category lengths sum alignment fragments; overlaps may be counted more than once.\\n";
     printf "file name: merged\\n";
     printf "sequences:         %5d\\n", \$n_seqs;
     printf "total length: %10d bp  (%d bp excl N/X-runs)\\n", \$total_len, \$n_excl;
@@ -271,7 +214,7 @@ PYEOF
     printf "bases masked: %10d bp ( %5.2f %%)\\n", \$bases_masked, \$mask_pct;
     printf "==================================================\\n";
     printf "               number of      length   percentage\\n";
-    printf "               elements*    occupied  of sequence\\n";
+    printf "               fragments*   aligned   of sequence\\n";
     printf "--------------------------------------------------\\n";
 
     my \$retro_n  = (\$main_count{LTR}//0) + (\$main_count{LINE}//0) + (\$main_count{SINE}//0);

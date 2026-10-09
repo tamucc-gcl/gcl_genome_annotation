@@ -5,10 +5,8 @@
     Run RepeatMasker on a single batch chunk, then adjust coordinates back to
     global genomic positions.
 
-    seqkit subseq --bed outputs sequences in genome fasta order, NOT in BED
-    file order. The coordinate mapping is therefore built by parsing the actual
-    FASTA headers produced by seqkit (format: >scaffold_name_start-end:.)
-    rather than assuming BED line N corresponds to FASTA sequence N.
+    Batches now contain intact contigs. Build the coordinate mapping from actual
+    FASTA order and authoritative lengths, rather than assuming BED line order.
 
     RepeatMasker enforces a 50-character limit on FASTA identifiers.
     Because the encoded names can exceed this, we:
@@ -36,7 +34,8 @@
 process REPEAT_MASK_BATCH {
     tag "${assembly_id}:${batch_id}"
     label 'repeat_mask_batch'
-    //publishDir "${params.outdir}/repeats/chunks", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/repeats/logs", mode: 'copy', overwrite: true, pattern: '*.repeatmasker.log'
+    publishDir "${params.outdir}/repeats/maps", mode: 'copy', overwrite: true, pattern: '*.coord_map.tsv'
 
     input:
     tuple val(assembly_id), val(batch_id), path(batch_fasta), path(batch_bed),
@@ -50,6 +49,9 @@ process REPEAT_MASK_BATCH {
         path("${assembly_id}.${batch_id}.adjusted.fa"),
         path("${assembly_id}.${batch_id}.adjusted.align"),
         emit: batch_results
+    tuple val(assembly_id), val(batch_id), path("${assembly_id}.${batch_id}.repeatmasker.log"), emit: execution_log
+
+    tuple val(assembly_id), val(batch_id), path("${assembly_id}.${batch_id}.coord_map.tsv"), emit: coordinates
 
     script:
     def speed_flag = params.job_speed ? "-${params.job_speed}" : "-s"
@@ -64,10 +66,8 @@ process REPEAT_MASK_BATCH {
     ' ${batch_fasta} > short_ids.fa
 
     # ── Build coordinate mapping from FASTA headers ───────────────────────────
-    #   seqkit subseq --bed header format: >scaffold_name_start-end:.
-    #   We parse these directly to get the correct seq_N → scaffold mapping,
-    #   since seqkit outputs in genome order not BED order.
-    python3 ${build_coord_map_script} ${batch_fasta} ${seq_lengths} coord_map.tsv
+    # Bare IDs map to full contigs; exact matches take precedence over range-like suffixes.
+    python3 ${build_coord_map_script} ${batch_fasta} ${seq_lengths} ${assembly_id}.${batch_id}.coord_map.tsv
 
     # ── 1. Run RepeatMasker ───────────────────────────────────────────────────
     RepeatMasker \\
@@ -79,19 +79,33 @@ process REPEAT_MASK_BATCH {
         -xsmall -small \\
         -a \\
         -gff \\
-        short_ids.fa
+        short_ids.fa 2>&1 | tee ${assembly_id}.${batch_id}.repeatmasker.log
+
+    # A successful zero-hit run may omit the masked FASTA/alignment outputs.
+    # Require the tool's explicit zero-hit message before producing an unchanged reference.
+    if grep -qi 'No repetitive sequences were detected' ${assembly_id}.${batch_id}.repeatmasker.log; then
+        if [ ! -e short_ids.fa.masked ]; then
+            awk '{ print }' short_ids.fa > short_ids.fa.masked
+        fi
+        if [ ! -e short_ids.fa.out ]; then
+            printf 'SW div del ins query begin end left repeat class\\nscore coordinates\\n\\n' > short_ids.fa.out
+        fi
+        if [ ! -e short_ids.fa.align ]; then
+            touch short_ids.fa.align
+        fi
+    fi
 
     # ── 2. Adjust .out file ───────────────────────────────────────────────────
     awk '
     BEGIN {
         FS = "\\t"
-        while ((getline < "coord_map.tsv") > 0) {
+        while ((getline < "${assembly_id}.${batch_id}.coord_map.tsv") > 0) {
             map_scaff[\$1]  = \$2
             map_offset[\$1] = int(\$3) - 1
             map_end[\$1]    = int(\$4)
             map_slen[\$1]   = int(\$5)
         }
-        close("coord_map.tsv")
+        close("${assembly_id}.${batch_id}.coord_map.tsv")
         FS = " "
     }
     NR <= 3 { print; next }
@@ -113,11 +127,11 @@ process REPEAT_MASK_BATCH {
     #   Headers become: >scaffold_name__start1__end
     awk '
     BEGIN {
-        while ((getline < "coord_map.tsv") > 0) {
+        while ((getline < "${assembly_id}.${batch_id}.coord_map.tsv") > 0) {
             split(\$0, a, "\\t")
             fa_hdr[a[1]] = a[2] "__" a[3] "__" a[4]
         }
-        close("coord_map.tsv")
+        close("${assembly_id}.${batch_id}.coord_map.tsv")
     }
     /^>/ {
         short = substr(\$1, 2)
@@ -131,13 +145,13 @@ process REPEAT_MASK_BATCH {
     # ── 4. Adjust .align file ─────────────────────────────────────────────────
     awk '
     BEGIN {
-        while ((getline < "coord_map.tsv") > 0) {
+        while ((getline < "${assembly_id}.${batch_id}.coord_map.tsv") > 0) {
             split(\$0, a, "\\t")
             map_scaff[a[1]]  = a[2]
             map_offset[a[1]] = int(a[3]) - 1
             map_slen[a[1]]   = int(a[5])
         }
-        close("coord_map.tsv")
+        close("${assembly_id}.${batch_id}.coord_map.tsv")
     }
     /^[[:space:]]*[0-9]/ && NF >= 14 {
         sid = \$5
@@ -164,5 +178,7 @@ process REPEAT_MASK_BATCH {
     touch ${assembly_id}.${batch_id}.adjusted.out
     touch ${assembly_id}.${batch_id}.adjusted.fa
     touch ${assembly_id}.${batch_id}.adjusted.align
+    touch ${assembly_id}.${batch_id}.repeatmasker.log
+    touch ${assembly_id}.${batch_id}.coord_map.tsv
     """
 }

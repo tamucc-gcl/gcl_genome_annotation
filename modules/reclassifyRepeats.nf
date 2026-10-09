@@ -46,9 +46,14 @@ process RECLASSIFY_REPEATS {
         emit: reclass_report
 
     script:
-    def threshold = params.terrier_threshold ?: 0.7
+    def threshold = params.terrier_threshold == null ? 0.7 : params.terrier_threshold
     """
     set -euo pipefail
+    if [ ! -s '${classified_lib}' ]; then
+        touch ${assembly_id}_reclassified_repeats.fa
+        printf 'repeat_id\\toriginal_class\\tterrier_class\\tstatus\\n' > ${assembly_id}_reclassification_report.tsv
+        exit 0
+    fi
 
     # ── 1. Run Terrier on entire library (--unknown-only renames only Unknown) ─
     terrier \\
@@ -95,6 +100,8 @@ with open(f"{ASM}_reclassified_repeats.fa") as fh:
 n_reclassified = 0
 n_unchanged = 0
 n_known = 0
+if len(orig_list) != len(reclass_list):
+    raise ValueError('Terrier changed the number of repeat families')
 
 with open(f"{ASM}_reclassification_report.tsv", "w") as out:
     out.write("repeat_id\\toriginal_class\\tterrier_class\\tstatus\\n")
@@ -127,7 +134,7 @@ PYEOF
 
     # ── 3. Summary ────────────────────────────────────────────────────────────
     n_total=\$(grep -c '^>' ${assembly_id}_reclassified_repeats.fa)
-    n_still_unknown=\$(grep '^>' ${assembly_id}_reclassified_repeats.fa | grep -ci '#unknown' || echo 0)
+    n_still_unknown=\$(grep '^>' ${assembly_id}_reclassified_repeats.fa | grep -ci '#unknown' || true)
     echo "Reclassified library: \${n_total} total families, \${n_still_unknown} still Unknown" >&2
     """
 

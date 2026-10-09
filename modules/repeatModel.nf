@@ -18,21 +18,22 @@
 process REPEAT_MODEL {
     tag "${assembly_id}"
     label 'repeat'
-    publishDir "${params.outdir}/repeats/denovo", mode: params.publish_dir_mode
-
-    container "${params.repeatmodeler_container}"
+    publishDir "${params.outdir}/repeats/denovo/${assembly_id}", mode: params.publish_dir_mode
 
     input:
-    tuple val(assembly_id), path(assembly_path)
-    path dfam_dir
+    tuple val(assembly_id), path(assembly_path), path(dfam_source)
+    val seed
 
     output:
     tuple val(assembly_id), path("${assembly_id}-families.fa"),  emit: families_fa
     tuple val(assembly_id), path("${assembly_id}-families.stk"), emit: families_stk
     tuple val(assembly_id), path("${assembly_id}-rmod.log"),     emit: log_file
+    tuple val(assembly_id), path('RM_*', optional: true), emit: training
+    tuple val(assembly_id), path('repeatmodeler.log'), emit: execution_log
 
     script:
     """
+    set -euo pipefail
     export BLAST_USAGE_REPORT=false
 
     # Build BLAST database for RepeatModeler
@@ -44,13 +45,12 @@ process REPEAT_MODEL {
     RepeatModeler \
         -threads ${task.cpus} \
         -database ${assembly_id} \
+        -seed ${seed} \
         -LTRStruct \
         -numAddlRounds ${params.repModel_rounds} 2>&1 | tee repeatmodeler.log
 
-    # Collect outputs (RepeatModeler places them in RM_ directories)
-    # cp RM_*/families-rmod.fa  ${assembly_id}-families.fa
-    # cp RM_*/families-rmod.stk ${assembly_id}-families.stk
-    # cp repeatmodeler.log       ${assembly_id}-rmod.log
+    # RepeatModeler writes the declared families/Stockholm/log outputs directly.
+    # Retain its RM_* training directories through Nextflow's native stage-out.
     """
 
     stub:
@@ -58,5 +58,6 @@ process REPEAT_MODEL {
     touch ${assembly_id}-families.fa
     touch ${assembly_id}-families.stk
     touch ${assembly_id}-rmod.log
+    touch repeatmodeler.log
     """
 }

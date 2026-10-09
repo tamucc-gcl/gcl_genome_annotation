@@ -26,6 +26,11 @@ process CLASSIFY_REPEATS {
 
     script:
     """
+    set -euo pipefail
+    if [ ! -s '${families_fa}' ]; then
+        touch ${assembly_id}_curatedRepeats.fasta
+        exit 0
+    fi
     # Reclassify with RepeatClassifier
     RepeatClassifier -consensi ${families_fa}
 

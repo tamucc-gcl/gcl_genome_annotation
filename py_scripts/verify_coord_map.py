@@ -24,7 +24,7 @@ name = None
 seq_len = 0
 
 def check(name, seq_len):
-    parts = name.split("__")
+    parts = name.rsplit("__", 2)
     if len(parts) == 3:
         try:
             expected = int(parts[2]) - int(parts[1]) + 1
@@ -32,7 +32,7 @@ def check(name, seq_len):
             return status, seq_len == expected
         except ValueError:
             pass
-    return "OK(no_range)", True
+    return "MISMATCH(missing_range)", False
 
 with open(adjusted_fa) as fh:
     for line in fh:
