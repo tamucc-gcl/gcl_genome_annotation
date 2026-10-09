@@ -33,12 +33,14 @@ process QC_RNA_RAW {
     tag "${rid}"
     publishDir "${params.outdir}/rna/qc/raw", mode: 'copy', overwrite: true
     input:
-    tuple val(rid), val(request), val(suffixes), path(first, stageAs: "${rid}_raw_R1${suffixes[0]}"), path(second, stageAs: "${rid}_raw_R2${suffixes[1]}")
+    // Dynamic path names are resolved per task in Nextflow 23.10.1. A GString
+    // inside a stageAs option map is evaluated while declaring the process.
+    tuple val(rid), val(request), val(suffixes), path("${rid}_raw_R1${suffixes[0]}"), path("${rid}_raw_R2${suffixes.size() > 1 ? suffixes[1] : '.fastq'}")
     path helper
     output:
     tuple val(rid), path("${rid}_raw"), emit: qc
     script:
-    def reads = [first] + (second instanceof Collection ? second : [second])
+    def reads = (0..<suffixes.size()).collect { "${rid}_raw_R${it + 1}${suffixes[it]}" }
     def inputs = groovy.json.JsonOutput.toJson(reads.collect { it.toString() }).getBytes('UTF-8').encodeBase64().toString()
     """
     python ${helper} qc --request '${request}' --inputs '${inputs}' --outdir ${rid}_raw --threads ${task.cpus}
@@ -65,12 +67,12 @@ process QC_RNA_PROCESSED {
     tag "${rid}"
     publishDir "${params.outdir}/rna/qc/processed", mode: 'copy', overwrite: true
     input:
-    tuple val(rid), val(request), val(suffixes), path(first, stageAs: "${rid}_processed_R1${suffixes[0]}"), path(second, stageAs: "${rid}_processed_R2${suffixes[1]}")
+    tuple val(rid), val(request), val(suffixes), path("${rid}_processed_R1${suffixes[0]}"), path("${rid}_processed_R2${suffixes.size() > 1 ? suffixes[1] : '.fastq'}")
     path helper
     output:
     tuple val(rid), path("${rid}_processed"), emit: qc
     script:
-    def reads = [first] + (second instanceof Collection ? second : [second])
+    def reads = (0..<suffixes.size()).collect { "${rid}_processed_R${it + 1}${suffixes[it]}" }
     def inputs = groovy.json.JsonOutput.toJson(reads.collect { it.toString() }).getBytes('UTF-8').encodeBase64().toString()
     """
     python ${helper} qc --request '${request}' --inputs '${inputs}' --outdir ${rid}_processed --threads ${task.cpus}

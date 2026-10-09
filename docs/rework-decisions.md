@@ -95,3 +95,8 @@ processing inherits configured scratch; shared-path planners remain outside scra
 Python syntax checks passed. Updated RNA and protein handoffs await cluster validation;
 prior acceptance applies to the preceding implementation. Original downstream
 modules remain unchanged and are the starting point for subsequent integration.
+
+The rna_contracts_03 cluster attempt stopped at module parsing: dynamic stageAs
+option strings referenced rid before task inputs were bound. Replaced those
+options with native dynamic path declarations for RNA QC and protein handoffs.
+No RNA tasks ran in that attempt; corrected Nextflow execution remains pending.

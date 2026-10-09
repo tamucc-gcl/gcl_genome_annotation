@@ -36,7 +36,7 @@ process PUBLISH_FAILED_PROTEIN_SOURCE {
     tag "${source_id}"
     publishDir "${params.outdir}/protein_sources", mode: 'symlink', overwrite: true
     input:
-    tuple val(source_id), path(bundle, stageAs: "${source_id}")
+    tuple val(source_id), path("${source_id}")
     output:
     tuple val(source_id), path("${source_id}", includeInputs: true), emit: source
     script:
@@ -49,7 +49,7 @@ process STORE_PROTEIN_SOURCE {
     storeDir "${store_directory}"
     publishDir "${params.outdir}/protein_sources", mode: 'symlink', overwrite: true
     input:
-    tuple val(source_id), val(store_directory), path(bundle, stageAs: "${source_id}")
+    tuple val(source_id), val(store_directory), path("${source_id}")
     output:
     tuple val(source_id), path("${source_id}", includeInputs: true), emit: source
     script:
@@ -60,7 +60,7 @@ process STORE_PROTEIN_SOURCE {
     # storeDir destinations can be new nested paths. Create the parent before
     # Nextflow's stage-out move; otherwise the script can succeed without a stored bundle.
     Path('${store_directory}').mkdir(parents=True, exist_ok=True)
-    source = Path('${bundle}')
+    source = Path('${source_id}')
     assert json.loads((source / 'source.json').read_text())['status'] == 'ready'
     Path('${source_id}/STORE_READY.json').write_text('{"status":"ready","normalization_version":1}\\n')
     PY

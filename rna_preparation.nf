@@ -41,7 +41,7 @@ workflow {
     }
     def qcInput = { stage, rid, manifest, reads ->
         def suffixes = reads.collect { it.name.endsWith('.gz') ? '.fastq.gz' : '.fastq' }
-        tuple(rid, encode([readset_id: rid, stage: stage]), suffixes + ['.fastq'], reads[0], reads.size() == 2 ? reads[1] : [])
+        tuple(rid, encode([readset_id: rid, stage: stage]), suffixes, reads[0], reads.size() == 2 ? reads[1] : [])
     }
     QC_RNA_RAW(rawReads.map { rid, manifest, reads -> qcInput('raw', rid, manifest, reads) }, helper)
     def trimming = rawReads.join(readsets).map { rid, manifest, reads, row ->
