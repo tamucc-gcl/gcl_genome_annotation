@@ -1,4 +1,4 @@
-# Prediction protein preparation (shared-store acceptance pending)
+# Prediction protein preparation (real pilot and stored rerun passed)
 
 `protein_evidence.nf` runs the accepted input preflight, prepares requested protein
 sources, combines them per assembly, writes reports and stops. It does not run RNA
@@ -90,7 +90,7 @@ The user-supplied acceptance.json on 9 October 2026 reports all checks passed:
 unit tests, shared sources, unchanged resume, adding an assembly using existing
 sources, failed-source isolation, and disabled evidence. The blocked case correctly
 exited 1 while its independent assembly completed. Real OrthoDB and NCBI downloads
-and the real-data evidence bundle remain pending.
+and the real-data evidence bundle were subsequently confirmed on the pilot.
 
 ## Personal submission command
 
@@ -174,7 +174,9 @@ acquisition modules already use their shared database parameters with `storeDir`
 All future general database acquisition in the rework must retain persistent,
 version-specific shared storage; assembly-specific results stay in run outputs.
 
-The earlier fixture acceptance remains recorded above. This shared-store extension
-has been source-reviewed and needs a new cluster acceptance run, for example
+The earlier fixture acceptance remains recorded above. The broader shared-store
+synthetic suite has not been confirmed as rerun after its handoff fix, for example
 `--outdir testing/protein_contracts_02`. The fixtures use a temporary project store
 under that testing directory, with no real database downloads.
+
+Real-pilot confirmation on 9 October 2026: the user reported the initial run succeeded. The subsequent annotation-1515087.out and .nextflow_annotation_1515087.log show both sources stored, no acquisitions, and cached combination/report/assertion; the run completed successfully. The earlier failed shared-store synthetic acceptance run has not been confirmed as rerun. Next: [RNA preparation](rna-preparation.md).
