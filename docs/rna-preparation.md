@@ -136,3 +136,5 @@ sheet can run; each will be prepared once. Review `rna/README.md`, the MultiQC
 report and retention numbers. This run stops after RNA preparation. Next comes
 reference/repeat integrity, followed by reference-specific alignment and strand
 resolution before prediction integration.
+
+First cluster attempt on 9 October 2026: the unit suite passed, then Nextflow stopped while creating the acquisition Conda environment before publishing the RNA report. Local inputs now use Python alone; only run-accession inputs install SRA Toolkit. RNA tool environments use version pins with conda-forge ahead of bioconda, and explicit channel overrides exclude inherited/default channels. See [Bioconda setup](https://bioconda.github.io/). The corrected cluster solve and actual-tool acceptance remain pending; use testing/rna_contracts_02 for the next attempt.
