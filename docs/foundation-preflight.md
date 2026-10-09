@@ -52,6 +52,11 @@ Outputs under `annotation_preflight/preflight/`:
 - `README.md`: assembly readiness/mode/reason summary, plus failed RNA inputs.
 - `resolved_inputs.json`: resolved settings, origins, RNA associations, taxonomy lineage, snapshot/rules/sheet checksums and pending-validation labels.
 
+The output bundle itself is named `preflight`; publication targets the output
+root so this directory appears exactly once. Older revisions nested it as
+`preflight/preflight`, which could make a successful run's report appear missing
+to the acceptance runner.
+
 A separate assertion task returns non-success after the report task when any requested input is blocked. Ready assemblies remain listed, but this entry launches no annotation branches. This is not yet the complete runtime failure-isolation implementation. Global malformed/ambiguous tables produce a failed preflight rather than a silently reduced batch.
 
 ## Cluster checks before using the contract downstream

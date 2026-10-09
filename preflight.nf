@@ -4,7 +4,9 @@ nextflow.enable.dsl = 2
 
 process RESOLVE_ANNOTATION_INPUTS {
     cache false  // Also checks original shared-filesystem paths for presence on each invocation.
-    publishDir "${params.outdir}/preflight", mode: 'copy', overwrite: true
+    // The declared output is already a directory named preflight.
+    // Publish the bundle under outdir, yielding outdir/preflight exactly once.
+    publishDir "${params.outdir}", mode: 'copy', overwrite: true
     input:
     val request_base64
     path resolver

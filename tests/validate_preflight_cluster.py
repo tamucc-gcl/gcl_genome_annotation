@@ -54,17 +54,26 @@ def run_case(name, sheet, rna, expected_status, expected_states, folder, tax):
     case = folder / name
     case.mkdir()
     output = case / 'results'
+    output.mkdir()
     command = ['nextflow', '-log', str(case / 'nextflow.log'),
         '-C', str(ROOT / 'conf/preflight.config'), 'run', str(ROOT / 'preflight.nf'),
         '-profile', 'slurm', '-w', str(case / 'work'),
         '--sample_sheet', str(sheet), '--rna_sheet', str(rna),
         '--taxid', '999', '--taxdump_dir', str(tax), '--outdir', str(output),
         '--ref_proteome_accession', 'GCF_024713975.1']
+    (case / 'command.json').write_text(json.dumps(command, indent=2) + '\n')
     print(f'Running {name} (tiny synthetic preflight only)...', flush=True)
     with (case / 'console.log').open('w') as log:
         result = subprocess.run(command, cwd=case, stdout=log, stderr=subprocess.STDOUT)
     report = output / 'preflight'
-    manifest = json.loads((report / 'resolved_inputs.json').read_text())
+    manifest_path = report / 'resolved_inputs.json'
+    if not manifest_path.is_file():
+        console_path = case / 'console.log'
+        tail = '\n'.join(console_path.read_text(errors='replace').splitlines()[-35:])
+        raise RuntimeError(f'{name}: Nextflow exited {result.returncode} without a published manifest. '
+                           f'Inspect {console_path} and {case / "nextflow.log"}.\n'
+                           f'Last console lines:\n{tail}')
+    manifest = json.loads(manifest_path.read_text())
     assert (report / 'README.md').is_file(), f'{name}: published report missing'
     assert manifest['status'] == expected_status, f'{name}: {manifest}'
     assert (result.returncode == 0) == (expected_status == 'ready'), (
