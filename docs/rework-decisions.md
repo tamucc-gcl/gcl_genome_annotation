@@ -52,7 +52,7 @@ The preflight currently resolves settings and file presence only; the legacy
 annotation entry point has not been migrated. Real pilot inputs and personal
 submission scripts are maintained separately in the consuming project repository.
 
-Next: cluster input validation, reference/repeat integrity, RNA preparation and
-protein sources, four-route prediction, model/evidence assessment, final filtering
+Next: finish cluster input-contract acceptance, protein-source preparation, RNA
+preparation, reference/repeat integrity, four-route prediction, model/evidence assessment, final filtering
 and functional/release integration. The native resume dependency checks remain
 required before declaring settings iteration reliable.

@@ -108,7 +108,8 @@ def read_table(path, allowed, required):
             if not any(x.strip() for x in cells):
                 continue
             if len(cells) != len(header):
-                raise ValueError(f'{path}:{reader.line_num}: expected {len(header)} fields')
+                raise ValueError(f'{path}:{reader.line_num}: expected {len(header)} fields, '
+                                 f'found {len(cells)}; check missing/extra commas and CSV quoting')
             rows.append(dict(zip(header, (x.strip() for x in cells))))
     return rows
 
@@ -233,6 +234,7 @@ def resolve_assembly(row, params, tax, rules, sheet_base, launch_base):
             if present(row.get(key)) and sources:
                 raise ValueError(f'{key} explicitly supplied while protein evidence is disabled')
             sources = []
+            origin = 'disabled_by_use_protein_evidence'
         if key == 'protein_fastas':
             base = sheet_base if origin == 'assembly_row' else launch_base
             sources = [readable(x, base) for x in sources]
@@ -246,6 +248,7 @@ def resolve_assembly(row, params, tax, rules, sheet_base, launch_base):
         if present(row.get('orthodb_clade')) and row['orthodb_clade'].lower() != 'none':
             raise ValueError('Explicit OrthoDB request conflicts with disabled protein evidence')
         settings['orthodb_clade'] = 'none'
+        origins['orthodb_clade'] = 'disabled_by_use_protein_evidence'
     elif not clade:
         raise ValueError('Cannot derive OrthoDB partition: correct taxid or override orthodb_clade')
     elif clade != 'none' and clade not in rules['allowed_orthodb_clades']:
@@ -310,6 +313,8 @@ def build_manifest(request, rules):
     launch = Path(request['launch_dir']).resolve()
     assembly_sheet = path_at(request['sample_sheet'], launch)
     rows = read_table(assembly_sheet, ASSEMBLY_FIELDS, ['assembly_id'])
+    if rows and not ({'assembly_fasta', 'assembly_path'} & rows[0].keys()):
+        raise ValueError(f'{assembly_sheet}: required column assembly_fasta (or legacy assembly_path)')
     if not rows:
         raise ValueError('Assembly sheet has no rows')
     rna_sheet = path_at(request['rna_sheet'], launch) if request.get('rna_sheet') else None

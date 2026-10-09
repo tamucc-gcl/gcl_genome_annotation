@@ -28,7 +28,7 @@ For an unmapped telomere motif, provide an override or disable telomere analysis
 
 eggNOG's taxonomic restriction is intentionally unrestricted (`none`) unless overridden. A restriction is not equivalent to the organism's identity: automatically restricting a non-model genome to its own species could defeat the intended homolog search. All resolved settings and origins are saved for review.
 
-## Cluster invocation (not executed during development)
+## Cluster invocation
 
 Run from your project submission directory with its paths available to compute nodes. Supply an existing fixed NCBI taxdump directory containing names.dmp and nodes.dmp, optionally merged.dmp. The resolver records checksums and never downloads or updates the taxonomy snapshot.
 
@@ -63,7 +63,34 @@ python -m unittest discover -s tests -p 'test_annotation_inputs.py'
 
 These tests use tiny synthetic fixtures for precedence, quoted CSV, all four routes, shared RNA, blocked assemblies, source conflicts and nuclear genetic-code selection. Then run the Nextflow preflight on a small real cluster sheet and check global taxid inheritance, row taxid override, row `auto` against global overrides, and missing-taxonomy failures.
 
-No Python tests, Nextflow compilation, workflow execution or biological tools were run locally. This code has received source review only. Validate runtime behavior with the cluster's Nextflow 23.10.1 before adding production stages.
+The user has successfully run the real-data preflight on Nextflow 23.10.1 with
+an assembly, RNA inputs, taxonomy and spike-in accession, reporting `ready` and
+`rna_protein`. A malformed RNA CSV also produced the expected published failure
+report and non-success assertion. This does not validate biological stages.
+
+Complete the remaining foundation acceptance checks from the project root:
+
+```bash
+module load nextflow/23.10.1
+module load miniconda3
+python gcl_genome_annotation/tests/validate_preflight_cluster.py \
+  --outdir testing/preflight_contracts_01
+```
+
+Use a new empty output directory on the shared cluster filesystem. The runner
+first executes the Python contract tests, then submits three tiny Nextflow
+preflights: a ready batch containing all four routes and shared RNA; failed shared
+RNA blocking only its consumers in the manifest; and malformed CSV with a global
+failure. Non-success Nextflow exits in the latter two cases are expected and
+checked. Reports, logs, synthetic inputs and `acceptance.json` are retained.
+It launches no reads processing or annotation tools and leaves the real pilot
+inputs, output directory, submission script and launch history untouched.
+
+Run this controller command inside a cluster allocation if site policy prohibits
+controllers on login nodes. Worker tasks use the existing SLURM preflight config.
+The suite is stdlib-only; the controller needs Python 3.8 or newer. The newly
+expanded tests and runner have received source review only and have not been
+executed locally; their cluster result is the remaining step-1 acceptance gate.
 
 ## Next increment
 
@@ -71,4 +98,8 @@ See the [9 October rework addendum](rework-decisions.md) for the accepted defaul
 filtering policy and simplified checkpoint scope. Real input sheets, cluster paths
 and personal submission scripts belong in the consuming project repository.
 
-After this contract is validated, wire per-assembly settings into reference/repeat preparation and fix the record/coordinate bugs. Resolve each distinct taxonomy identity once, keep species settings out of unrelated read-preprocessing inputs, and pass only stage-relevant values to expensive tasks. Then add protein-source and RNA preparation workflows. The complete design remains in the consolidated build specification supplied with the planning handoff.
+After acceptance passes, implement protein-source preparation, then RNA
+preparation, then reference/repeat integrity, following the revised implementation
+order. Keep species settings out of unrelated read preprocessing and pass only
+stage-relevant values to expensive tasks. The preflight entry remains separate
+until the annotation stages are migrated.
