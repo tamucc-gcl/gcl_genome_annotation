@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "description": "Initial explicit ancestry rules; nearest ancestor wins. BUSCO odb10 matches the existing pipeline generation. Catalogue/tool compatibility must be checked on cluster before production.",
+  "allowed_orthodb_clades": ["Metazoa", "Vertebrata", "Viridiplantae", "Arthropoda", "Fungi", "Alveolata", "Stramenopiles", "Amoebozoa", "Euglenozoa", "Eukaryota"],
+  "orthodb_clade": [
+    {"taxid": "7742", "value": "Vertebrata"},
+    {"taxid": "6656", "value": "Arthropoda"},
+    {"taxid": "33208", "value": "Metazoa"},
+    {"taxid": "33090", "value": "Viridiplantae"},
+    {"taxid": "4751", "value": "Fungi"},
+    {"taxid": "33630", "value": "Alveolata"},
+    {"taxid": "33634", "value": "Stramenopiles"},
+    {"taxid": "554915", "value": "Amoebozoa"},
+    {"taxid": "33682", "value": "Euglenozoa"}
+  ],
+  "busco_lineage": [
+    {"taxid": "7898", "value": "actinopterygii_odb10"},
+    {"taxid": "40674", "value": "mammalia_odb10"},
+    {"taxid": "8782", "value": "aves_odb10"},
+    {"taxid": "7742", "value": "vertebrata_odb10"},
+    {"taxid": "7147", "value": "diptera_odb10"},
+    {"taxid": "7399", "value": "hymenoptera_odb10"},
+    {"taxid": "7088", "value": "lepidoptera_odb10"},
+    {"taxid": "50557", "value": "insecta_odb10"},
+    {"taxid": "6656", "value": "arthropoda_odb10"},
+    {"taxid": "6231", "value": "nematoda_odb10"},
+    {"taxid": "6447", "value": "mollusca_odb10"},
+    {"taxid": "33208", "value": "metazoa_odb10"},
+    {"taxid": "4751", "value": "fungi_odb10"},
+    {"taxid": "3193", "value": "embryophyta_odb10"},
+    {"taxid": "2759", "value": "eukaryota_odb10"}
+  ],
+  "telomere_motif": [
+    {"taxid": "7742", "value": "TTAGGG"}
+  ]
+}

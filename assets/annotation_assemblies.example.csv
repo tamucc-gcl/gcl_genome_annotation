@@ -1,0 +1,6 @@
+assembly_id,assembly_fasta,taxid,rna_readsets,use_protein_evidence,orthodb_clade,protein_fastas,min_contig_length
+sample_hap1,assemblies/hap1.fa,,liver_run1,true,auto,proteomes/relative.faa,1000
+sample_hap2,assemblies/hap2.fa,,liver_run1,true,auto,proteomes/relative.faa,1000
+protein_only,assemblies/other.fa,,,true,auto,none,1000
+rna_only,assemblies/rna_only.fa,,liver_run1,false,none,none,1000
+genome_only,assemblies/genome_only.fa,,,false,none,none,0

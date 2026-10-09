@@ -2,8 +2,8 @@ library(tidyverse)
 library(rtracklayer)
 library(S4Vectors)
 
-gff <- rtracklayer::import("results/<assembly_id>.annotated.gff3")
-annot <- readr::read_tsv("results/<assembly_id>.functional_annotations.tsv")
+gff <- rtracklayer::import("~/../Downloads/Sde-CMat_203_hap2.annotated.gff3")
+annot <- readr::read_tsv("~/../Downloads/Sde-CMat_203_hap2.functional_annotations.tsv")
 
 mrna_ids <- gff[gff$type == "mRNA"] |>
   mcols() |>

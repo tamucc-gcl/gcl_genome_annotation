@@ -1,0 +1,2 @@
+readset_id,library_id,sample_id,tissue,layout,fastq_1,fastq_2,run_accession,strandedness
+liver_run1,liver_library,donor,liver,paired,reads/liver_R1.fastq.gz,reads/liver_R2.fastq.gz,,
