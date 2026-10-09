@@ -58,10 +58,12 @@ This supplements the successful real-data preflight. Read contents, source
 acquisition and biological stages remain outside this acceptance scope.
 
 Protein-source preparation is now implemented as a separate entry point, with
-cluster acceptance pending. See [protein evidence](protein-evidence.md) for tests
-and the real-download pilot. Next after acceptance: RNA
+synthetic cluster acceptance passed on 9 October 2026 (user-supplied acceptance.json). See [protein evidence](protein-evidence.md) for tests
+and the real-download pilot. Next: real protein-source acquisition on the pilot, then RNA
 preparation, reference/repeat integrity, four-route prediction, model/evidence assessment, final filtering
 and functional/release integration. The native resume dependency checks remain
 required before declaring settings iteration reliable.
 
-All pipeline parameter defaults, process environments/resources, execution profiles and reports now live in the root nextflow.config. Stage-specific config files have been removed. Species-dependent defaults are unset for taxonomy resolution; the preflight contig default is 1,000 bp. The legacy main.nf entry now reads its defaults from that same config; legacy runs must explicitly provide species settings because that entry does not yet consume the taxonomy-resolved manifest. Configuration consolidation still requires cluster acceptance.
+All pipeline parameter defaults, process environments/resources, execution profiles and reports now live in the root nextflow.config. Stage-specific config files have been removed. Species-dependent defaults are unset for taxonomy resolution; the preflight contig default is 1,000 bp. The legacy main.nf entry now reads its defaults from that same config; legacy runs must explicitly provide species settings because that entry does not yet consume the taxonomy-resolved manifest. The shared-config protein fixture suite passed on the cluster, including native resume and adding an assembly. Real network acquisitions remain pending.
+
+General databases must persist in shared, version-specific storeDir locations and be reused by fresh runs and different projects when the required validated source exists. Protein preparation now stores OrthoDB bundles under orthodb_database/validated/odb12/normalization-v1; exact-accession spike-ins/local proteins use a project-level protein_source_store. Failed sources are never promoted. Existing completed source bundles can be imported without another download. This extension requires a fresh cluster acceptance run, including reuse without -resume.

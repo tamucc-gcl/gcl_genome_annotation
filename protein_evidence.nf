@@ -2,7 +2,7 @@
 // Input preflight + prediction protein preparation only. No RNA, repeats or BRAKER.
 nextflow.enable.dsl = 2
 include { RESOLVE_ANNOTATION_INPUTS; ASSERT_ANNOTATION_INPUTS } from './modules/annotationInputs.nf'
-include { PLAN_PROTEIN_EVIDENCE; ACQUIRE_PROTEIN_SOURCE; COMBINE_PROTEIN_EVIDENCE; REPORT_PROTEIN_EVIDENCE; ASSERT_PROTEIN_EVIDENCE } from './modules/proteinEvidence.nf'
+include { PLAN_PROTEIN_EVIDENCE; ACQUIRE_PROTEIN_SOURCE; PUBLISH_FAILED_PROTEIN_SOURCE; STORE_PROTEIN_SOURCE; COMBINE_PROTEIN_EVIDENCE; REPORT_PROTEIN_EVIDENCE; ASSERT_PROTEIN_EVIDENCE } from './modules/proteinEvidence.nf'
 
 workflow {
     if (!params.sample_sheet) error 'Provide --sample_sheet'
@@ -17,6 +17,7 @@ workflow {
     ASSERT_ANNOTATION_INPUTS(RESOLVE_ANNOTATION_INPUTS.out.bundle)
     PLAN_PROTEIN_EVIDENCE(RESOLVE_ANNOTATION_INPUTS.out.bundle, ASSERT_ANNOTATION_INPUTS.out,
         encode([launch_dir: launchDir.toString(), orthodb_database: params.orthodb_database?.toString(),
+                protein_source_store: params.protein_source_store?.toString(),
                 published_sources: "${params.outdir}/protein_sources"]), helper,
         file("${projectDir}/assets/orthodb_sources.json", checkIfExists: true))
 
@@ -33,8 +34,30 @@ workflow {
             tuple(assembly.assembly_id, encode(assembly))
         }
     }
-    ACQUIRE_PROTEIN_SOURCE(plan_sources, helper)
-    def sources = ACQUIRE_PROTEIN_SOURCE.out.source.map { sid, bundle -> bundle }.toList()
+    def routed = plan_sources.branch {
+        stored: new groovy.json.JsonSlurper().parseText(new String(it[1].decodeBase64(), 'UTF-8')).stored_path
+        acquire: true
+    }
+    ACQUIRE_PROTEIN_SOURCE(routed.acquire, helper)
+    def existing = routed.stored.map { sid, encoded, inputs ->
+        def spec = new groovy.json.JsonSlurper().parseText(new String(encoded.decodeBase64(), 'UTF-8'))
+        tuple(sid, file(spec.stored_path, checkIfExists: true))
+    }
+    def resolved = ACQUIRE_PROTEIN_SOURCE.out.source.mix(existing).branch {
+        ready: new groovy.json.JsonSlurper().parse(new File("${it[1]}/source.json")).status == 'ready'
+        failed: true
+    }
+    def stores = resolved.ready.map { sid, bundle ->
+        // Store placement is transport metadata, independent of source identity.
+        def plans = new groovy.json.JsonSlurper().parse(new File("${bundle}/request.json"))
+        def root = plans.kind == 'orthodb' ?
+            "${params.orthodb_database}/validated/${plans.release}/normalization-v1" :
+            "${params.protein_source_store}/normalization-v1"
+        tuple(sid, file(root).toString(), bundle)
+    }
+    STORE_PROTEIN_SOURCE(stores)
+    PUBLISH_FAILED_PROTEIN_SOURCE(resolved.failed)
+    def sources = STORE_PROTEIN_SOURCE.out.source.mix(PUBLISH_FAILED_PROTEIN_SOURCE.out.source).map { sid, bundle -> bundle }.toList()
     // Only each assembly's requested bundles enter its combination/cache identity.
     def combinations = plan_assemblies.combine(sources.map { bundles -> [bundles] }).map { aid, encoded, bundles ->
         def assembly = new groovy.json.JsonSlurper().parseText(new String(encoded.decodeBase64(), 'UTF-8'))

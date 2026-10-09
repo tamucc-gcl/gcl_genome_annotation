@@ -12,7 +12,8 @@ from validate_preflight_cluster import fixtures, table
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def run_case(folder, fixture_dir, name, sheet, expected, source_count, resume=False, added=0):
+def run_case(folder, fixture_dir, name, sheet, expected, source_count, resume=False, added=0, reused=False,
+             acquisitions=None):
     case = folder / name
     case.mkdir(exist_ok=True)
     output = case / 'results'
@@ -22,6 +23,7 @@ def run_case(folder, fixture_dir, name, sheet, expected, source_count, resume=Fa
         '-C', str(ROOT / 'nextflow.config'), 'run', str(ROOT / 'protein_evidence.nf'),
         '-profile', 'slurm', '-w', str(case / 'work'), '--sample_sheet', str(fixture_dir / sheet),
         '--taxid', '999', '--taxdump_dir', str(fixture_dir / 'taxdump'), '--outdir', str(output)]
+    command += ['--protein_source_store', str(folder / 'project_source_store')]
     if resume:
         command.append('-resume')
     print(f'Running {name} ({suffix}; local synthetic proteins only)...', flush=True)
@@ -47,9 +49,16 @@ def run_case(folder, fixture_dir, name, sheet, expected, source_count, resume=Fa
     with (output / 'pipeline/pipeline_trace.txt').open() as handle:
         trace = list(csv.DictReader(handle, delimiter='\t'))
     sources = [row for row in trace if row['name'].startswith('ACQUIRE_PROTEIN_SOURCE')]
-    assert len(sources) == source_count, f'{name}: acquisition task count differs from unique sources'
+    if reused or resume:
+        assert not sources, 'Stored sources were reacquired'
+    else:
+        expected_acquisitions = source_count if acquisitions is None else acquisitions
+        assert len(sources) == expected_acquisitions, f'{name}: unexpected acquisition task count'
+    if reused or resume:
+        stores = [row for row in trace if row['name'].startswith('STORE_PROTEIN_SOURCE')]
+        assert len(stores) == source_count, 'Missing stored sources'
+        assert all(row['status'] in ('STORED', 'CACHED') for row in stores), 'Stored sources were copied again'
     if resume:
-        assert all(row['status'] == 'CACHED' for row in sources), 'Unchanged source acquisitions were not cached'
         combines = [row for row in trace if row['name'].startswith('COMBINE_PROTEIN_EVIDENCE')]
         assert len(combines) == len(expected), 'Missing per-assembly combination task'
         assert sum(row['status'] == 'CACHED' for row in combines) == len(expected) - added, (
@@ -108,10 +117,18 @@ def main():
         summary['checks'].append(run_case(folder, fixture_dir, 'ready', 'ready_proteins.csv', ready, 2, resume=True))
         summary['checks'].append(run_case(folder, fixture_dir, 'ready', 'added_proteins.csv',
             {**ready, 'C': 'ready'}, 2, resume=True, added=1))
+        # New launch directory, work directory and outdir; no -resume.
+        summary['checks'].append(run_case(folder, fixture_dir, 'fresh_store_reuse',
+            'ready_proteins.csv', ready, 2, reused=True))
         summary['checks'].append(run_case(folder, fixture_dir, 'blocked', 'blocked_proteins.csv',
-            {'bad_a': 'blocked', 'bad_b': 'blocked', 'independent': 'ready'}, 2))
+            {'bad_a': 'blocked', 'bad_b': 'blocked', 'independent': 'ready'}, 2, acquisitions=1))
         summary['checks'].append(run_case(folder, fixture_dir, 'disabled', 'disabled_proteins.csv',
             {'disabled': 'not_requested'}, 0))
+        stored = list((folder / 'project_source_store/normalization-v1').glob('*/source.json'))
+        assert len(stored) == 2, 'Failed acquisition was added to the permanent store'
+        assert all(json.loads(path.read_text())['status'] == 'ready' for path in stored)
+        assert all((path.parent / 'STORE_READY.json').is_file() for path in stored)
+        summary['checks'].append({'case': 'only_ready_sources_stored', 'passed': True})
         summary['status'] = 'passed'
     except (OSError, ValueError, AssertionError, RuntimeError) as exc:
         summary['error'] = str(exc)

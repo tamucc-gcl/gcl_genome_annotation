@@ -18,7 +18,6 @@ process PLAN_PROTEIN_EVIDENCE {
 process ACQUIRE_PROTEIN_SOURCE {
     tag "${source_id}"
     label 'protein_source'
-    publishDir "${params.outdir}/protein_sources", mode: 'copy', overwrite: true
     input:
     tuple val(source_id), val(spec_base64), path(local_inputs, stageAs: 'input/*')
     path helper
@@ -30,6 +29,44 @@ process ACQUIRE_PROTEIN_SOURCE {
     """
     python -c "import base64; open('source_request.json','wb').write(base64.b64decode('${spec_base64}'))"
     python ${helper} acquire --spec source_request.json --staged-base64 '${staged}' --outdir ${source_id}
+    """
+}
+
+process PUBLISH_FAILED_PROTEIN_SOURCE {
+    tag "${source_id}"
+    publishDir "${params.outdir}/protein_sources", mode: 'symlink', overwrite: true
+    input:
+    tuple val(source_id), path(bundle, stageAs: 'incoming/*')
+    output:
+    tuple val(source_id), path("${source_id}"), emit: source
+    script:
+    """
+    python - <<'PY'
+    from pathlib import Path
+    Path('${source_id}').symlink_to(Path('${bundle}').resolve(), target_is_directory=True)
+    PY
+    """
+}
+
+// Only successful acquisitions reach this process; failed bundles are never stored.
+process STORE_PROTEIN_SOURCE {
+    tag "${source_id}"
+    storeDir "${store_directory}"
+    publishDir "${params.outdir}/protein_sources", mode: 'symlink', overwrite: true
+    input:
+    tuple val(source_id), val(store_directory), path(bundle, stageAs: 'incoming/*')
+    output:
+    tuple val(source_id), path("${source_id}"), emit: source
+    script:
+    """
+    python - <<'PY'
+    import json, shutil
+    from pathlib import Path
+    source = Path('${bundle}')
+    assert json.loads((source / 'source.json').read_text())['status'] == 'ready'
+    shutil.copytree(source, '${source_id}')
+    Path('${source_id}/STORE_READY.json').write_text('{"status":"ready","normalization_version":1}\\n')
+    PY
     """
 }
 

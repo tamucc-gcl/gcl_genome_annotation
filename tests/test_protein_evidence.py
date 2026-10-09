@@ -174,6 +174,41 @@ class ProteinTests(unittest.TestCase):
         self.assertEqual(retry['sources'][0]['source_id'], first['sources'][0]['source_id'])
         self.assertIn('retry_nonce', retry['sources'][0])
 
+    def test_shared_store_survives_new_run_and_detects_tampering(self):
+        cache = self.base / 'general_database'
+        cache.mkdir()
+        archive = cache / 'Vertebrata.fa.gz'
+        with gzip.open(archive, 'wt') as handle:
+            handle.write('>ortho\nMPEPTIDE\n')
+        self.catalogue['partitions']['Vertebrata'] = proteins.checksum(archive, 'md5')
+        options = {'orthodb_database': str(cache), 'launch_dir': str(self.base)}
+        row = self.row(protein_fastas=[], orthodb_clade='Vertebrata')
+        first = self.plan([row], **options)
+        _, source = self.source(first['sources'][0])
+        bundle = self.base / 'sources' / source['source_id']
+        store = Path(first['sources'][0]['store_dir']) / source['source_id']
+        store.parent.mkdir(parents=True)
+        import shutil
+        shutil.copytree(bundle, store)
+        proteins.write_json(store / 'STORE_READY.json', {'status': 'ready'})
+        archive.unlink()  # Reuse cannot depend on the original archive shortcut.
+        second = self.plan([row, self.row('B', protein_fastas=[], orthodb_clade='Vertebrata')],
+                           name='different_project', **options)
+        self.assertEqual(len(second['sources']), 1)
+        self.assertEqual(second['sources'][0]['source_id'], source['source_id'])
+        self.assertEqual(second['sources'][0]['stored_path'], str(store.resolve()))
+        (store / 'proteins.fa').write_text('>tampered\nMK\n')
+        with self.assertRaisesRegex(ValueError, 'checksum mismatch'):
+            self.plan([row], name='tampered_store', **options)
+
+    def test_completed_run_bundle_is_imported_without_redownload(self):
+        options = {'protein_source_store': str(self.base / 'project_store'), 'launch_dir': str(self.base)}
+        first = self.plan([self.row()], **options)
+        directory, result = self.source(first['sources'][0])
+        second = self.plan([self.row()], name='import_plan', published_sources=str(directory), **options)
+        self.assertEqual(second['sources'][0]['stored_path'], str((directory / result['source_id']).resolve()))
+        self.assertFalse(Path(second['sources'][0]['store_dir']).exists())
+
     def test_summary_accounts_for_disabled_and_blocked(self):
         plan = self.plan([self.row('disabled', use_protein_evidence=False), self.row('blocked')])
         directories = []

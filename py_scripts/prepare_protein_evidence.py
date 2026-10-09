@@ -36,6 +36,18 @@ def read_json(path):
     return json.loads(Path(path).read_text(encoding='utf-8'))
 
 
+def validate_bundle(bundle, source_id):
+    bundle = Path(bundle)
+    stored = read_json(bundle / 'source.json')
+    if stored['status'] != 'ready' or stored['source_id'] != source_id:
+        raise ValueError(f'Invalid protein store bundle: {bundle}')
+    for filename, key in ((stored['raw_file'], 'raw_sha256'),
+                          ('proteins.fa', 'proteins_sha256'), ('id_map.tsv', 'id_map_sha256')):
+        if not (bundle / filename).is_file() or checksum(bundle / filename) != stored[key]:
+            raise ValueError(f'Protein store checksum mismatch: {bundle / filename}')
+    return stored
+
+
 def plan(manifest, catalogue, options, outdir):
     if manifest['status'] != 'ready':
         raise ValueError('Protein preparation requires a ready input preflight')
@@ -57,7 +69,8 @@ def plan(manifest, catalogue, options, outdir):
         digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
         spec['source_id'] = 'p' + digest[:24]
         if spec['source_id'] in sources:
-            previous = {k: v for k, v in sources[spec['source_id']].items() if k != 'retry_nonce'}
+            previous = {k: v for k, v in sources[spec['source_id']].items()
+                        if k not in ('retry_nonce', 'store_dir', 'stored_path')}
             if previous != spec:
                 raise ValueError('Inconsistent source identity')
             return spec['source_id']
@@ -69,6 +82,32 @@ def plan(manifest, catalogue, options, outdir):
                 # task identity on resume; successfully acquired sources stay cached.
                 spec['retry_nonce'] = datetime.now(timezone.utc).isoformat()
         sources[spec['source_id']] = spec
+        if spec['kind'] == 'orthodb':
+            root = options.get('orthodb_database')
+            if not root:
+                raise ValueError('Provide --orthodb_database for the shared OrthoDB store')
+            store = Path(root).expanduser() / 'validated' / spec['release'] / 'normalization-v1'
+        else:
+            root = options.get('protein_source_store')
+            store = Path(root).expanduser() / 'normalization-v1' if root else None
+        if store is not None:
+            if not store.is_absolute():
+                store = Path(options['launch_dir']) / store
+            spec['store_dir'] = str(store.resolve())
+            bundle = store / spec['source_id']
+            if bundle.exists():
+                metadata = bundle / 'source.json'
+                if not metadata.is_file() or not (bundle / 'STORE_READY.json').is_file():
+                    raise ValueError(f'Incomplete protein store bundle: {bundle}; move it aside before retrying')
+                validate_bundle(bundle, spec['source_id'])
+                spec['stored_path'] = str(bundle.resolve())
+            elif published:
+                # Import a completed source from the earlier per-run implementation,
+                # preserving its validated archive rather than downloading it again.
+                previous = Path(published) / spec['source_id']
+                if (previous / 'source.json').is_file() and read_json(previous / 'source.json')['status'] == 'ready':
+                    validate_bundle(previous, spec['source_id'])
+                    spec['stored_path'] = str(previous.resolve())
         return spec['source_id']
 
     for row in manifest['assemblies']:
