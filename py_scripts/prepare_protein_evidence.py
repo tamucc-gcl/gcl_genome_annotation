@@ -101,13 +101,6 @@ def plan(manifest, catalogue, options, outdir):
                     raise ValueError(f'Incomplete protein store bundle: {bundle}; move it aside before retrying')
                 validate_bundle(bundle, spec['source_id'])
                 spec['stored_path'] = str(bundle.resolve())
-            elif published:
-                # Import a completed source from the earlier per-run implementation,
-                # preserving its validated archive rather than downloading it again.
-                previous = Path(published) / spec['source_id']
-                if (previous / 'source.json').is_file() and read_json(previous / 'source.json')['status'] == 'ready':
-                    validate_bundle(previous, spec['source_id'])
-                    spec['stored_path'] = str(previous.resolve())
         return spec['source_id']
 
     for row in manifest['assemblies']:

@@ -165,9 +165,8 @@ launching elsewhere. The spike-in identity includes its exact accession; local
 FASTA identities include their path and content checksum. These sources need not
 be shared among unrelated projects.
 
-Completed, validated source bundles from the earlier implementation are imported
-from the existing output directory into the permanent store on the first rerun.
-Keep that output and its work files intact until promotion completes. The old
+The normal run downloads missing validated sources and stores them permanently.
+One-time imports of earlier per-run downloads are not implemented. The old
 unversioned `<clade>.fa` files are not relabeled as odb12 or overwritten.
 
 The existing Dfam, Rfam, BUSCO, OMArk, InterProScan, eggNOG, DIAMOND and Kofam

@@ -201,14 +201,6 @@ class ProteinTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'checksum mismatch'):
             self.plan([row], name='tampered_store', **options)
 
-    def test_completed_run_bundle_is_imported_without_redownload(self):
-        options = {'protein_source_store': str(self.base / 'project_store'), 'launch_dir': str(self.base)}
-        first = self.plan([self.row()], **options)
-        directory, result = self.source(first['sources'][0])
-        second = self.plan([self.row()], name='import_plan', published_sources=str(directory), **options)
-        self.assertEqual(second['sources'][0]['stored_path'], str((directory / result['source_id']).resolve()))
-        self.assertFalse(Path(second['sources'][0]['store_dir']).exists())
-
     def test_summary_accounts_for_disabled_and_blocked(self):
         plan = self.plan([self.row('disabled', use_protein_evidence=False), self.row('blocked')])
         directories = []
