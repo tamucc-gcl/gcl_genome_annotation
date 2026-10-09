@@ -267,6 +267,20 @@ class InputTests(unittest.TestCase):
         self.assertEqual(result['settings']['genetic_code'], 1)
         self.assertEqual(result['settings']['orthodb_clade'], 'Vertebrata')
         self.assertEqual(result['settings']['busco_lineage'], 'actinopterygii_odb10')
+        self.assertEqual(result['settings']['taxa_name'], 'Actinopterygii')
+        self.assertEqual(result['settings']['taxid'], '999')
+        self.assertEqual(result['origins']['taxa_name'], 'taxonomy')
+        self.params['taxa_name'] = 'Vertebrata'
+        override = resolver.resolve_assembly(row, self.params, tax, self.rules, self.base, self.base)
+        self.assertEqual(override['settings']['taxa_name'], 'Vertebrata')
+        self.assertEqual(override['settings']['taxid'], '999')
+        override = resolver.resolve_assembly(dict(row, taxa_name='Mammalia'), self.params, tax,
+                                             self.rules, self.base, self.base)
+        self.assertEqual(override['settings']['taxa_name'], 'Mammalia')
+        override = resolver.resolve_assembly(dict(row, taxa_name='auto'), self.params, tax,
+                                             self.rules, self.base, self.base)
+        self.assertEqual(override['settings']['taxa_name'], 'Actinopterygii')
+        self.params['taxa_name'] = 'auto'
         self.params['busco_lineage'] = 'global_override'
         result = resolver.resolve_assembly(row, self.params, tax, self.rules, self.base, self.base)
         self.assertEqual(result['settings']['busco_lineage'], 'global_override')

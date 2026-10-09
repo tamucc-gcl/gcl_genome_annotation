@@ -179,8 +179,8 @@ workflow {
     def legacy_taxon_key = 'taxon_' + java.security.MessageDigest.getInstance('SHA-256')
         .digest(params.taxa_name.toString().getBytes('UTF-8')).encodeHex().toString().substring(0, 20)
     CURATE_DFAM(DOWNLOAD_DFAM_DB.out.dfam_db_dir.map { folder -> tuple(legacy_taxon_key, params.taxa_name, folder) })
-    ch_dfam_library = CURATE_DFAM.out.bundle.map { key, folder -> file("${folder}/dfam_subset.lib") }.first()
-    ch_dfam_source = CURATE_DFAM.out.bundle.map { key, folder -> file("${folder}/dfam_subset.source.json") }.first()
+    ch_dfam_library = CURATE_DFAM.out.bundle.map { key, folder -> file("${folder}/dfam_subset.lib") }
+    ch_dfam_source = CURATE_DFAM.out.bundle.map { key, folder -> file("${folder}/dfam_subset.source.json") }
 
     // ── Step 1: De novo repeat modeling (per genome) ─────────────────────────
     REPEAT_MODEL(ch_assemblies_filtered.combine(ch_dfam_source), params.repeat_seed)
@@ -203,9 +203,9 @@ workflow {
     //   Repeats hitting only SwissProt above threshold → gene-derived → removed
     FILTER_REPEAT_LIBRARY(
         RECLASSIFY_REPEATS.out.reclassified_lib,
-        DOWNLOAD_DIAMOND_DB.out.diamond_db.first(),
-        EXTRACT_REPEAT_PEPS.out.repeat_peps.first(),
-        INDEX_REPEAT_PEPS.out.index.map { key, db, source -> db }.first())
+        DOWNLOAD_DIAMOND_DB.out.diamond_db,
+        EXTRACT_REPEAT_PEPS.out.repeat_peps,
+        INDEX_REPEAT_PEPS.out.index.map { key, db, source -> db })
 
     // ── Step 5: Mask genome with combined libraries (per genome) ─────────────
     // Join assembly path back with filtered repeats on assembly_id

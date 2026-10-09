@@ -45,6 +45,23 @@ uses `diamond/swissprot.dmnd`. It does not download replacement databases or cop
 the full FamDB database into the project. Override the general protein index with
 `--repeat_filter_database /path/to/custom.dmnd` when needed.
 
+Automatic Dfam selection uses the closest ancestry group in
+`assets/taxonomy_rules.json`, rather than assuming that Dfam contains the exact
+NCBI species. For Paralichthys lethostigma (141886), this selects Actinopterygii;
+species identity remains 141886. An explicit global or assembly-row `taxa_name`
+still overrides this choice, including a more specific group supported by the
+installed release. Extraction must produce a nonempty library; this is not an
+automatic runtime search through progressively broader taxa.
+
+The first real pilot stopped at Dfam extraction because 141886 was absent from
+its taxonomy. RepeatModeler depends on successful extraction in this entry, so
+the failure preceded modelling. This ancestry-default correction has static
+checks and extended precedence assertions; cluster validation remains pending.
+Restart with the existing sbatch and `-resume`. Keep the work directory and
+Nextflow cache: changes to the input planner do not force reference tasks with
+unchanged scientific inputs to rerun. Any explicit `taxa_name=141886` override
+must instead be cleared or changed to Actinopterygii.
+
 Taxon subsets are native storeDir outputs under
 `dfam/subsets/dfam39/tetools-1.95/taxon_<taxonomy-hash>/`. The subset is checksummed;
 FamDB release, partition inventory/sizes and native information output are recorded.
@@ -111,22 +128,22 @@ invalidate the filtering/masking descendants. Shared stores also work without
 
 ## Cluster acceptance and real pilot
 
-Implementation and static syntax checks are complete; runtime acceptance is pending.
-The first cluster attempt passed Python contracts but stopped during module
-compilation on an unescaped Python regex dollar anchor in the Groovy script.
-That anchor now uses Python's `\Z` end-of-string form. A static interpolation audit
-passed across all 13 imported process modules; a regression check now covers the
-stage's include tree. No scientific tasks ran in that attempt, and corrected
-Nextflow execution remains pending.
-The second attempt reached the masking merge but failed because its TEtools
-container provides `python3`, not `python`. Merge helper calls and the Dfam
-extraction validator now use `python3`; other TEtools stage tasks were checked
-for the same mismatch. Corrected cluster execution remains pending.
-Run from the consuming project root after syncing the pipeline:
+Cluster fixture acceptance passed on 9 October 2026 under Nextflow 23.10.1 in
+`testing/reference_repeat_contracts_03` (user-supplied console output and
+`acceptance.json`). Python contracts, fresh actual masking, unchanged resume,
+adding an assembly, invalid-reference isolation and invalid-library blocking all
+passed. Fresh/resume/added checks include exact comparison against unsplit masking.
+The blocked cases returned the expected exit 1; these are successful safety checks.
+This acceptance covers reference integrity and custom-library masking, not de novo
+discovery, classification or protein filtering. Earlier regex interpolation and
+container interpreter errors are fixed; the successful run exercised the corrected
+merge. The Dfam extraction branch remains for the real pilot.
+
+To repeat acceptance, run from the consuming project root with a new empty directory:
 
 ```bash
 python gcl_genome_annotation/tests/validate_reference_repeats_cluster.py \
-  --outdir testing/reference_repeat_contracts_01
+  --outdir testing/reference_repeat_contracts_04
 ```
 
 Use an empty output directory. This runs all Python contract tests and actual
@@ -143,7 +160,7 @@ route, not fake discovery acceptance. `--repeat_mask_benchmark true` additionall
 compares parallel masking with one whole-reference batch; leave it false for the
 large real run to avoid duplicate masking.
 
-After fixture acceptance, change only the pipeline entry in the personal sbatch
+With fixture acceptance passed, change only the pipeline entry in the personal sbatch
 Nextflow command from `rna_preparation.nf` to `reference_repeats.nf`, retaining its
 sample sheet, taxonomy/database arguments, testing outdir, profile and `-resume`.
 Do not pass the synthetic `repeat_library` or benchmark option for the real pilot.

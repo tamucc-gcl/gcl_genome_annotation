@@ -23,6 +23,8 @@ General database downloads use persistent shared stores; spike-in proteins use a
 
 [Reference and repeat preparation](docs/reference-repeats.md) is implemented in
 reference_repeats.nf, reusing the existing scientific modules with reference identity,
-record-safe curation, shared database reuse and whole-contig masking repairs. Static
-checks are complete; cluster fixture acceptance and the real discovery/masking pilot
-remain pending. This entry stops before alignment and prediction.
+record-safe curation, shared database reuse and whole-contig masking repairs. Cluster
+fixture acceptance passed on Nextflow 23.10.1, including actual custom-library masking,
+unsplit comparison, resume, adding an assembly and invalid-input blocking. The real
+discovery/classification/filtering pilot remains pending. This entry stops before
+alignment and prediction.

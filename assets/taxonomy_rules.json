@@ -32,5 +32,16 @@
   ],
   "telomere_motif": [
     {"taxid": "7742", "value": "TTAGGG"}
+  ],
+  "taxa_name": [
+    {"taxid": "7898", "value": "Actinopterygii"},
+    {"taxid": "40674", "value": "Mammalia"},
+    {"taxid": "8782", "value": "Aves"},
+    {"taxid": "7742", "value": "Vertebrata"},
+    {"taxid": "6656", "value": "Arthropoda"},
+    {"taxid": "33208", "value": "Metazoa"},
+    {"taxid": "33090", "value": "Viridiplantae"},
+    {"taxid": "4751", "value": "Fungi"},
+    {"taxid": "2759", "value": "Eukaryota"}
   ]
 }

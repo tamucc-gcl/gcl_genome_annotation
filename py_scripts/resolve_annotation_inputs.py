@@ -189,8 +189,8 @@ def derive(key, taxon, rules):
         return taxon['species']
     if key == 'genetic_code':
         return taxon['genetic_code']
-    if key == 'taxa_name':
-        return taxon['taxid']  # Dfam accepts a taxonomy ID; no invented clade name.
+    # Dfam's release-specific taxonomy may omit the species. Select an explicit
+    # ancestry group from the catalogue for its repeat-library search instead.
     # eggNOG taxonomic restriction is a deliberate biological override, not species identity.
     if key == 'eggnog_taxid':
         return 'none'

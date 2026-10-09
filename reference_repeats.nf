@@ -83,8 +83,9 @@ workflow {
         INDEX_REPEAT_PEPS(EXTRACT_REPEAT_PEPS.out.repeat_peps.map { path ->
             tuple('repeat_peps_' + java.security.MessageDigest.getInstance('SHA-256').digest(path.bytes).encodeHex().toString(), path)
         })
-        FILTER_REPEAT_LIBRARY(classified, generalDb, EXTRACT_REPEAT_PEPS.out.repeat_peps.first(),
-            INDEX_REPEAT_PEPS.out.index.map { key, db, source -> db }.first())
+        // No-input acquisition and its mapped index already emit reusable value channels.
+        FILTER_REPEAT_LIBRARY(classified, generalDb, EXTRACT_REPEAT_PEPS.out.repeat_peps,
+            INDEX_REPEAT_PEPS.out.index.map { key, db, source -> db })
         COMBINE_REPEAT_LIBS(FILTER_REPEAT_LIBRARY.out.filtered_lib.join(dfamByAssembly).map { aid, library, dfamLib, source ->
             tuple(aid, library, dfamLib)
         })

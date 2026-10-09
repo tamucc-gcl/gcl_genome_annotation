@@ -19,7 +19,7 @@ Derived settings:
 | Scientific name | NCBI scientific name for the effective node |
 | OrthoDB partition | Closest matching ancestor in `assets/taxonomy_rules.json`; no automatic Eukaryota fallback |
 | BUSCO lineage | Closest mapped ancestor; initial mapping targets odb10, matching the legacy pipeline generation |
-| Dfam selection (`taxa_name`) | Effective taxonomy ID |
+| Dfam selection (`taxa_name`) | Nearest ancestry group in the catalogue; ray-finned fish use Actinopterygii |
 | Nuclear genetic code | Nuclear field in nodes.dmp, following its inheritance flag; not the mitochondrial code |
 | Telomere motif | Conservative curated mapping; initial automatic coverage is vertebrates only |
 | OMArk organism identity | Effective taxid |

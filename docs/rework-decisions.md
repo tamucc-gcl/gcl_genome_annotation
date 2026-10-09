@@ -124,6 +124,20 @@ contracts, record-safe repeat filtering, whole-contig batches, exact reconstruct
 linkage/GFF integrity and overlap-aware coverage. Existing Dfam 3.9 partitions,
 SwissProt DIAMOND and RepeatPeps are reused; taxon subsets and derived RepeatPeps
 indices use shared stores. Tool pins, including the repaired Terrier environment,
-are described in docs/reference-repeats.md. Static checks are complete. Actual
-RepeatMasker fixture acceptance and the full real-data discovery pilot remain
-pending; no scientific acceptance is claimed from implementation or syntax checks.
+are described in docs/reference-repeats.md. Cluster fixture acceptance passed on
+9 October 2026 under Nextflow 23.10.1 in testing/reference_repeat_contracts_03
+(user-supplied acceptance.json): Python contracts, actual custom-library masking
+with unsplit comparison, unchanged resume, adding an assembly, independent valid
+reference completion despite an invalid reference, and invalid-library blocking.
+The two blocked cases returned the expected exit 1. This accepts reference integrity
+and the custom-library masking route. Full real-data discovery, classification,
+protein filtering, shared repeat-database stores and repeat biology remain pending
+the flounder pilot; fixture acceptance does not imply those branches were exercised.
+
+The first real repeat pilot stopped at CURATE_DFAM because species taxid 141886
+was not present in the Dfam taxonomy. The automatic taxa_name default now selects
+the nearest ancestry group from the explicit catalogue (Actinopterygii for this
+flounder), retaining the effective species taxid. Explicit global/row choices still
+override it. RepeatModeler was gated by the failed extraction. Resume preserves
+completed work when task inputs are unchanged; corrected extraction and real
+discovery acceptance remain pending on the cluster.
