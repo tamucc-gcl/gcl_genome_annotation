@@ -2,6 +2,7 @@
 import csv
 import gzip
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -21,6 +22,30 @@ class ReferenceRepeatsTests(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+    def test_embedded_scripts_escape_literal_dollars_for_groovy(self):
+        # Python/shell quoting does not suppress interpolation in a Groovy GString.
+        pending, seen = [ROOT / 'reference_repeats.nf'], set()
+        while pending:
+            path = pending.pop().resolve()
+            if path in seen:
+                continue
+            seen.add(path)
+            text = path.read_text()
+            for relative in re.findall(r"\bfrom\s+['\"]([^'\"]+)['\"]", text):
+                pending.append((path.parent / relative).with_suffix('.nf'))
+            for block in re.finditer('"""(.*?)"""', text, re.S):
+                script = block[1]
+                for position, character in enumerate(script):
+                    if character != '$':
+                        continue
+                    slashes, previous = 0, position - 1
+                    while previous >= 0 and script[previous] == '\\':
+                        slashes += 1
+                        previous -= 1
+                    if slashes % 2 == 0 and script[position + 1:position + 2] != '{':
+                        line = text[:block.start(1) + position].count('\n') + 1
+                        self.fail(f'{path.name}:{line}: escape literal dollars or use braced Groovy interpolation')
 
     def write(self, name, text):
         path = self.root / name

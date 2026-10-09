@@ -112,6 +112,12 @@ invalidate the filtering/masking descendants. Shared stores also work without
 ## Cluster acceptance and real pilot
 
 Implementation and static syntax checks are complete; runtime acceptance is pending.
+The first cluster attempt passed Python contracts but stopped during module
+compilation on an unescaped Python regex dollar anchor in the Groovy script.
+That anchor now uses Python's `\Z` end-of-string form. A static interpolation audit
+passed across all 13 imported process modules; a regression check now covers the
+stage's include tree. No scientific tasks ran in that attempt, and corrected
+Nextflow execution remains pending.
 Run from the consuming project root after syncing the pipeline:
 
 ```bash

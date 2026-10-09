@@ -37,7 +37,7 @@ process CURATE_DFAM {
     info = (folder / 'famdb_info.txt').read_text()
     expected = '${params.dfam_version}'
     version = expected[0] + '.' + expected[1:]
-    if not re.search(r'Version\\s*:\\s*' + re.escape(version) + r'(?:\\s|$)', info):
+    if not re.search(r'Version\\s*:\\s*' + re.escape(version) + r'(?:\\s|\\Z)', info):
         raise SystemExit('FamDB release does not match the configured Dfam release: ' + version)
     library = folder / 'dfam_subset.lib'
     if not library.stat().st_size:
