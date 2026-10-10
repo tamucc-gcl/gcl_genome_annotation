@@ -45,7 +45,7 @@ process REPEAT_MODEL {
     RepeatModeler \
         -threads ${task.cpus} \
         -database ${assembly_id} \
-        -seed ${seed} \
+        -srand ${seed} \
         -LTRStruct \
         -numAddlRounds ${params.repModel_rounds} 2>&1 | tee repeatmodeler.log
 
