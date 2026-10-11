@@ -9,3 +9,6 @@ dependencies:
     - torch==2.6.0
     - lightning==2.6.1
     - bio-terrier==0.4.0
+    # Keep torchapp's Click classes compatible with Typer's CLI context.
+    - typer==0.15.4
+    - click==8.1.8

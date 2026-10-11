@@ -87,6 +87,12 @@ and [Dfam 3.9](https://www.dfam.org/releases/Dfam_3.9/families/FamDB/) are pinne
 The existing Terrier environment is now pinned to bio-terrier 0.4.0, torch 2.6.0 and
 lightning 2.6.1: the old torch <2.6 constraint conflicts with the current package's
 [requirements](https://github.com/rbturnbull/terrier/blob/main/pyproject.toml).
+Its CLI dependencies are pinned to Typer 0.15.4 and Click 8.1.8. The real pilot
+failed before inference with a missing `_param_default_explicit` attribute when
+torchapp mixed Typer's vendored CLI context with an independently installed Click.
+These pins use Typer's earlier external-Click implementation;
+[Typer 0.15.4 declares Click <8.2](https://github.com/fastapi/typer/blob/0.15.4/pyproject.toml).
+Cluster verification of the corrected Terrier environment remains pending.
 Terrier 0.4 uses updated training weights; this is recorded in the stage settings and
 must be evaluated in the real pilot, rather than assumed equivalent to older models.
 The [upstream release description](https://pypi.org/project/bio-terrier/) describes
