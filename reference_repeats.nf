@@ -74,7 +74,7 @@ workflow {
         CLASSIFY_REPEATS(CURATE_REPEATS.out.clustered_repeats)
         def classified
         if (params.repeat_reclassify) {
-            RECLASSIFY_REPEATS(CLASSIFY_REPEATS.out.curated_repeats)
+            RECLASSIFY_REPEATS(CLASSIFY_REPEATS.out.curated_repeats, file("${projectDir}/py_scripts/run_terrier.py"))
             classified = RECLASSIFY_REPEATS.out.reclassified_lib
         } else {
             classified = CLASSIFY_REPEATS.out.curated_repeats

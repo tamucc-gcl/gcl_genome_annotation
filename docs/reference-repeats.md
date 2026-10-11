@@ -92,7 +92,15 @@ failed before inference with a missing `_param_default_explicit` attribute when
 torchapp mixed Typer's vendored CLI context with an independently installed Click.
 These pins use Typer's earlier external-Click implementation;
 [Typer 0.15.4 declares Click <8.2](https://github.com/fastapi/typer/blob/0.15.4/pyproject.toml).
-Cluster verification of the corrected Terrier environment remains pending.
+The real pilot passed CLI parsing and completed prediction after these pins.
+It then hit an upstream hierarchicalsoftmax single-child threshold indexing bug
+while writing classifications. `run_terrier.py` applies a version/source-checked
+in-memory correction to that one condition in hierarchicalsoftmax 1.4.4, with a
+small regression check before loading model weights. Single-child branches have
+no softmax slot; confidence thresholds still apply at every branching decision.
+The wrapper is a staged Nextflow input so changes invalidate reclassification.
+No installed package files are edited. Corrected output generation still awaits
+cluster verification. See the [affected upstream function](https://github.com/rbturnbull/hierarchicalsoftmax/blob/v1.4.4/hierarchicalsoftmax/inference.py).
 Terrier 0.4 uses updated training weights; this is recorded in the stage settings and
 must be evaluated in the real pilot, rather than assumed equivalent to older models.
 The [upstream release description](https://pypi.org/project/bio-terrier/) describes

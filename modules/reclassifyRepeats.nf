@@ -38,6 +38,7 @@ process RECLASSIFY_REPEATS {
 
     input:
     tuple val(assembly_id), path(classified_lib)
+    path terrier_runner
 
     output:
     tuple val(assembly_id), path("${assembly_id}_reclassified_repeats.fa"),
@@ -56,7 +57,7 @@ process RECLASSIFY_REPEATS {
     fi
 
     # ── 1. Run Terrier on entire library (--unknown-only renames only Unknown) ─
-    terrier \\
+    python3 '${terrier_runner}' \\
         --input ${classified_lib} \\
         --output-fasta ${assembly_id}_reclassified_repeats.fa \\
         --output-csv terrier_probabilities.csv \\

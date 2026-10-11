@@ -195,7 +195,7 @@ workflow {
     //   Uses deep learning to assign superfamily labels to families that
     //   RepeatClassifier couldn't classify via homology. Already-classified
     //   families pass through unchanged.
-    RECLASSIFY_REPEATS(CLASSIFY_REPEATS.out.curated_repeats)
+    RECLASSIFY_REPEATS(CLASSIFY_REPEATS.out.curated_repeats, file("${projectDir}/py_scripts/run_terrier.py"))
 
     // ── Step 4: Filter gene-derived sequences from repeat library ──────────────
     //   Uses two-database strategy: RepeatPeps (TE proteins) + SwissProt
