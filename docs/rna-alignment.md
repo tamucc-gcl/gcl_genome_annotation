@@ -73,7 +73,8 @@ splice-supported reads, and may not represent all reads in an unusual library.
 Conflicting lane settings within a library also block that library.
 
 All parameters and process definitions are in `nextflow.config`:
-`rna_alignment_seed`, `rna_alignment_memory`, `rna_min_intron`, `rna_max_intron`,
+`rna_alignment_seed`, `rna_alignment_memory`, `rna_alignment_cpus`,
+`rna_alignment_threads`, `rna_min_intron`, `rna_max_intron`,
 `rna_strand_min_mapq`, `rna_strand_min_informative`,
 `rna_strand_dominant_fraction`, and `rna_strand_unstranded_tolerance`.
 Inference thresholds affect inference only; MAPQ affects QC/inference; intron
@@ -85,6 +86,14 @@ job was not explicitly labelled OUT_OF_MEMORY, so memory exhaustion remains
 unconfirmed. HISAT2 stderr is also streamed into the native task error log for
 diagnosis when scratch outputs cannot be returned. The allowance can be changed
 with `--rna_alignment_memory`; synthetic tests do not establish real-data usage.
+The user reports that Crest's exclusive-node behaviour has been unreliable.
+`rna_alignment_cpus` therefore exposes the CPU reservation so it can be set to
+the full count for the chosen node class. Crest normal nodes were confirmed by
+the user to have 64 CPUs and 350952 MB of configured memory; the default CPU
+reservation is now 64. `rna_alignment_threads` defaults
+to 14 independently, allowing full CPU reservation without forcing more mapper
+threads. No exclusive-node flags have been added. Tiny acceptance runs explicitly
+request four CPUs, two mapper threads and 8 GB.
 
 ## Outputs
 

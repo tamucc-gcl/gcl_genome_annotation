@@ -49,7 +49,7 @@ process ALIGN_RNA_READSET {
     def paths = reads instanceof Collection ? reads : [reads]
     def readArgs = options.layout == 'paired' ? "-1 ${quote(paths[0])} -2 ${quote(paths[1])}" : "-U ${quote(paths[0])}"
     def readCheck = groovy.json.JsonOutput.toJson([spec: options, paths: paths.collect { it.toString() }]).getBytes('UTF-8').encodeBase64().toString()
-    def alignThreads = Math.max(1, (task.cpus as int) - 2)
+    def alignThreads = Math.min(params.rna_alignment_threads as int, Math.max(1, (task.cpus as int) - 2))
     """
     set -euo pipefail
     python rna_alignment.py reads --request '${readCheck}'

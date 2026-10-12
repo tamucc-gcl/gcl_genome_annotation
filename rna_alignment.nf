@@ -19,6 +19,8 @@ workflow {
         error 'Invalid RNA intron limits'
     if ((params.rna_strand_min_mapq as int) < 0 || (params.rna_strand_min_mapq as int) > 255)
         error 'RNA strand MAPQ must be between 0 and 255'
+    if ((params.rna_alignment_cpus as int) < 3 || (params.rna_alignment_threads as int) < 1)
+        error 'RNA alignment needs at least 3 allocated CPUs and a positive mapper thread count'
     RESOLVE_ANNOTATION_INPUTS(encode(request), file("${projectDir}/py_scripts/resolve_annotation_inputs.py"),
         file("${projectDir}/assets/taxonomy_rules.json"))
     ASSERT_ANNOTATION_INPUTS(RESOLVE_ANNOTATION_INPUTS.out.bundle)

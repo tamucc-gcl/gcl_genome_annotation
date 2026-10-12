@@ -169,3 +169,15 @@ routing all passed using actual HISAT2 alignment. The environment versions were
 compatible; the earlier build stall's cause remains unconfirmed. This accepts
 the synthetic alignment/BAM handoff contracts, not real flounder mapping quality.
 Next is the real alignment pilot using accepted prepared reads and references.
+
+Real alignment retries: the first attempt lost both jobs to NODE_FAIL on
+crest-c003. The next attempt placed both jobs on crest-c019 with 48 GB requests;
+Slurm reported approximately 156 and 212 GiB peaks, one FAILED job and one
+CANCELLED job, without an explicit OUT_OF_MEMORY state. The cause of the SAM
+stream truncation remains unconfirmed. HISAT2 stderr now also reaches the native
+task error log. The user reports unreliable exclusive-node behaviour on Crest
+and confirmed that normal nodes have 64 CPUs and 350952 MB configured memory.
+Real alignment now reserves 64 CPUs and requests 300 GB per task, while keeping
+14 mapper threads. This uses the full CPU allocation to avoid co-locating the
+alignment jobs; no exclusive-node flags are used. Synthetic acceptance uses
+four CPUs, two mapper threads and 8 GB. The revised real pilot remains pending.
