@@ -4,7 +4,7 @@ Pipeline for Genome Annotation
 ![](assets/genome_annotation_pipeline.png)
 ## Pipeline rework
 
-The new [input and taxonomy preflight](docs/foundation-preflight.md) supports two-sheet validation, global defaults, per-assembly overrides and taxonomy-derived settings. It is a separate entry point; the legacy annotation workflow has not yet been migrated. See the handoff for cluster commands and current limitations.
+The new [input and taxonomy preflight](docs/foundation-preflight.md) supports two-sheet validation, global defaults, per-assembly overrides and taxonomy-derived settings. The integrated `main.nf` now connects preparation, repeats, alignment and BRAKER3 prediction. Downstream annotation and model filtering have not yet been connected. Standalone entries remain available for development and testing.
 Input-contract acceptance passed on Nextflow 23.10.1.
 
 [Protein evidence preparation](docs/protein-evidence.md) adds validated,
@@ -37,4 +37,11 @@ HISAT2 BAMs with mapping/strand QC, and stops before BRAKER3. There is no BAM
 merge or standalone StringTie step. Python checks and actual Nextflow/HISAT2
 cluster acceptance passed, including recovery, resume, strand-only changes,
 adding a reference, blocked inference and no-RNA routing. The real alignment
-pilot remains pending.
+pilot passed; both flounder readsets have validated BAMs and confidently reverse-stranded libraries. The linked alignment MultiQC report was confirmed by the user.
+
+[BRAKER3 prediction](docs/braker-prediction.md) connects the accepted masked reference,
+protein evidence and separate readset BAMs. `braker_prediction.nf` starts from
+completed published stage outputs for the first real pilot, avoiding repeat discovery
+and remapping. The integrated `main.nf` uses native task outputs throughout.
+Input checks, runtime checks and prediction integrity reporting are implemented;
+cluster wiring acceptance and the real training/prediction pilot remain pending.

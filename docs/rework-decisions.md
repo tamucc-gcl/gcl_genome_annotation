@@ -204,3 +204,23 @@ environment so this change does not invalidate completed scientific tasks.
 Local validation with actual MultiQC retained both assembly identities in all
 three datasets; 70 Python contracts passed. Cluster integration checks now also
 require the linked report and complete labelled MultiQC datasets.
+
+12 October 2026: the real alignment outputs and split preparation/alignment
+MultiQC reports were reviewed and accepted. IBC1/IBC2 primary mapping was
+76.63%/80.92%, with tens of millions of spliced primary reads. Strand inference
+was confidently reverse for both libraries. BAM dictionaries, indices, mate
+counts and reference identities passed the existing reports. This accepts the
+evidence for a BRAKER3 pilot, not gene-model quality.
+
+The next implementation connects protein/RNA/reference preparation, repeats and
+alignment in `main.nf`, then extends the existing BRAKER module for RNA+protein
+prediction using multiple separate BAMs. A development `braker_prediction.nf`
+reuses completed stage outputs to avoid rerunning the long real repeat/alignment
+pilot. Runtime checks run automatically before prediction; optional check-only
+execution is for diagnosis. Root config remains the sole configuration file.
+BRAKER3 v3.0.8 is pinned, private AUGUSTUS training is retained, and the existing
+eight optimization rounds remain the baseline. Library protocols are metadata;
+BRAKER's strand-separated UTR BAM flag is not used. The current connected milestone
+stops after prediction integrity reporting. Scientific downstream modules remain
+available for the next filtering/annotation steps. Python contract validation
+passes locally; connected cluster acceptance and real BRAKER training are pending.

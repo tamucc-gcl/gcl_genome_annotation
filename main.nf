@@ -1,494 +1,351 @@
 #!/usr/bin/env nextflow
-
-/*
-========================================================================================
-    GENOME ANNOTATION PIPELINE
-========================================================================================
-    Repeat modeling, curation, and masking pipeline
-
-    Usage:
-        nextflow run main.nf \
-            --sample_sheet samples.csv \
-            --dfam_dir /path/to/dfam \
-            --taxa_name Actinopterygii \
-            --outdir results \
-            -profile singularity
-========================================================================================
-*/
-
+// Integrated rework: inputs -> proteins/RNA/reference/repeats -> alignment -> BRAKER3.
+// This milestone stops at validated predictions. Existing downstream modules remain for extension.
 nextflow.enable.dsl = 2
-
-// Parameter defaults and process resources are defined in nextflow.config.
-
-// ── Parameter validation ─────────────────────────────────────────────────────
-if (!params.sample_sheet) { error "Please provide --sample_sheet" }
-if (!params.dfam_database) { error "Please provide --dfam_database" }
-if (!params.taxa_name)    { error "Please provide --taxa_name" }
-
-/*
-========================================================================================
-    IMPORT FUNCTIONS
-========================================================================================
-*/
-include { parseSampleSheet } from './functions/parse_sample_sheet.nf'
-
-/*
-========================================================================================
-    IMPORT MODULES
-========================================================================================
-*/
-
-include { COMBINE_REPEAT_LIBS } from './modules/combineRepeatLibs.nf'
+include { RESOLVE_ANNOTATION_INPUTS; ASSERT_ANNOTATION_INPUTS } from './modules/annotationInputs.nf'
+include { PLAN_PROTEIN_EVIDENCE; ACQUIRE_PROTEIN_SOURCE; PUBLISH_FAILED_PROTEIN_SOURCE; STORE_PROTEIN_SOURCE; COMBINE_PROTEIN_EVIDENCE; REPORT_PROTEIN_EVIDENCE; ASSERT_PROTEIN_EVIDENCE } from './modules/proteinEvidence.nf'
+include { PLAN_RNA_PREPARATION; ACQUIRE_RNA_READSET; QC_RNA_RAW; TRIM_RNA_READSET; QC_RNA_PROCESSED; SUBSET_RNA_READSET; REPORT_RNA_PREPARATION; ASSERT_RNA_PREPARATION } from './modules/rnaPreparation.nf'
 include { FILTER_ASSEMBLY } from './modules/filterAssembly.nf'
-
-// ── Database ─────────────────────────────
-include { CURATE_DFAM; DOWNLOAD_DFAM_DB } from './modules/curateDfam.nf'
-
-// ── Repeat annotation ─────────────────────────────
-include { REPEAT_MODEL  } from './modules/repeatModel.nf'
+include { CURATE_DFAM } from './modules/curateDfam.nf'
+include { REPEAT_MODEL } from './modules/repeatModel.nf'
 include { CURATE_REPEATS } from './modules/curateRepeats.nf'
 include { CLASSIFY_REPEATS } from './modules/classifyRepeats.nf'
 include { RECLASSIFY_REPEATS } from './modules/reclassifyRepeats.nf'
 include { EXTRACT_REPEAT_PEPS; INDEX_REPEAT_PEPS; FILTER_REPEAT_LIBRARY } from './modules/filterRepeatLibrary.nf'
-//include { REPEAT_MASK   } from './modules/repeatMask.nf'
-include { REPEAT_MASK_PARALLEL as REPEAT_MASK } from './workflows/repeatMaskParallel.nf'
+include { COMBINE_REPEAT_LIBS } from './modules/combineRepeatLibs.nf'
+include { REPEAT_MASK_PARALLEL; REPEAT_MASK_PARALLEL as UNSPLIT_MASK_BENCHMARK } from './workflows/repeatMaskParallel.nf'
+include { AUDIT_REPEAT_LIBRARY; VALIDATE_REFERENCE_REPEATS; COMPARE_REPEAT_MASKS; REPORT_REFERENCE_REPEATS; ASSERT_REFERENCE_REPEATS } from './modules/referenceRepeats.nf'
+include { INDEX_RNA_REFERENCE; ALIGN_RNA_READSET; QC_RNA_ALIGNMENT; RESOLVE_RNA_STRAND; REPORT_RNA_ALIGNMENT; ASSERT_RNA_ALIGNMENT } from './modules/rnaAlignment.nf'
+include { PLAN_BRAKER_INPUTS; VALIDATE_BRAKER_INPUTS; CHECK_BRAKER_SOFTWARE; BRAKER; VALIDATE_BRAKER_OUTPUTS; REPORT_BRAKER; ASSERT_BRAKER } from './modules/braker.nf'
+include { PLAN_CONNECTED_RNA_ALIGNMENT } from './modules/connectedRnaAlignment.nf'
 
-// ── Telomere annotation ─────────────────────────────
-include { TELOMERE_ANNOTATION } from './modules/telomere.nf'
-
-// ── Centromere annotation ─────────────────────────────
-include { CENTROMERE_ANNOTATION; CENTROMERE_TO_GFF3 } from './modules/centromere.nf'
-
-// ── Structural annotation ─────────────────────────────
-include { DOWNLOAD_ORTHODB } from './modules/downloadOrthoDB.nf'
-include { PREPARE_PROTEIN_DB } from './modules/prepareProteinDb.nf'
-include { BRAKER } from './modules/braker.nf'
-include { COMPUTE_AED; AED_STUB } from './modules/computeAed.nf'
-include { FILTER_GENE_MODELS } from './modules/filterGeneModels.nf'
-include { FLAG_TE_GENES } from './modules/flagTeGenes.nf'
-include { RENAME_GENE_MODELS } from './modules/renameGeneModels.nf'
-include { AGAT } from './modules/agat.nf'
-include { BUSCO; DOWNLOAD_BUSCO_DB } from './modules/busco.nf'
-include { OMARK; DOWNLOAD_OMARK_DB } from './modules/omark.nf'
-include { STRUCTURAL_QC } from './modules/structural_qc.nf'
-
-// ── ncRNA annotation ─────────────────────────────
-include { tRNASCAN } from './modules/trna-scan.nf'
-//include { INFERNAL; DOWNLOAD_RFAM_DB } from './modules/infernal.nf'
-include { DOWNLOAD_RFAM_DB } from './modules/infernal.nf'
-include { INFERNAL_PARALLEL as INFERNAL } from './workflows/infernalParallel.nf'
-
-// ── Functional annotation ─────────────────────────────
-include { CHUNK_PROTEINS } from './modules/chunk_proteins.nf'
-include { INTERPROSCAN; MERGE_INTERPROSCAN; DOWNLOAD_INTERPROSCAN_DB } from './modules/interproscan.nf'
-include { EGGNOG; MERGE_EGGNOG; DOWNLOAD_EGGNOG_DB } from './modules/eggnog.nf'
-include { DIAMOND; MERGE_DIAMOND; DOWNLOAD_DIAMOND_DB } from './modules/diamond.nf'
-include { KOFAMSCAN; MERGE_KOFAMSCAN; DOWNLOAD_KOFAMSCAN_DB } from './modules/kofamscan.nf'
-include { DEEPSIG; MERGE_DEEPSIG } from './modules/deepsig.nf'
-
-// ── Annotation merging ─────────────────────────────
-include { MERGE_FUNCTIONAL_ANNOTATIONS } from './modules/merge_functional_annotations.nf'
-include { ANNOTATE_GFF3 } from './modules/annotate_gff3.nf'
-include { EXTRACT_SEQUENCES } from './modules/extractSequences.nf'
-include { ANNOTATION_REPORT } from './modules/annotation_report.nf'
-
-
-/*
-========================================================================================
-    MAIN WORKFLOW
-========================================================================================
-*/
 workflow {
+    if (!params.sample_sheet) error 'Provide --sample_sheet'
+    if (params.n_rm_chunks < 1 || params.repeat_seed < 0) error 'Invalid repeat batches/seed'
+    if (!(params.job_speed in [null, 's', 'q', 'qq'])) error '--job_speed must be s, q, qq or null'
+    if ((params.rna_min_intron as int) < 1 || (params.rna_max_intron as int) < (params.rna_min_intron as int)) error 'Invalid RNA intron limits'
+    if ((params.rna_strand_min_mapq as int) < 0 || (params.rna_strand_min_mapq as int) > 255) error 'Invalid RNA strand MAPQ'
+    if ((params.rna_alignment_cpus as int) < 3 || (params.rna_alignment_threads as int) < 1) error 'Invalid RNA CPU/thread settings'
+    if ((params.braker_threads as int) < 1 || (params.braker_threads as int) > 48 || (params.braker_cpus as int) < 1 || (params.braker_rounds as int) < 1)
+        error 'BRAKER needs positive CPUs/rounds and 1..48 tool threads'
+    def encode = { value -> groovy.json.JsonOutput.toJson(value).getBytes('UTF-8').encodeBase64().toString() }
+    def parse = { path -> new groovy.json.JsonSlurper().parse(new File(path.toString())) }
+    def taxonKey = { taxa -> 'taxon_' + java.security.MessageDigest.getInstance('SHA-256').digest(taxa.toString().getBytes('UTF-8')).encodeHex().toString().substring(0, 20) }
+    def proteinHelper = file("${projectDir}/py_scripts/prepare_protein_evidence.py", checkIfExists: true)
+    def rnaHelper = file("${projectDir}/py_scripts/prepare_rna.py", checkIfExists: true)
+    def repeatHelper = file("${projectDir}/py_scripts/reference_repeats.py", checkIfExists: true)
+    def alignmentHelper = file("${projectDir}/py_scripts/rna_alignment.py", checkIfExists: true)
+    def helpers = [alignmentHelper, repeatHelper]
+    def readHelpers = [alignmentHelper, rnaHelper]
+    def brakerHelpers = ['braker_prediction.py', 'reference_repeats.py', 'prepare_protein_evidence.py'].collect {
+        file("${projectDir}/py_scripts/${it}", checkIfExists: true)
+    }
+    def request = [launch_dir: launchDir.toString(), sample_sheet: params.sample_sheet.toString(),
+        rna_sheet: params.rna_sheet?.toString(), taxdump_dir: params.taxdump_dir?.toString(),
+        params: params.collectEntries { key, value -> [key.toString(), value] }]
+    RESOLVE_ANNOTATION_INPUTS(encode(request), file("${projectDir}/py_scripts/resolve_annotation_inputs.py"),
+        file("${projectDir}/assets/taxonomy_rules.json"))
+    ASSERT_ANNOTATION_INPUTS(RESOLVE_ANNOTATION_INPUTS.out.bundle)
 
-    // Parse sample sheet → channel of [assembly_id, assembly_path]
-    ch_assemblies = parseSampleSheet(params.sample_sheet)
+    // Protein evidence: shared database stores and project-specific spike-ins.
+    PLAN_PROTEIN_EVIDENCE(RESOLVE_ANNOTATION_INPUTS.out.bundle, ASSERT_ANNOTATION_INPUTS.out,
+        encode([launch_dir: launchDir.toString(), orthodb_database: params.orthodb_database?.toString(),
+                protein_source_store: params.protein_source_store?.toString(),
+                published_sources: "${params.outdir}/protein_sources"]), proteinHelper,
+        file("${projectDir}/assets/orthodb_sources.json", checkIfExists: true))
 
-    /*
-    ========================================================================================
-        Database Downloads
-    ========================================================================================
-    */
+    def plan_sources = PLAN_PROTEIN_EVIDENCE.out.bundle.flatMap { directory ->
+        def data = new groovy.json.JsonSlurper().parse(new File("${directory}/plan.json"))
+        data.sources.collect { source ->
+            tuple(source.source_id, encode(source),
+                  source.local_path ? [file(source.local_path, checkIfExists: true)] : [])
+        }
+    }
+    def plan_assemblies = PLAN_PROTEIN_EVIDENCE.out.bundle.flatMap { directory ->
+        def data = new groovy.json.JsonSlurper().parse(new File("${directory}/plan.json"))
+        data.assemblies.collect { assembly ->
+            tuple(assembly.assembly_id, encode(assembly))
+        }
+    }
+    def routed = plan_sources.branch {
+        stored: new groovy.json.JsonSlurper().parseText(new String(it[1].decodeBase64(), 'UTF-8')).stored_path
+        acquire: true
+    }
+    ACQUIRE_PROTEIN_SOURCE(routed.acquire, proteinHelper)
+    def existing = routed.stored.map { sid, encoded, inputs ->
+        def spec = new groovy.json.JsonSlurper().parseText(new String(encoded.decodeBase64(), 'UTF-8'))
+        tuple(sid, file(spec.stored_path, checkIfExists: true))
+    }
+    def resolved = ACQUIRE_PROTEIN_SOURCE.out.source.mix(existing).branch {
+        ready: new groovy.json.JsonSlurper().parse(new File("${it[1]}/source.json")).status == 'ready'
+        failed: true
+    }
+    def stores = resolved.ready.map { sid, bundle ->
+        // Store placement is transport metadata, independent of source identity.
+        def plans = new groovy.json.JsonSlurper().parse(new File("${bundle}/request.json"))
+        def root = plans.kind == 'orthodb' ?
+            "${params.orthodb_database}/validated/${plans.release}/normalization-v1" :
+            "${params.protein_source_store}/normalization-v1"
+        tuple(sid, file(root).toString(), bundle)
+    }
+    STORE_PROTEIN_SOURCE(stores)
+    PUBLISH_FAILED_PROTEIN_SOURCE(resolved.failed)
+    def sources = STORE_PROTEIN_SOURCE.out.source.mix(PUBLISH_FAILED_PROTEIN_SOURCE.out.source).map { sid, bundle -> bundle }.toList()
+    // Only each assembly's requested bundles enter its combination/cache identity.
+    def combinations = plan_assemblies.combine(sources.map { bundles -> [bundles] }).map { aid, encoded, bundles ->
+        def assembly = new groovy.json.JsonSlurper().parseText(new String(encoded.decodeBase64(), 'UTF-8'))
+        tuple(aid, encoded, bundles.findAll { assembly.source_ids.contains(it.fileName.toString()) }.sort { it.fileName.toString() })
+    }
+    COMBINE_PROTEIN_EVIDENCE(combinations, proteinHelper)
+    REPORT_PROTEIN_EVIDENCE(COMBINE_PROTEIN_EVIDENCE.out.evidence.map { aid, bundle -> bundle }.collect(),
+        file("${projectDir}/py_scripts/report_protein_evidence.py", checkIfExists: true))
+    ASSERT_PROTEIN_EVIDENCE(REPORT_PROTEIN_EVIDENCE.out.status)
+    // Assembly-independent RNA preparation and raw/filtered QC.
+    PLAN_RNA_PREPARATION(RESOLVE_ANNOTATION_INPUTS.out.bundle, ASSERT_ANNOTATION_INPUTS.out,
+        encode([quality: params.rna_trim_quality, window: params.rna_trim_window,
+                min_length: params.rna_min_read_length, max_n: params.rna_max_n_bases]), rnaHelper)
 
-    // ── Step 0: Prepare protein database for BRAKER ─────────────────────────
-    //   Supports four configurations:
-    //     --orthodb_clade Vertebrata --ref_proteome_accession GCF_xxx → combined
-    //     --orthodb_clade Vertebrata                                  → OrthoDB only
-    //     --ref_proteome_accession GCF_xxx                            → reference only
-    //     (neither specified)                                         → no protein evidence
-    if (params.orthodb_clade) {
-        DOWNLOAD_ORTHODB(params.orthodb_clade)
-        ch_orthodb = DOWNLOAD_ORTHODB.out.orthodb_proteins
+    def readsets = PLAN_RNA_PREPARATION.out.bundle.flatMap { folder ->
+        def plan = new groovy.json.JsonSlurper().parse(new File("${folder}/plan.json"))
+        plan.readsets.collect { row -> tuple(row.readset_id, row) }
+    }
+    def acquisition = readsets.map { rid, row ->
+        tuple(rid, encode(row.raw_request), [row.fastq_1, row.fastq_2].findAll { it }.collect { file(it, checkIfExists: true) })
+    }
+    def splitStatus = { channel -> channel.branch {
+        ready: new groovy.json.JsonSlurper().parse(new File("${it[1]}/rna.json")).status == 'ready'
+        failed: true
+    } }
+    ACQUIRE_RNA_READSET(acquisition, rnaHelper)
+    def raw = splitStatus(ACQUIRE_RNA_READSET.out.bundle)
+    // Keep real reads as path inputs. Local validation and passthrough stages emit
+    // metadata only; Nextflow stages the original reads directly for each consumer.
+    def rawReads = raw.ready.join(readsets).map { rid, bundle, row ->
+        def metadata = new groovy.json.JsonSlurper().parse(new File("${bundle}/rna.json"))
+        def paths = row.raw_request.run_accession ? metadata.files.collect { file("${bundle}/${it}") } :
+            [row.fastq_1, row.fastq_2].findAll { it }.collect { file(it) }
+        tuple(rid, file("${bundle}/rna.json"), paths)
+    }
+    def qcInput = { stage, rid, manifest, reads ->
+        def suffixes = reads.collect { it.name.endsWith('.gz') ? '.fastq.gz' : '.fastq' }
+        tuple(rid, encode([readset_id: rid, stage: stage]), suffixes, reads[0], reads.size() == 2 ? reads[1] : [])
+    }
+    QC_RNA_RAW(rawReads.map { rid, manifest, reads -> qcInput('raw', rid, manifest, reads) }, rnaHelper)
+    def trimming = rawReads.join(readsets).map { rid, manifest, reads, row ->
+        tuple(rid, encode([readset_id: rid] + row.trim_request), manifest, reads)
+    }
+    TRIM_RNA_READSET(trimming, rnaHelper)
+    def clean = splitStatus(TRIM_RNA_READSET.out.bundle)
+    def resolveReads = { rid, bundle, priorManifest, priorReads ->
+        def metadata = new groovy.json.JsonSlurper().parse(new File("${bundle}/rna.json"))
+        tuple(rid, file("${bundle}/rna.json"), metadata.passthrough ? priorReads :
+            (metadata.status == 'ready' ? metadata.files.collect { file("${bundle}/${it}") } : []))
+    }
+    def cleanReads = clean.ready.join(rawReads).map(resolveReads)
+    QC_RNA_PROCESSED(cleanReads.map { rid, manifest, reads -> qcInput('processed', rid, manifest, reads) }, rnaHelper)
+    def selecting = cleanReads.join(readsets).map { rid, manifest, reads, row ->
+        tuple(rid, encode([readset_id: rid] + row.subset_request), manifest, reads)
+    }
+    SUBSET_RNA_READSET(selecting, rnaHelper)
+    def selectedReads = SUBSET_RNA_READSET.out.bundle.join(cleanReads).map(resolveReads)
+    def failedReads = raw.failed.mix(clean.failed).map { rid, bundle -> tuple(rid, file("${bundle}/rna.json"), []) }
+    def finalStates = selectedReads.mix(failedReads).toList()
+    def finalResults = finalStates.map { rows -> rows.collect { it[1] } }
+    def readPaths = finalStates.map { rows -> encode(rows.collectEntries { rid, manifest, reads ->
+        [rid, reads.collect { it.toString() }]
+    }) }
+    // Stage individual ZIPs so MultiQC does not need to traverse linked directories.
+    def collectQc = { channel -> channel.flatMap { rid, bundle ->
+        def reports = file("${bundle}/*_fastqc.zip", checkIfExists: true)
+        reports instanceof Collection ? reports : [reports]
+    }.toList() }
+    def rawQcResults = collectQc(QC_RNA_RAW.out.qc)
+    def processedQcResults = collectQc(QC_RNA_PROCESSED.out.qc)
+    def fastpReports = clean.ready.flatMap { rid, bundle ->
+        def report = file("${bundle}/${rid}_fastp.json")
+        report.exists() ? [report] : []
+    }.toList()
+    REPORT_RNA_PREPARATION(PLAN_RNA_PREPARATION.out.bundle, finalResults, readPaths, rawQcResults, processedQcResults, fastpReports,
+        file("${projectDir}/py_scripts/report_rna_preparation.py"))
+    ASSERT_RNA_PREPARATION(REPORT_RNA_PREPARATION.out.status)
+    // Reference normalization and existing repeat discovery/curation/masking.
+    // Assertion dependency ensures no scientific work starts on an incomplete input contract.
+    def assemblies = RESOLVE_ANNOTATION_INPUTS.out.bundle.combine(ASSERT_ANNOTATION_INPUTS.out).flatMap { folder, passed ->
+        parse("${folder}/resolved_inputs.json").assemblies.collect { row ->
+            if (params.repeat_mask_benchmark && row.assembly_id.endsWith('__benchmark'))
+                error 'Assembly IDs ending __benchmark are reserved when the masking benchmark is enabled'
+            tuple(row.assembly_id, row)
+        }
+    }
+    FILTER_ASSEMBLY(assemblies.map { aid, row ->
+        tuple(aid, file(row.assembly_fasta, checkIfExists: true), row.settings.min_contig_length)
+    }, repeatHelper)
+    def referenceStates = FILTER_ASSEMBLY.out.bundle.map { aid, folder ->
+        tuple(aid, file("${folder}/${aid}.reference.json"))
+    }
+    def referenceSplit = referenceStates.branch {
+        ready: parse(it[1]).status == 'ready'
+        failed: true
+    }
+    def preparedReferences = referenceSplit.ready.join(FILTER_ASSEMBLY.out.bundle).map { aid, state, folder ->
+        tuple(aid, file("${folder}/${aid}.filtered.fasta"), state)
+    }
+    def librarySources
+    if (params.repeat_library) {
+        // An explicit complete library is a scientific input, also used by tiny masking fixtures.
+        def supplied = file(params.repeat_library, checkIfExists: true)
+        librarySources = preparedReferences.map { aid, reference, state -> tuple(aid, supplied) }
     } else {
-        ch_orthodb = Channel.fromPath("${projectDir}/assets/NO_PROT_DB")
+        if (!params.dfam_database) error 'Provide --dfam_database for the existing Dfam FamDB directory'
+        if (!params.diamond_database && !params.repeat_filter_database) error 'Provide --diamond_database or --repeat_filter_database'
+        def dfam = file("${params.dfam_database}/dfam_db", checkIfExists: true)
+        def generalDb = file(params.repeat_filter_database ?: "${params.diamond_database}/swissprot.dmnd", checkIfExists: true)
+        def requestedTaxa = preparedReferences.join(assemblies).map { aid, reference, state, row ->
+            tuple(taxonKey(row.settings.taxa_name), aid, row.settings.taxa_name)
+        }
+        CURATE_DFAM(requestedTaxa.map { key, aid, taxa -> tuple(key, taxa, dfam) }.unique { it[0] })
+        def dfamByAssembly = requestedTaxa.combine(CURATE_DFAM.out.bundle, by: 0).map { key, aid, taxa, folder ->
+            tuple(aid, file("${folder}/dfam_subset.lib"), file("${folder}/dfam_subset.source.json"))
+        }
+        REPEAT_MODEL(preparedReferences.join(dfamByAssembly).map { aid, reference, state, library, source ->
+            tuple(aid, reference, source)
+        }, params.repeat_seed)
+        CURATE_REPEATS(REPEAT_MODEL.out.families_fa, repeatHelper)
+        CLASSIFY_REPEATS(CURATE_REPEATS.out.clustered_repeats)
+        def classified
+        if (params.repeat_reclassify) {
+            RECLASSIFY_REPEATS(CLASSIFY_REPEATS.out.curated_repeats, file("${projectDir}/py_scripts/run_terrier.py"))
+            classified = RECLASSIFY_REPEATS.out.reclassified_lib
+        } else {
+            classified = CLASSIFY_REPEATS.out.curated_repeats
+        }
+        EXTRACT_REPEAT_PEPS()
+        INDEX_REPEAT_PEPS(EXTRACT_REPEAT_PEPS.out.repeat_peps.map { path ->
+            tuple('repeat_peps_' + java.security.MessageDigest.getInstance('SHA-256').digest(path.bytes).encodeHex().toString(), path)
+        })
+        // No-input acquisition and its mapped index already emit reusable value channels.
+        FILTER_REPEAT_LIBRARY(classified, generalDb, EXTRACT_REPEAT_PEPS.out.repeat_peps,
+            INDEX_REPEAT_PEPS.out.index.map { key, db, source -> db })
+        COMBINE_REPEAT_LIBS(FILTER_REPEAT_LIBRARY.out.filtered_lib.join(dfamByAssembly).map { aid, library, dfamLib, source ->
+            tuple(aid, library, dfamLib)
+        })
+        librarySources = COMBINE_REPEAT_LIBS.out.combined_lib
     }
-
-    PREPARE_PROTEIN_DB(DOWNLOAD_ORTHODB.out.orthodb_proteins)
-
-    // ── Step 0: DFam (runs once) ─────────────────────────────
-    DOWNLOAD_DFAM_DB(params.dfam_version)
-
-    // ── Step 0: RFam (runs once) ─────────────────────────────
-    DOWNLOAD_RFAM_DB(params.rfam_version)
-
-    // ── Step 0: BUSCO (runs once) ─────────────────────────────
-    DOWNLOAD_BUSCO_DB(params.busco_lineage)
-    ch_busco_db = DOWNLOAD_BUSCO_DB.out.db
-
-    // ── Step 0: OMArk (runs once) ─────────────────────────────
-    DOWNLOAD_OMARK_DB(params.oma_db_name)
-
-    // ── Step 0: Download InterProScan database (runs once) ─────────────────────────────
-    DOWNLOAD_INTERPROSCAN_DB(params.interproscan_version)
-
-    // ── Step 0: Download EggNOG database (runs once) ─────────────────────────────
-    DOWNLOAD_EGGNOG_DB(params.eggnog_version)
-
-    // ── Step 0: Download Diamond database (runs once) ─────────────────────────────
-    DOWNLOAD_DIAMOND_DB(params.diamond_version)
-
-    // ── Step 0: Download KoFamScan database (runs once) ─────────────────────────────
-    DOWNLOAD_KOFAMSCAN_DB(params.kofamscan_version)
-
-    // ── Step 0: Extract repeat peptides (runs once) ─────────────────────────────
-    EXTRACT_REPEAT_PEPS()
-    INDEX_REPEAT_PEPS(EXTRACT_REPEAT_PEPS.out.repeat_peps.map { path ->
-        tuple('repeat_peps_' + java.security.MessageDigest.getInstance('SHA-256').digest(path.bytes).encodeHex().toString(), path)
-    })
-
-    /*
-    ========================================================================================
-        Assembly Filtering and Stats
-    ========================================================================================
-    */
-
-    def reference_helper = file("${projectDir}/py_scripts/reference_repeats.py", checkIfExists: true)
-    FILTER_ASSEMBLY(ch_assemblies.map { aid, fa -> tuple(aid, fa, params.min_contig_length) }, reference_helper)
-    ch_assemblies_filtered = FILTER_ASSEMBLY.out.bundle.map { aid, folder ->
-        def state = new groovy.json.JsonSlurper().parse(new File("${folder}/${aid}.reference.json"))
-        if (state.status != 'ready') error "Reference preparation failed for ${aid}: ${state.reason}"
-        tuple(aid, file("${folder}/${aid}.filtered.fasta"))
+    AUDIT_REPEAT_LIBRARY(librarySources, repeatHelper)
+    def acceptedLibraries = AUDIT_REPEAT_LIBRARY.out.status.filter { aid, status -> parse(status).status == 'ready' }
+        .join(librarySources).map { aid, status, library -> tuple(aid, library) }
+    def maskInputs = preparedReferences.join(acceptedLibraries).map { aid, reference, state, library ->
+        tuple(aid, reference, library)
     }
-
-    /*
-    ========================================================================================
-        Repeat Annotation
-    ========================================================================================
-    */
-
-    // ── Step 0: Extract Dfam library (runs once) ─────────────────────────────
-    def legacy_taxon_key = 'taxon_' + java.security.MessageDigest.getInstance('SHA-256')
-        .digest(params.taxa_name.toString().getBytes('UTF-8')).encodeHex().toString().substring(0, 20)
-    CURATE_DFAM(DOWNLOAD_DFAM_DB.out.dfam_db_dir.map { folder -> tuple(legacy_taxon_key, params.taxa_name, folder) })
-    ch_dfam_library = CURATE_DFAM.out.bundle.map { key, folder -> file("${folder}/dfam_subset.lib") }
-    ch_dfam_source = CURATE_DFAM.out.bundle.map { key, folder -> file("${folder}/dfam_subset.source.json") }
-
-    // ── Step 1: De novo repeat modeling (per genome) ─────────────────────────
-    REPEAT_MODEL(ch_assemblies_filtered.combine(ch_dfam_source), params.repeat_seed)
-
-    // ── Step 2: Curate de novo repeats (per genome) ──────────────────────────
-    CURATE_REPEATS(REPEAT_MODEL.out.families_fa, reference_helper)
-
-    // ── Step 3: Classify de novo repeats (per genome) ──────────────────────────
-    CLASSIFY_REPEATS(CURATE_REPEATS.out.clustered_repeats)
-
-    // ── Step 3b: Reclassify Unknown families with Terrier (per genome) ───────
-    //   Uses deep learning to assign superfamily labels to families that
-    //   RepeatClassifier couldn't classify via homology. Already-classified
-    //   families pass through unchanged.
-    RECLASSIFY_REPEATS(CLASSIFY_REPEATS.out.curated_repeats, file("${projectDir}/py_scripts/run_terrier.py"))
-
-    // ── Step 4: Filter gene-derived sequences from repeat library ──────────────
-    //   Uses two-database strategy: RepeatPeps (TE proteins) + SwissProt
-    //   Repeats hitting RepeatPeps are confirmed TEs → kept
-    //   Repeats hitting only SwissProt above threshold → gene-derived → removed
-    FILTER_REPEAT_LIBRARY(
-        RECLASSIFY_REPEATS.out.reclassified_lib,
-        DOWNLOAD_DIAMOND_DB.out.diamond_db,
-        EXTRACT_REPEAT_PEPS.out.repeat_peps,
-        INDEX_REPEAT_PEPS.out.index.map { key, db, source -> db })
-
-    // ── Step 5: Mask genome with combined libraries (per genome) ─────────────
-    // Join assembly path back with filtered repeats on assembly_id
-    COMBINE_REPEAT_LIBS(FILTER_REPEAT_LIBRARY.out.filtered_lib.combine(ch_dfam_library))
-    REPEAT_MASK(ch_assemblies_filtered.join(COMBINE_REPEAT_LIBS.out.combined_lib), params.n_rm_chunks)
-
-    /*
-    ========================================================================================
-        Telomere Annotation
-    ========================================================================================
-    */
-    TELOMERE_ANNOTATION(ch_assemblies_filtered)
-
-    /*
-    ========================================================================================
-        Centromere Annotation
-    ========================================================================================
-    */
-
-    // ── Step: De novo centromere detection with centroAnno ────────────────────
-    //   Runs on UNMASKED assembly — centromeric satellites are tandem repeats
-    //   that RepeatMasker soft-masks, so centroAnno must see the original
-    //   sequence to detect them via k-mer frequency analysis.
-    //   No dependency on repeat pipeline — starts immediately.
-    CENTROMERE_ANNOTATION(ch_assemblies_filtered)
-
-    // ── Step: Convert centroAnno output to GFF3 ──────────────────────────────
-    ch_centroanno_gff_input = CENTROMERE_ANNOTATION.out.monomer_csv
-        .join(CENTROMERE_ANNOTATION.out.hor_csv, by: 0)
-        // produces: [assembly_id, monomer_csv, hor_csv]
-
-    CENTROMERE_TO_GFF3(ch_centroanno_gff_input)
-
-
-    /*
-    ========================================================================================
-        Structural Annotation
-    ========================================================================================
-    */
-
-    // ── Step 5a: Run Breaker on SoftMasked genome (per genome) ─────────────
-    BRAKER(REPEAT_MASK.out.masked_fasta,
-            PREPARE_PROTEIN_DB.out.combined_proteins.collect())
-
-    // ── Compute AED (runs immediately after BRAKER) ──────────────
-    // protein_db is the combined FASTA from PREPARE_PROTEIN_DB.
-    // Only compute AED if a protein database was actually built.
-
-    ch_braker_for_aed = BRAKER.out.braker_gff3
-        .join(REPEAT_MASK.out.masked_fasta)
-        .map { aid, gff, fa -> tuple(aid, fa, gff) }
-
-    if (params.orthodb_clade || params.ref_proteome_accession) {
-        COMPUTE_AED(ch_braker_for_aed,
-                PREPARE_PROTEIN_DB.out.combined_proteins.collect())
-        ch_aed_scores = COMPUTE_AED.out.aed_scores
-    } else {
-        // No protein DB → skip AED, emit header-only stub via /dev/null trick
-        AED_STUB(BRAKER.out.braker_gff3)
-        ch_aed_scores = AED_STUB.out.aed_scores
+    REPEAT_MASK_PARALLEL(maskInputs, params.n_rm_chunks)
+    def benchmarkChecks = Channel.value([])
+    if (params.repeat_mask_benchmark) {
+        UNSPLIT_MASK_BENCHMARK(maskInputs.map { aid, reference, library -> tuple(aid + '__benchmark', reference, library) }, 1)
+        def benchmark = UNSPLIT_MASK_BENCHMARK.out.masked_fasta.join(UNSPLIT_MASK_BENCHMARK.out.repeat_out)
+            .map { aid, masked, annotations -> tuple(aid.toString().replaceFirst(/__benchmark$/, ''), masked, annotations) }
+        COMPARE_REPEAT_MASKS(REPEAT_MASK_PARALLEL.out.masked_fasta.join(REPEAT_MASK_PARALLEL.out.repeat_out)
+            .join(benchmark), repeatHelper)
+        benchmarkChecks = COMPARE_REPEAT_MASKS.out.toList()
     }
-
-    // ── Step 5b: Run gene filtering (per genome) ─────────────
-    FILTER_GENE_MODELS(
-        BRAKER.out.braker_gff3
-            .join(BRAKER.out.braker_proteins)
-            .join(ch_aed_scores)
-            // → (assembly_id, gff3, proteins, aed_scores)
-        )
-
-
-    // ── Step 5c: Flag TE-derived gene models ───────────────────────────────
-    ch_flag_input = FILTER_GENE_MODELS.out.filtered_gff3
-        .join(FILTER_GENE_MODELS.out.filtered_proteins)
-        .join(REPEAT_MASK.out.repeat_gff)
-        .join(RECLASSIFY_REPEATS.out.reclassified_lib)
-        // produces: [assembly_id, braker_gff3, braker_proteins, repeat_gff]
-
-    FLAG_TE_GENES(ch_flag_input)
-    //   ↑ Use the PRE-filter repeat library here — we want all TE sequences
-    //     for homology detection, including ones removed from masking library
-
-    // ── Rename retained protein-coding gene models ──────────────────────────────
-    // This is the canonical ID boundary.
-    // After this point, all downstream protein-coding IDs are final IDs.
-
-    ch_rename_input = FLAG_TE_GENES.out.flagged_gff3
-        .join(FILTER_GENE_MODELS.out.filtered_proteins)
-        .join(FILTER_GENE_MODELS.out.filtered_aed)
-
-    RENAME_GENE_MODELS(ch_rename_input)
-
-    // ── Step 6: Get descriptive stats for annotations (per genome) ─────────────
-    ch_agat_inputs = ch_assemblies_filtered
-        .join(RENAME_GENE_MODELS.out.renamed_gff3, by: 0)
-        .map { id, assembly_path, gff_path -> tuple(id, assembly_path, gff_path) }
-
-    AGAT(ch_agat_inputs)
-
-    // ── Step 7: Run BUSCO on protein predictions (per genome) ─────────────
-    BUSCO(
-        RENAME_GENE_MODELS.out.renamed_proteins,
-        DOWNLOAD_BUSCO_DB.out.db)
-
-    // ── Step 8: Run OMArk on protein predictions (per genome) ─────────────
-    OMARK(
-        RENAME_GENE_MODELS.out.renamed_proteins,
-        DOWNLOAD_OMARK_DB.out.omamer_db,
-        DOWNLOAD_OMARK_DB.out.taxa_db)
-
-    /*
-    ========================================================================================
-        ncRNA Annotation
-    ========================================================================================
-    */
-
-    // ── Step 9: Run tRNA-Scan-SE on SoftMasked genome (per genome) ─────────────
-    tRNASCAN(REPEAT_MASK.out.masked_fasta)
-
-    // ─ Step 10: Run Infernal on SoftMasked genome (per genome) ─────────────
-    INFERNAL(REPEAT_MASK.out.masked_fasta,
-            DOWNLOAD_RFAM_DB.out.rfam_db_dir)
-
-    /*
-    ========================================================================================
-        Functional Annotation
-    ========================================================================================
-    */
-
-    // ── Step 11: Split proteins into chunks ─────────────
-    CHUNK_PROTEINS(
-        RENAME_GENE_MODELS.out.renamed_proteins)
-
-    // ch_chunks: (assembly_id, chunk_id, chunk_file)
-    ch_chunks = CHUNK_PROTEINS.out.chunks
-    .flatMap { assembly_id, f_or_list ->
-
-        // Normalize: if it's already a list/collection, use it; otherwise wrap it
-        def files = (f_or_list instanceof Collection) ? f_or_list : [f_or_list]
-
-        files
-            .sort { it.name }
-            .collect { f ->
-                def m = (f.name =~ /part_(\d+)/)
-                def chunk_id = m ? "part_${m[0][1]}" : f.baseName
-                tuple(assembly_id, chunk_id, f)
+    def validations = REPEAT_MASK_PARALLEL.out.masked_fasta.join(REPEAT_MASK_PARALLEL.out.repeat_out)
+        .join(referenceSplit.ready).join(acceptedLibraries).map { aid, masked, annotations, state, library ->
+            tuple(aid, state, masked, annotations, library)
+        }
+    VALIDATE_REFERENCE_REPEATS(validations, encode([
+        tetools_version: params.tetools_version, dfam_version: params.dfam_version,
+        repeat_seed: params.repeat_seed, additional_model_rounds: params.repModel_rounds,
+        min_repeat_length: params.min_repeat_length, cluster_pct: params.cluster_pct,
+        repeat_reclassify: params.repeat_reclassify, terrier_threshold: params.terrier_threshold,
+        terrier_environment: 'bio-terrier=0.4.0; torch=2.6.0; lightning=2.6.1',
+        filter_evalue: params.repeat_filter_evalue, filter_pident: params.repeat_filter_pident,
+        library_mode: params.repeat_library ? 'supplied_complete_library' : 'denovo_plus_dfam',
+        masking_policy: 'whole_contigs', requested_batches: params.n_rm_chunks, job_speed: params.job_speed
+    ]), repeatHelper)
+    REPORT_REFERENCE_REPEATS(RESOLVE_ANNOTATION_INPUTS.out.bundle, referenceStates.map { it[1] }.toList(),
+        AUDIT_REPEAT_LIBRARY.out.status.map { it[1] }.toList(), VALIDATE_REFERENCE_REPEATS.out.status.map { it[1] }.toList(),
+        benchmarkChecks,
+        file("${projectDir}/py_scripts/report_reference_repeats.py"))
+    ASSERT_REFERENCE_REPEATS(REPORT_REFERENCE_REPEATS.out.status, benchmarkChecks)
+    // RNA alignment can run once normalization and RNA preparation are ready, alongside repeats.
+    PLAN_CONNECTED_RNA_ALIGNMENT(RESOLVE_ANNOTATION_INPUTS.out.bundle, ASSERT_ANNOTATION_INPUTS.out,
+        REPORT_RNA_PREPARATION.out.status, ASSERT_RNA_PREPARATION.out,
+        referenceSplit.ready.join(FILTER_ASSEMBLY.out.bundle).map { aid, state, folder -> folder }.toList(),
+        encode([reference_dir: 'reference_inputs', strand_policy: [min_informative: params.rna_strand_min_informative,
+            dominant_fraction: params.rna_strand_dominant_fraction, unstranded_tolerance: params.rna_strand_unstranded_tolerance]]), alignmentHelper)
+    def alignmentPlans = PLAN_CONNECTED_RNA_ALIGNMENT.out.plan.map { path -> new groovy.json.JsonSlurper().parse(path.toFile()) }
+    def alignmentReferences = alignmentPlans.flatMap { plan -> plan.references }
+    INDEX_RNA_REFERENCE(alignmentReferences.map { row ->
+        tuple(row.reference_id, file(row.reference, checkIfExists: true), file(row.identity, checkIfExists: true))
+    }.unique { it[0] }, helpers)
+    def alignmentJobs = alignmentPlans.flatMap { plan -> plan.jobs }.map { job -> tuple(job.reference_id, job) }
+    def indexed = alignmentJobs.combine(INDEX_RNA_REFERENCE.out.index, by: 0).map { refid, job, index ->
+        tuple([job.assembly_id, job.readset_id], job, index)
+    }
+    ALIGN_RNA_READSET(indexed.map { key, job, index ->
+        tuple(job.assembly_id, job.readset_id, encode(job.spec), index,
+              job.read_paths.collect { file(it, checkIfExists: true) })
+    }, readHelpers)
+    def aligned = ALIGN_RNA_READSET.out.alignment.map { aid, rid, folder -> tuple([aid, rid], folder) }
+    QC_RNA_ALIGNMENT(indexed.join(aligned).map { key, job, index, folder ->
+        tuple(job.assembly_id, job.readset_id, encode(job.spec + [min_mapq: params.rna_strand_min_mapq]), folder, index)
+    }, alignmentHelper)
+    def qc = QC_RNA_ALIGNMENT.out.qc.map { aid, rid, folder -> tuple([aid, rid], folder) }
+    RESOLVE_RNA_STRAND(indexed.join(qc).map { key, job, index, folder ->
+        tuple(job.assembly_id, job.readset_id, encode(job.policy), folder)
+    }, alignmentHelper)
+    def bams = ALIGN_RNA_READSET.out.alignment.map { aid, rid, folder ->
+        [assembly_id: aid, readset_id: rid, bam: "readsets/${aid}/${rid}/aligned.bam",
+         bam_index: "readsets/${aid}/${rid}/aligned.bam.csi"]
+    }.toList().map { rows -> encode(rows) }
+    def alignmentLogs = ALIGN_RNA_READSET.out.alignment.map { aid, rid, folder ->
+        [aid: aid, rid: rid, folder: folder]
+    }.toList().map { rows ->
+        def samples = []
+        def logs = []
+        rows.sort { a, b -> (a.aid <=> b.aid) ?: (a.rid <=> b.rid) }.each { row ->
+            ['hisat2.log', 'flagstat.txt', 'samtools_stats.txt'].each { name ->
+                samples << "${row.aid}/${row.rid}".toString()
+                logs << file("${row.folder}/${name}", checkIfExists: true)
             }
+        }
+        tuple(samples, logs)
     }
-    // ── Step 12: Run InterProScan on protein chunks ─────────────
-    INTERPROSCAN(
-        ch_chunks,
-        DOWNLOAD_INTERPROSCAN_DB.out.db)
-
-    // group per assembly
-    ch_ipr_tsv_grouped = INTERPROSCAN.out.interproscan_tsv
-        .map { assembly_id, chunk_id, tsv -> tuple(assembly_id, tsv) }
-        .groupTuple(size: params.n_chunks)
-
-    MERGE_INTERPROSCAN(ch_ipr_tsv_grouped)
-
-    // ── Step 13: Run eggNOG on protein chunks ─────────────
-    EGGNOG(
-        ch_chunks,
-        DOWNLOAD_EGGNOG_DB.out.eggnog_db_dir)
-
-    // group per assembly
-    ch_eggnog_annotations_grouped = EGGNOG.out.eggnog_annotations
-        .map { assembly_id, chunk_id, tsv -> tuple(assembly_id, tsv) }
-        .groupTuple(size: params.n_chunks)
-
-    MERGE_EGGNOG(ch_eggnog_annotations_grouped)
-
-    // ── Step 14: Run Diamond on protein chunks ─────────────
-    DIAMOND(
-        ch_chunks,
-        DOWNLOAD_DIAMOND_DB.out.diamond_db)
-
-    // group per assembly
-    ch_diamond_annotations_grouped = DIAMOND.out.diamond_annotations
-        .map { assembly_id, chunk_id, tsv -> tuple(assembly_id, tsv) }
-        .groupTuple(size: params.n_chunks)
-
-    MERGE_DIAMOND(ch_diamond_annotations_grouped)
-
-    // ── Step 15: Run KoFamScan on protein chunks ─────────────
-    KOFAMSCAN(
-        ch_chunks,
-        DOWNLOAD_KOFAMSCAN_DB.out.kofamscan_db_dir)
-
-    ch_kofamscan_grouped = KOFAMSCAN.out.kofamscan_annotations
-        .map { assembly_id, chunk_id, tsv -> tuple(assembly_id, tsv) }
-        .groupTuple(size: params.n_chunks)
-
-    MERGE_KOFAMSCAN(ch_kofamscan_grouped)
-
-    // ── Step 16: Run DeepSIG on protein chunks ─────────────
-    DEEPSIG(ch_chunks)
-
-    ch_deepsig_grouped = DEEPSIG.out.deepsig_annotations
-        .map { assembly_id, chunk_id, gff -> tuple(assembly_id, gff) }
-        .groupTuple(size: params.n_chunks)
-
-    MERGE_DEEPSIG(ch_deepsig_grouped)
-
-    /*
-    ========================================================================================
-        Annotation Merging
-    ========================================================================================
-    */
-    // ── Step 17: Merge all functional annotations into single file per genome ─────────────
-    ch_func_merged = MERGE_INTERPROSCAN.out.merged_tsv
-        .join(MERGE_EGGNOG.out.merged)
-        .join(MERGE_DIAMOND.out.merged)
-        .join(MERGE_KOFAMSCAN.out.merged)
-        .join(MERGE_DEEPSIG.out.merged_gff3)
-        .join(RENAME_GENE_MODELS.out.renamed_proteins)
-        .join(RENAME_GENE_MODELS.out.renamed_gff3)
-        .join(ch_assemblies_filtered)
-        .join(OMARK.out.omark_ump)
-        .join(RENAME_GENE_MODELS.out.renamed_aed)
-        // produces: [assembly_id, ipr_tsv, eggnog_tsv, diamond_tsv, kofam_tsv, deepsig_gff3,
-        //            renamed_proteins_fa, renamed_gff3, genome_fasta, omark_ump, renamed_aed]
-
-    MERGE_FUNCTIONAL_ANNOTATIONS(ch_func_merged)
-
-    // ── Step 18: Merge all GFF3s and decorate with functional annotations ───────
-    ch_annotate_input = RENAME_GENE_MODELS.out.renamed_gff3
-        .join(tRNASCAN.out.trnascan_gff3)
-        .join(INFERNAL.out.infernal_gff3)
-        .join(TELOMERE_ANNOTATION.out.telomere_gff3)
-        .join(CENTROMERE_TO_GFF3.out.centromere_gff3)
-        .join(REPEAT_MASK.out.repeat_gff)
-        .join(MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv)
-    // produces: [assembly_id, braker_gff3, trnascan_gff3, infernal_gff3,
-    //            telomere_gff3, centromere_gff3, repeat_gff, func_tsv]
-
-    ANNOTATE_GFF3(ch_annotate_input)
-
-    // ── Step 18b: Structural QC per assembly ─────────────────────────
-    ch_structural_qc_in = MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv
-        .join(RENAME_GENE_MODELS.out.renamed_gff3)
-
-    STRUCTURAL_QC(ch_structural_qc_in)
-
-    // ── Step 19: Get relevant sequences with annotations ───────
-    ch_extract_input = ANNOTATE_GFF3.out.annotated_gff3
-        .join(ch_assemblies_filtered, by: 0)
-        // produces: [assembly_id, annotated_gff3, filtered_assembly]
-
-    EXTRACT_SEQUENCES(ch_extract_input)
-
-    /*
-    ========================================================================================
-        Create Report
-    ========================================================================================
-    */
-    ANNOTATION_REPORT(
-        FILTER_ASSEMBLY.out.bundle.map { id, folder -> file("${folder}/${id}.assembly_stats.tsv") }.collect(),
-        ANNOTATE_GFF3.out.annotated_gff3.map { id, f -> f }.collect(),
-        ANNOTATE_GFF3.out.gene_summary.map { id, f -> f }.collect(),
-        MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv.map { id, f -> f }.collect(),
-        REPEAT_MASK.out.repeat_tbl.map { id, f -> f }.collect(),
-        BUSCO.out.busco.map { id, f -> f }.collect(),
-        OMARK.out.omark_summary.map { id, f -> f }.collect(),
-        OMARK.out.omark_detailed.map { id, f -> f }.collect(),
-        AGAT.out.annotation_stats.map { id, f -> f }.collect(),
-        tRNASCAN.out.trnascan_tsv.map { id, f -> f }.collect(),
-        INFERNAL.out.infernal_tblout.map { id, f -> f }.collect(),
-        TELOMERE_ANNOTATION.out.telomere_gff3.map { id, f -> f }.collect(),
-        TELOMERE_ANNOTATION.out.telomere_tsv.map { id, f -> f }.collect(),
-        CENTROMERE_TO_GFF3.out.centromere_gff3.map { id, f -> f }.collect(),
-        STRUCTURAL_QC.out.structural_qc.map { id, f -> f }.collect()
-    )
-}
-
-// ── On-complete summary ──────────────────────────────────────────────────────
-workflow.onComplete {
-    log.info """
-    ============================================================
-    Pipeline complete!
-    Results : ${params.outdir}
-    Duration: ${workflow.duration}
-    Status  : ${workflow.success ? 'SUCCESS' : 'FAILED'}
-    ============================================================
-    """.stripIndent()
+    REPORT_RNA_ALIGNMENT(PLAN_CONNECTED_RNA_ALIGNMENT.out.plan,
+        QC_RNA_ALIGNMENT.out.qc.map { aid, rid, folder -> file("${folder}/alignment.json", checkIfExists: true) }.toList(),
+        RESOLVE_RNA_STRAND.out.strand.map { aid, rid, path -> path }.toList(), bams, alignmentLogs,
+        [alignmentHelper, file("${projectDir}/py_scripts/report_rna_alignment.py", checkIfExists: true)])
+    ASSERT_RNA_ALIGNMENT(REPORT_RNA_ALIGNMENT.out.status)
+    // Gene prediction: join scientific files by assembly, never read asynchronous publishDir outputs.
+    PLAN_BRAKER_INPUTS(RESOLVE_ANNOTATION_INPUTS.out.bundle, REPORT_REFERENCE_REPEATS.out.status,
+        REPORT_PROTEIN_EVIDENCE.out.status, REPORT_RNA_ALIGNMENT.out.status, brakerHelpers)
+    def predictionRequests = PLAN_BRAKER_INPUTS.out.plan.flatMap { path -> parse(path).jobs }
+        .map { row -> tuple(row.assembly_id, encode(row), row) }
+    def predictionFiles = REPEAT_MASK_PARALLEL.out.masked_fasta
+        .join(COMBINE_PROTEIN_EVIDENCE.out.evidence).join(FILTER_ASSEMBLY.out.bundle)
+        .join(ALIGN_RNA_READSET.out.alignment.groupTuple(by: 0))
+    def predictionInputs = predictionRequests.join(predictionFiles).map { aid, spec, row, genome, proteins, reference, rids, folders ->
+        def selected = row.readsets.collect { readset ->
+            def index = rids.indexOf(readset.readset_id)
+            if (index < 0) error "Missing native BAM for ${aid}/${readset.readset_id}"
+            folders[index]
+        }
+        tuple(aid, spec, genome, file("${proteins}/proteins.fa", checkIfExists: true),
+            selected.collect { file("${it}/aligned.bam", checkIfExists: true) },
+            selected.collect { file("${it}/aligned.bam.csi", checkIfExists: true) },
+            file("${reference}/${aid}.contigs.json", checkIfExists: true))
+    }
+    VALIDATE_BRAKER_INPUTS(predictionInputs, brakerHelpers)
+    CHECK_BRAKER_SOFTWARE(predictionInputs.join(VALIDATE_BRAKER_INPUTS.out.status), brakerHelpers)
+    def predictionResults = Channel.value([])
+    if (!params.braker_check_only) {
+        BRAKER(predictionInputs.join(CHECK_BRAKER_SOFTWARE.out.runtime), brakerHelpers)
+        VALIDATE_BRAKER_OUTPUTS(predictionInputs.join(BRAKER.out.prediction).map { aid, spec, genome, proteins, bams, indices, identity, prediction ->
+            tuple(aid, spec, prediction, identity)
+        }, brakerHelpers)
+        predictionResults = VALIDATE_BRAKER_OUTPUTS.out.status.map { aid, path -> path }.toList()
+    }
+    REPORT_BRAKER(PLAN_BRAKER_INPUTS.out.plan, predictionResults,
+        CHECK_BRAKER_SOFTWARE.out.runtime.map { aid, folder -> file("${folder}/inputs.json") }.toList(),
+        params.braker_check_only, '../rna_alignment/multiqc/multiqc_report.html', file("${projectDir}/py_scripts/report_braker.py"))
+    ASSERT_BRAKER(REPORT_BRAKER.out.status)
 }
