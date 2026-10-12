@@ -160,3 +160,12 @@ remain metadata for QC and strand consistency. The development entry reuses the
 accepted RNA/reference outputs and does not run repeats again. This does not
 introduce a checkpoint/import system into the eventual end-to-end workflow.
 Python checks pass; actual Nextflow/HISAT2 cluster acceptance remains pending.
+
+12 October 2026: RNA alignment cluster acceptance passed in
+testing/rna_alignment_contracts_01 (user-supplied acceptance.json). After the
+interrupted Python/pysam environment was rebuilt, recovery, unchanged resume,
+strand-only changes, an added reference, expected blocked exit 1 and no-RNA
+routing all passed using actual HISAT2 alignment. The environment versions were
+compatible; the earlier build stall's cause remains unconfirmed. This accepts
+the synthetic alignment/BAM handoff contracts, not real flounder mapping quality.
+Next is the real alignment pilot using accepted prepared reads and references.

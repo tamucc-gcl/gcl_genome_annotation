@@ -73,11 +73,18 @@ splice-supported reads, and may not represent all reads in an unusual library.
 Conflicting lane settings within a library also block that library.
 
 All parameters and process definitions are in `nextflow.config`:
-`rna_alignment_seed`, `rna_min_intron`, `rna_max_intron`,
+`rna_alignment_seed`, `rna_alignment_memory`, `rna_min_intron`, `rna_max_intron`,
 `rna_strand_min_mapq`, `rna_strand_min_informative`,
 `rna_strand_dominant_fraction`, and `rna_strand_unstranded_tolerance`.
 Inference thresholds affect inference only; MAPQ affects QC/inference; intron
 limits and alignment seed affect mapping. Unchanged tasks use native `-resume`.
+
+Alignment memory defaults to 300 GB after the full-depth real pilot reported
+Slurm peaks of approximately 156 and 212 GiB with a 48 GB request. The failed
+job was not explicitly labelled OUT_OF_MEMORY, so memory exhaustion remains
+unconfirmed. HISAT2 stderr is also streamed into the native task error log for
+diagnosis when scratch outputs cannot be returned. The allowance can be changed
+with `--rna_alignment_memory`; synthetic tests do not establish real-data usage.
 
 ## Outputs
 
@@ -113,7 +120,11 @@ or BRAKER. It checks fresh mapping, native resume, a strand-only change without
 remapping, adding a distinct reference while reusing completed work, expected
 blocking for insufficient strand evidence, and no-RNA routing. It verifies known
 splice junctions, high mapping rates, library associations and separate BAM paths.
-The new Nextflow/tool execution remains pending cluster acceptance.
+Cluster acceptance passed on 12 October 2026 in
+`testing/rna_alignment_contracts_01` (user-supplied acceptance.json): Python
+contracts, actual HISAT2 mapping recovered after an interrupted environment
+build, unchanged resume, strand-only changes, adding a reference, expected
+blocked exit 1 and no-RNA routing. The real alignment pilot remains pending.
 
 An interrupted first case can be continued without rewriting its synthetic
 inputs or losing the completed task cache:

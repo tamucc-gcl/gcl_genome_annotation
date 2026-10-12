@@ -34,5 +34,7 @@ alignment and prediction.
 [RNA alignment](docs/rna-alignment.md) is implemented in rna_alignment.nf. It
 uses the accepted selected reads and normalized references, produces separate
 HISAT2 BAMs with mapping/strand QC, and stops before BRAKER3. There is no BAM
-merge or standalone StringTie step. Python checks pass; actual Nextflow/HISAT2
-cluster acceptance and the real alignment pilot remain pending.
+merge or standalone StringTie step. Python checks and actual Nextflow/HISAT2
+cluster acceptance passed, including recovery, resume, strand-only changes,
+adding a reference, blocked inference and no-RNA routing. The real alignment
+pilot remains pending.

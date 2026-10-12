@@ -58,7 +58,7 @@ process ALIGN_RNA_READSET {
     hisat2 -x '${index}/genome' ${readArgs} --dta --seed ${params.rna_alignment_seed} \\
         --min-intronlen ${params.rna_min_intron} --max-intronlen ${params.rna_max_intron} \\
         --rg-id '${rid}' --rg ${sampleArg} --rg 'LB:${options.library_id}' \\
-        -p ${alignThreads} 2> '${rid}/hisat2.log' | \\
+        -p ${alignThreads} 2> >(tee '${rid}/hisat2.log' >&2) | \\
         samtools sort -@ 1 -m 2G -o '${rid}/aligned.bam' -
     samtools index -c -@ ${alignThreads} '${rid}/aligned.bam'
     samtools quickcheck -v '${rid}/aligned.bam'

@@ -69,6 +69,7 @@ def run_case(root, inputs, name, sheet, expected, suffix='fresh', resume=False, 
                '--sample_sheet', str(inputs / sheet), '--rna_sheet', str(inputs / 'reads.csv'),
                '--rna_prepared_status', str(inputs / 'prepared.json'), '--rna_reference_dir', str(inputs / 'references'),
                '--taxid', '999', '--taxdump_dir', str(inputs / 'taxdump'), '--outdir', str(output),
+               '--rna_alignment_memory', '8 GB',
                '--rna_strand_min_informative', str(minimum)]
     if resume:
         command.append('-resume')
