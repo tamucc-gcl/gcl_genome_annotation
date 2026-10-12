@@ -293,7 +293,7 @@ workflow {
     RESOLVE_RNA_STRAND(indexed.join(qc).map { key, job, index, folder ->
         tuple(job.assembly_id, job.readset_id, encode(job.policy), folder)
     }, alignmentHelper)
-    def bams = ALIGN_RNA_READSET.out.alignment.map { aid, rid, folder ->
+    def alignmentBamLocations = ALIGN_RNA_READSET.out.alignment.map { aid, rid, folder ->
         [assembly_id: aid, readset_id: rid, bam: "readsets/${aid}/${rid}/aligned.bam",
          bam_index: "readsets/${aid}/${rid}/aligned.bam.csi"]
     }.toList().map { rows -> encode(rows) }
@@ -312,7 +312,7 @@ workflow {
     }
     REPORT_RNA_ALIGNMENT(PLAN_CONNECTED_RNA_ALIGNMENT.out.plan,
         QC_RNA_ALIGNMENT.out.qc.map { aid, rid, folder -> file("${folder}/alignment.json", checkIfExists: true) }.toList(),
-        RESOLVE_RNA_STRAND.out.strand.map { aid, rid, path -> path }.toList(), bams, alignmentLogs,
+        RESOLVE_RNA_STRAND.out.strand.map { aid, rid, path -> path }.toList(), alignmentBamLocations, alignmentLogs,
         [alignmentHelper, file("${projectDir}/py_scripts/report_rna_alignment.py", checkIfExists: true)])
     ASSERT_RNA_ALIGNMENT(REPORT_RNA_ALIGNMENT.out.status)
     // Gene prediction: join scientific files by assembly, never read asynchronous publishDir outputs.
