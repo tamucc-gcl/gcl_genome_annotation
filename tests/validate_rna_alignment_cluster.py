@@ -93,7 +93,7 @@ def run_case(root, inputs, name, sheet, expected, suffix='fresh', resume=False, 
         for task, count in expected_counts.items():
             jobs = [row for row in trace if row['name'].startswith(task)]
             assert len(jobs) == count, f'{task}: missing/duplicate tasks'
-            if resume:
+            if resume and suffix != 'recover':
                 cached = count - (1 if suffix == 'added' and task in ('INDEX_RNA_REFERENCE', 'ALIGN_RNA_READSET') else 0)
                 assert sum(row['status'] == 'CACHED' for row in jobs) == cached, f'{task}: unexpected invalidation'
         if suffix == 'strand_change':
@@ -123,13 +123,17 @@ def run_case(root, inputs, name, sheet, expected, suffix='fresh', resume=False, 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--outdir', required=True)
+    parser.add_argument('--resume', action='store_true', help='Reuse existing fixtures and resume an interrupted ready run')
     args = parser.parse_args()
     if sys.flags.optimize:
         parser.error('Run without -O/PYTHONOPTIMIZE')
     root = Path(args.outdir).resolve()
     root.mkdir(parents=True, exist_ok=True)
-    if any(root.iterdir()):
+    if any(root.iterdir()) and not args.resume:
         parser.error('--outdir must be empty')
+    if args.resume and not all((root / path).exists() for path in
+                               ('fixtures/prepared.json', 'fixtures/ready.csv', 'ready/.nextflow')):
+        parser.error('--resume needs the original fixtures and ready/.nextflow cache')
     summary = dict(status='failed', checks=[], scope='Actual HISAT2 alignment and BAM handoff; no repeats or gene prediction')
     try:
         with (root / 'unit_tests.log').open('w') as log:
@@ -142,9 +146,11 @@ def main():
         if version.returncode or not re.search(r'\bversion\s+23\.10\.1\b', version.stdout + version.stderr):
             raise RuntimeError('Load Nextflow 23.10.1')
         inputs = root / 'fixtures'
-        create_inputs(inputs)
+        if not args.resume:
+            create_inputs(inputs)
         expected = dict(A='ready', B='ready')
-        summary['checks'].append(run_case(root, inputs, 'ready', 'ready.csv', expected))
+        summary['checks'].append(run_case(root, inputs, 'ready', 'ready.csv', expected,
+                                         'recover' if args.resume else 'fresh', resume=args.resume))
         summary['checks'].append(run_case(root, inputs, 'ready', 'ready.csv', expected, 'resume', resume=True))
         summary['checks'].append(run_case(root, inputs, 'ready', 'ready.csv', expected, 'strand_change', resume=True, strand='reverse'))
         summary['checks'].append(run_case(root, inputs, 'ready', 'added.csv', {**expected, 'C': 'ready'}, 'added', resume=True))

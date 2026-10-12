@@ -115,6 +115,19 @@ blocking for insufficient strand evidence, and no-RNA routing. It verifies known
 splice junctions, high mapping rates, library associations and separate BAM paths.
 The new Nextflow/tool execution remains pending cluster acceptance.
 
+An interrupted first case can be continued without rewriting its synthetic
+inputs or losing the completed task cache:
+
+```bash
+python gcl_genome_annotation/tests/validate_rna_alignment_cluster.py \
+  --outdir testing/rna_alignment_contracts_01 --resume
+```
+
+Stop the previous validator before resuming. Recovery completes the ready case
+with native Nextflow resume, then runs the normal acceptance cases, including a
+separate unchanged-resume check. Environment creation failures are infrastructure
+failures and do not imply that alignment failed.
+
 After acceptance, change only the Nextflow script in the personal sbatch command
 to `gcl_genome_annotation/rna_alignment.nf`. Keep the existing input/taxonomy
 arguments, `--outdir /work/birdlab/GCL/prj_seemann-flounder_genome/testing/genome_annotation`,
