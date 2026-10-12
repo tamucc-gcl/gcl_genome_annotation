@@ -26,5 +26,13 @@ reference_repeats.nf, reusing the existing scientific modules with reference ide
 record-safe curation, shared database reuse and whole-contig masking repairs. Cluster
 fixture acceptance passed on Nextflow 23.10.1, including actual custom-library masking,
 unsplit comparison, resume, adding an assembly and invalid-input blocking. The real
-discovery/classification/filtering pilot remains pending. This entry stops before
+discovery/classification/filtering pilot completed; its reports were reviewed as
+a baseline to continue, with heavily masked small contigs flagged for later
+RNA/protein support review. This entry stops before
 alignment and prediction.
+
+[RNA alignment](docs/rna-alignment.md) is implemented in rna_alignment.nf. It
+uses the accepted selected reads and normalized references, produces separate
+HISAT2 BAMs with mapping/strand QC, and stops before BRAKER3. There is no BAM
+merge or standalone StringTie step. Python checks pass; actual Nextflow/HISAT2
+cluster acceptance and the real alignment pilot remain pending.

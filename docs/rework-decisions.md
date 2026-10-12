@@ -141,3 +141,22 @@ flounder), retaining the effective species taxid. Explicit global/row choices st
 override it. RepeatModeler was gated by the failed extraction. Resume preserves
 completed work when task inputs are unchanged; corrected extraction and real
 discovery acceptance remain pending on the cluster.
+
+12 October 2026: the user supplied completed real flounder reference/repeat
+reports. Reference identity and all 679,059,826 bp across 31 contigs were
+preserved. Unique masked coverage was 47.55%; 1,364 de novo families survived
+protein filtering, with 61 gene-derived candidates removed and 307 TE-protected
+candidates retained. The reports support continuing with this baseline;
+near-completely masked small contigs still need downstream RNA/protein support
+review. Fixture acceptance alone did not establish this biological result.
+
+Next implementation is RNA alignment, followed by migration of accepted stages
+into main.nf and extension of the existing BRAKER3 prediction module. The user
+confirmed keeping BRAKER3; a conversational reference to BRAKER4 was incorrect.
+BRAKER3 consumes multiple mapped BAMs and runs transcript assembly internally.
+The alignment stage therefore produces separate sorted BAMs per readset/reference,
+with no pipeline BAM merge or standalone StringTie run. Library associations
+remain metadata for QC and strand consistency. The development entry reuses the
+accepted RNA/reference outputs and does not run repeats again. This does not
+introduce a checkpoint/import system into the eventual end-to-end workflow.
+Python checks pass; actual Nextflow/HISAT2 cluster acceptance remains pending.
