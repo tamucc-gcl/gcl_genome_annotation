@@ -74,28 +74,36 @@ Conflicting lane settings within a library also block that library.
 
 All parameters and process definitions are in `nextflow.config`:
 `rna_alignment_seed`, `rna_alignment_memory`, `rna_alignment_cpus`,
-`rna_alignment_threads`, `rna_min_intron`, `rna_max_intron`,
+`rna_alignment_threads`, `rna_no_temp_splicesite`, `rna_min_intron`, `rna_max_intron`,
 `rna_strand_min_mapq`, `rna_strand_min_informative`,
 `rna_strand_dominant_fraction`, and `rna_strand_unstranded_tolerance`.
 Inference thresholds affect inference only; MAPQ affects QC/inference; intron
 limits and alignment seed affect mapping. Unchanged tasks use native `-resume`.
 
-Alignment memory defaults to 300 GB after the full-depth real pilot reported
-Slurm peaks of approximately 156 and 212 GiB with a 48 GB request. The failed
-job was not explicitly labelled OUT_OF_MEMORY, so memory exhaustion remains
-unconfirmed. HISAT2 stderr is also streamed into the native task error log for
-diagnosis when scratch outputs cannot be returned. The allowance can be changed
-with `--rna_alignment_memory`; synthetic tests do not establish real-data usage.
-The user reports that Crest's exclusive-node behaviour has been unreliable.
-`rna_alignment_cpus` therefore exposes the CPU reservation so it can be set to
-the full count for the chosen node class. Crest normal nodes were confirmed by
-the user to have 64 CPUs and 350952 MB of configured memory; the default CPU
-reservation is now 64. `rna_alignment_threads` defaults
-to 14 independently, allowing full CPU reservation without forcing more mapper
-threads. No exclusive-node flags have been added. Tiny acceptance runs explicitly
-request four CPUs, two mapper threads and 8 GB.
+Alignment defaults to 16 reserved CPUs, 14 mapper threads and 48 GB memory after
+the successful mapper-only diagnostic with splice-site reuse disabled. Full
+mapping with sorting at these defaults remains to be validated. CPU reservation,
+mapper threads and memory are independently configurable. HISAT2 stderr also
+reaches the native task error log when scratch outputs cannot be returned.
+No exclusive-node flags are used. Tiny acceptance runs explicitly request four
+CPUs, two mapper threads and 8 GB.
 
 ## Outputs
+
+HISAT2 now defaults to `--no-temp-splicesite` (`rna_no_temp_splicesite = true`).
+Spliced alignment and XS tags remain enabled, but splice sites discovered by
+earlier reads are not reused to help later reads with short anchors. This can
+affect sensitivity; mapping rate alone does not establish equivalent junction
+or gene support. Set `--rna_no_temp_splicesite false` to restore reuse for a
+controlled comparison. Changing this setting invalidates the alignment cache.
+
+On 12 October 2026, full IBC1 mapping with two threads and SAM output discarded
+completed with this option: 58,267,066 pairs, 76.63% overall alignment rate,
+29m35s, maximum RSS 1,123,308 KiB and exit 0. The otherwise identical diagnostic
+with reuse enabled grew to approximately 168 GiB before cancellation. This
+strongly implicates within-run splice-site reuse in the earlier memory growth,
+without establishing the underlying software defect. Full pipeline BAM/QC
+validation with the new default and reduced resources remains pending.
 
 Under `rna_alignment/`:
 

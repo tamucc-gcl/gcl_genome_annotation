@@ -50,12 +50,13 @@ process ALIGN_RNA_READSET {
     def readArgs = options.layout == 'paired' ? "-1 ${quote(paths[0])} -2 ${quote(paths[1])}" : "-U ${quote(paths[0])}"
     def readCheck = groovy.json.JsonOutput.toJson([spec: options, paths: paths.collect { it.toString() }]).getBytes('UTF-8').encodeBase64().toString()
     def alignThreads = Math.min(params.rna_alignment_threads as int, Math.max(1, (task.cpus as int) - 2))
+    def spliceReuseArg = params.rna_no_temp_splicesite ? '--no-temp-splicesite' : ''
     """
     set -euo pipefail
     python rna_alignment.py reads --request '${readCheck}'
     mkdir ${rid}
     # Strand-neutral mapping: splice-derived XS tags remain independent of a supplied strand setting.
-    hisat2 -x '${index}/genome' ${readArgs} --dta --seed ${params.rna_alignment_seed} \\
+    hisat2 -x '${index}/genome' ${readArgs} --dta ${spliceReuseArg} --seed ${params.rna_alignment_seed} \\
         --min-intronlen ${params.rna_min_intron} --max-intronlen ${params.rna_max_intron} \\
         --rg-id '${rid}' --rg ${sampleArg} --rg 'LB:${options.library_id}' \\
         -p ${alignThreads} 2> >(tee '${rid}/hisat2.log' >&2) | \\

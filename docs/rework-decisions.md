@@ -181,3 +181,16 @@ Real alignment now reserves 64 CPUs and requests 300 GB per task, while keeping
 14 mapper threads. This uses the full CPU allocation to avoid co-locating the
 alignment jobs; no exclusive-node flags are used. Synthetic acceptance uses
 four CPUs, two mapper threads and 8 GB. The revised real pilot remains pending.
+
+12 October 2026: a further full-node attempt reported HISAT2 killed with signal
+9 and roughly 375 GiB task peak. A mapper-only two-thread IBC1 diagnostic still
+grew to approximately 168 GiB before cancellation. With only
+`--no-temp-splicesite` added, the full 58,267,066-pair diagnostic completed in
+29m35s with 1,123,308 KiB peak RSS, 76.63% overall alignment and exit 0. Disable
+within-run splice-site reuse by default through `rna_no_temp_splicesite = true`;
+keep spliced mapping, DTA and XS tags. The setting remains configurable because
+reuse can help short-anchor reads. The comparison strongly implicates reuse in
+memory growth; it does not prove a particular software defect or equal biological
+sensitivity. At the user's request, return alignment resources to 16 reserved
+CPUs, 14 mapper threads and 48 GB memory. Full BAM/QC validation at these
+resources remains pending; the diagnostic used two threads and discarded SAM.
