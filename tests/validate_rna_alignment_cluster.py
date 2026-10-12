@@ -85,6 +85,17 @@ def run_case(root, inputs, name, sheet, expected, suffix='fresh', resume=False, 
         tail = '\n'.join((case / f'{suffix}.console.log').read_text(errors='replace').splitlines()[-40:])
         raise RuntimeError(f'{name}: exit {process.returncode}; missing alignment report.\n{tail}')
     data = json.loads(status.read_text())
+    alignment_dir = output / 'rna_alignment'
+    assert '(multiqc/multiqc_report.html)' in (alignment_dir / 'README.md').read_text()
+    assert (alignment_dir / 'multiqc/multiqc_report.html').is_file()
+    if data['readsets']:
+        expected_samples = {f"{row['assembly_id']}/{row['readset_id']}" for row in data['readsets']}
+        for module in ('bowtie2', 'samtools_stats', 'samtools_flagstat'):
+            with (alignment_dir / f'multiqc/multiqc_report_data/multiqc_{module}.txt').open() as handle:
+                module_rows = list(csv.DictReader(handle, delimiter='\t'))
+            assert {next(iter(row.values())) for row in module_rows} == expected_samples, f'MultiQC {module}: lost/mislabelled sample'
+    else:
+        assert 'No RNA alignment was requested' in (alignment_dir / 'multiqc/multiqc_report.html').read_text()
     assert {row['assembly_id']: row['status'] for row in data['assemblies']} == expected
     assert (process.returncode == 0) == all(value != 'blocked' for value in expected.values())
     with (output / 'pipeline/pipeline_trace.txt').open() as handle:

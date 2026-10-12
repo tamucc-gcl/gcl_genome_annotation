@@ -194,3 +194,13 @@ memory growth; it does not prove a particular software defect or equal biologica
 sensitivity. At the user's request, return alignment resources to 16 reserved
 CPUs, 14 mapper threads and 48 GB memory. Full BAM/QC validation at these
 resources remains pending; the diagnostic used two threads and discarded SAM.
+
+RNA alignment reporting now generates MultiQC 1.25.1 from native staged HISAT2,
+samtools flagstat and samtools stats text logs. Assembly/readset labels prevent
+shared log filenames or reuse of a readset across assemblies from collapsing
+samples. The generated README links to multiqc/multiqc_report.html; no-RNA
+inputs receive a clear no-alignment page. Reporting has a separate helper and
+environment so this change does not invalidate completed scientific tasks.
+Local validation with actual MultiQC retained both assembly identities in all
+three datasets; 70 Python contracts passed. Cluster integration checks now also
+require the linked report and complete labelled MultiQC datasets.

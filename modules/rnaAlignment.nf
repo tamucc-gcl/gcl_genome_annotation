@@ -101,20 +101,23 @@ process RESOLVE_RNA_STRAND {
 }
 
 process REPORT_RNA_ALIGNMENT {
-    label 'rna_strand'
     publishDir "${params.outdir}/rna_alignment", mode: 'copy', overwrite: true
     input:
     path plan
     path statistics, stageAs: 'qc/qc??.json'
     path strands, stageAs: 'strands/strand??.json'
     val bams
-    path helper
+    tuple val(log_samples), path(alignment_logs, stageAs: 'logs/log????.txt')
+    path report_helpers
     output:
     path 'rna_alignment_status.json', emit: status
     path 'README.md', emit: report
+    path 'multiqc', emit: multiqc
     script:
+    def logs = alignment_logs instanceof Collection ? alignment_logs : [alignment_logs]
+    def multiqcRequest = groovy.json.JsonOutput.toJson([samples: log_samples, paths: logs.collect { it.toString() }]).getBytes('UTF-8').encodeBase64().toString()
     """
-    python ${helper} report --plan '${plan}' --qc qc --strands strands --request '${bams}' --outdir .
+    python report_rna_alignment.py --plan '${plan}' --qc qc --strands strands --request '${bams}' --multiqc-request '${multiqcRequest}' --outdir .
     """
 }
 

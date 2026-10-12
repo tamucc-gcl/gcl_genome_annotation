@@ -54,8 +54,22 @@ workflow {
         [assembly_id: aid, readset_id: rid, bam: "readsets/${aid}/${rid}/aligned.bam",
          bam_index: "readsets/${aid}/${rid}/aligned.bam.csi"]
     }.toList().map { rows -> encode(rows) }
+    def alignmentLogs = ALIGN_RNA_READSET.out.alignment.map { aid, rid, folder ->
+        [aid: aid, rid: rid, folder: folder]
+    }.toList().map { rows ->
+        def samples = []
+        def logs = []
+        rows.sort { a, b -> (a.aid <=> b.aid) ?: (a.rid <=> b.rid) }.each { row ->
+            ['hisat2.log', 'flagstat.txt', 'samtools_stats.txt'].each { name ->
+                samples << "${row.aid}/${row.rid}".toString()
+                logs << file("${row.folder}/${name}", checkIfExists: true)
+            }
+        }
+        tuple(samples, logs)
+    }
     REPORT_RNA_ALIGNMENT(PLAN_RNA_ALIGNMENT.out.plan,
         QC_RNA_ALIGNMENT.out.qc.map { aid, rid, folder -> file("${folder}/alignment.json", checkIfExists: true) }.toList(),
-        RESOLVE_RNA_STRAND.out.strand.map { aid, rid, path -> path }.toList(), bams, helper)
+        RESOLVE_RNA_STRAND.out.strand.map { aid, rid, path -> path }.toList(), bams, alignmentLogs,
+        [helper, file("${projectDir}/py_scripts/report_rna_alignment.py", checkIfExists: true)])
     ASSERT_RNA_ALIGNMENT(REPORT_RNA_ALIGNMENT.out.status)
 }

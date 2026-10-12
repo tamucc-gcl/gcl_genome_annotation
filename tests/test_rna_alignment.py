@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'py_scripts'))
 import rna_alignment as alignment
+import report_rna_alignment as reporting
 from reference_repeats import reference as normalize
 
 
@@ -20,6 +21,22 @@ def qc(forward=100, reverse=0, status='ready'):
 
 
 class AlignmentContracts(unittest.TestCase):
+    def test_no_rna_report_link_resolves(self):
+        import base64
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan = root / 'plan.json'
+            plan.write_text(json.dumps({'assemblies': [{'assembly_id': 'A', 'rna_readsets': []}], 'jobs': []}))
+            encode = lambda value: base64.b64encode(json.dumps(value).encode()).decode()
+            args = ['report_rna_alignment.py', '--plan', str(plan), '--qc', str(root / 'qc'),
+                    '--strands', str(root / 'strands'), '--request', encode([]),
+                    '--multiqc-request', encode(dict(paths=[], samples=[])), '--outdir', str(root)]
+            with patch.object(sys, 'argv', args):
+                reporting.main()
+            self.assertIn('(multiqc/multiqc_report.html)', (root / 'README.md').read_text())
+            self.assertIn('No RNA alignment was requested', (root / 'multiqc/multiqc_report.html').read_text())
+            self.assertEqual(json.loads((root / 'rna_alignment_status.json').read_text())['status'], 'ready')
+
     def test_selected_read_bytes_and_mate_order(self):
         from prepare_rna import digest
         with tempfile.TemporaryDirectory() as tmp:

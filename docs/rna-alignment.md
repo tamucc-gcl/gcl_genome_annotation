@@ -117,6 +117,12 @@ Under `rna_alignment/`:
 - `strand/<assembly>/<readset>.strand.json`: supplied/inferred strand and policy.
 - `README.md` and `rna_alignment_status.json`: assembly/library readiness,
   separate BAM lists, mapping statistics and reasons for blocked results.
+- `multiqc/multiqc_report.html`: linked from the generated README; summarizes
+  HISAT2 logs, samtools flagstat and samtools stats under assembly/readset labels.
+  HISAT2's default summary format is parsed by MultiQC's Bowtie 2 / HiSAT2 module.
+  The report consumes only native staged text logs, not BAMs. With no requested
+  RNA, the linked page explains that no alignment was requested. Reporting uses
+  MultiQC 1.25.1 and a separate helper so changes do not invalidate mapping.
 
 The final assertion exits nonzero for incomplete evidence, after publication of
 the report. Environment/scheduler/tool failures can stop execution before a report.
