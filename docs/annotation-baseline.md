@@ -48,6 +48,23 @@ Local Python contracts passed; cluster acceptance remains pending.
 
 ## Real flounder pilot
 
+The user supplied the ready real-data baseline report on 13 October 2026.
+AGAT, BUSCO and OMArk completed. It records 21,528 genes, 45,399 coding
+transcripts and 21,528 selected representative proteins. BUSCO 5.3.2 with
+actinopterygii_odb10 found C:97.9% [S:93.9%, D:4.0%], F:0.3%, M:1.8%
+across 3,640 groups. OMArk used Percomorphaceae (16,241 conserved HOGs):
+91.71% single, 4.41% duplicated and 3.88% missing. It assessed 21,524 proteins:
+96.31% consistent, 0.75% inconsistent, 0% contaminants and 2.94% unknown.
+Consistent partial hits (530) and fragmented proteins (322) are subcategories,
+not additional independent totals. The user reconciled the four proteins absent
+from OMArk classifications: g11457.t1 (2 aa), g7676.t1 (4 aa), g7679.t1 (4 aa)
+and g7683.t1 (4 aa), each the sole isoform of its gene. They remain in the selected
+FASTA; they were not filtered by this pipeline. The selected count is 21,528,
+not the 21,524 previously inferred from the OMAmer progress log. The exact
+OMAmer short-sequence exclusion condition has not been verified for this database.
+This confirms real tool execution and establishes an unfiltered baseline, not
+final model quality. Inspect those extremely short predictions during model QC.
+
 After cluster contracts pass, change only the Nextflow script target in the
 project's sbatch from `braker_prediction.nf` to `annotation_qc.nf`. Keep the
 sample/RNA sheets, taxonomy/database arguments, existing output directory

@@ -299,3 +299,83 @@ post-analysis `omark --version` probe invoked argument validation requiring a
 database; version recording now reads installed package metadata, as for OMAmer.
 Existing database files are retained. The baseline report and final real OMArk
 acceptance remain pending recovery with native -resume.
+
+13 October 2026: user-supplied ready real baseline report confirms AGAT, BUSCO
+and OMArk completed. Selection contains 21,528 representatives from 21,528 genes
+and 45,399 coding transcripts. BUSCO actinopterygii_odb10 (3,640 groups) reports
+97.9% complete, 4.0% duplicated, 0.3% fragmented and 1.8% missing. OMArk's
+Percomorphaceae assessment uses 16,241 conserved HOGs: 91.71% single,
+4.41% duplicated and 3.88% missing. Of 21,524 assessed proteins, 96.31% are
+consistent, 0.75% inconsistent, 0% contaminants and 2.94% unknown. The four
+selected proteins absent from that assessment are not assumed filtered by the
+pipeline; reconcile them against OMArk classifications. Correction: the earlier
+answer used the OMAmer progress count as the selection count. It is 21,528.
+Real execution is accepted; this is an unfiltered baseline for subsequent
+all-available-evidence scoring and filter comparisons, not a final quality claim.
+
+The user reconciled the four omitted OMArk classifications against the selected
+FASTA mapping: g11457.t1 is 2 aa; g7676.t1, g7679.t1 and g7683.t1 are 4 aa.
+Each is its gene's sole isoform. They remain selected and have not been removed
+by pipeline filters. The assessed count is therefore distinct from the input count;
+the exact OMAmer length exclusion rule is not claimed as verified. These models
+need structural inspection; short protein length alone does not establish which
+legacy CDS/gene-span filters apply.
+
+13 October 2026: user requested planning and research before reconnecting scoring
+and filters. See evidence-scoring-plan.md. The proposal starts from existing
+miniprot/AED, filter, TE flagging, ID mapping and QC modules; audits retained ETP
+StringTie assemblies before duplicating work; adds an RNA-only assembly route;
+and defines combined AED/UTR/isoform handling before implementation. PASA,
+EviAnn, Mikado, junction QC and reference-transfer options are researched
+candidates, not selected defaults. Refinement is evaluated on retained unfiltered
+candidates before final hard filtering, with rescoring and complete sequence/ID
+validation. No scientific pipeline behavior changes in this planning step.
+
+The user accepted the proposed order and specified that canonical AED must follow
+MAKER's definition and protein/transcript evidence integration. This supersedes
+the proposed custom combined metric: evaluate MAKER's existing-model assessment
+as the reference, require agreement tests for any compatible scorer, preserve
+structures/IDs during scoring, and keep legacy protein-only/coding-region metrics
+separate. Gene-level filtering aggregation is our explicit policy, not silently
+claimed as part of MAKER's per-transcript AED. PASA and EviAnn are accepted for
+optional refinement exploration, not promoted as default pipeline stages.
+
+The first real evidence inventory confirms two per-readset StringTie assemblies,
+merged transcript coordinates and transcript FASTA in retained GeneMark-ETP/rnaseq.
+Use these as candidate reusable RNA evidence rather than the complete/incomplete/
+unsupported coding subsets. Per-readset/merged BAM hints are also retained.
+File presence alone does not establish compatible format/provenance; protein
+alignment availability and MAKER input conversion remain to be checked. Do not
+rerun StringTie just because the downstream scoring route is new.
+
+Follow-up inventory: StringTie 2.2.1 merged output is GTF despite its .gff suffix.
+It and the transcript FASTA contain the same 23,767 transcript IDs; all transcript
+contigs occur in the accepted reference. Both input readsets retain reverse strand
+metadata. No retained Spaln files were found. ProtHint top_chains.gff deliberately
+trims CDS blocks when generating CDSpart hints and cannot substitute for untrimmed
+protein alignment coverage. Reuse existing RNA evidence, create a separate cached
+protein alignment with the existing miniprot module, and validate MAKER scoring-only
+inputs without retraining or changing BRAKER models. The evidence inventory is
+complete at the listing/ID/reference-name level; scientific conversion/runtime
+acceptance remains an implementation task.
+
+The user rejected installing full MAKER for AED assessment. Use a lightweight
+implementation starting from existing interval utilities and pinned MAKER source,
+not the MAKER runtime. Source revision 4bf3085ae8df4680468646a63c635094a0a3dc2a:
+shadow_AED::get_AED/get_SN_SP unions supplied evidence blocks, compares them with
+transcript blocks, and computes 1-(SN+SP)/2. Upstream evidence selection still
+requires tracing; matching the core formula alone does not establish compatibility.
+Validate against source-derived fixtures or a minimal reference scorer without
+requiring a full MAKER installation. This supersedes the earlier scoring-only
+MAKER runtime proposal; PASA/EviAnn remain optional refinement candidates.
+
+13 October: implemented the first lightweight evidence AED pilot, starting from
+the existing miniprot command and retained ETP/StringTie transcripts. Pinned MAKER
+source separates the standard nucleotide union score from eAED and upstream
+clustering. The pilot uses matching contig/strand and direct transcript-span overlap;
+it does not claim to reproduce MAKER's complete clustering/preprocessing. Scores,
+source availability, legacy protein/CDS comparisons and checksums are explicit.
+No model filters or polishing are connected yet. All four evidence modes have
+local contracts; 102 Python tests passed. A tiny real-miniprot cluster validator
+checks four modes, retained RNA reuse, resume and changed-model blocking. Cluster
+execution, standalone StringTie fallback and the real database pilot are pending.

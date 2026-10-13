@@ -4,7 +4,10 @@ Pipeline for Genome Annotation
 [Unfiltered annotation baseline](docs/annotation-baseline.md) reconnects the existing
 AGAT, BUSCO and OMArk modules after validated predictions. `annotation_qc.nf`
 assesses completed BRAKER outputs without rerunning prediction. Local contracts
-pass; cluster acceptance and real baseline metrics remain pending.
+pass; the real flounder baseline is ready (BUSCO 97.9% complete; OMArk 96.31%
+lineage-consistent among assessed proteins). Four selected proteins absent from
+OMArk's assessment were reconciled to 2–4 aa sequences retained in the input;
+the synthetic acceptance summary has not been supplied.
 
 ![](assets/genome_annotation_pipeline.png)
 ## Pipeline rework
@@ -58,3 +61,11 @@ and genome-only runs without optional evidence reports. The real flounder ETP
 pilot passed prediction integrity validation on 13 October 2026: 21,528 genes
 and 45,399 coding transcripts with matching protein/CDS records. Downstream
 filtering and biological evaluation remain pending.
+
+[Evidence AED assessment](docs/evidence-scoring.md) adds a lightweight scoring
+pilot in `evidence_scoring.nf`, reusing the miniprot command and retained StringTie
+transcripts. It combines supplied RNA/protein blocks using MAKER's nucleotide AED
+formula, without installing MAKER or changing the predictions. Full MAKER evidence
+clustering is not reproduced. Local Python acceptance passed; tiny real-miniprot
+cluster acceptance and the real-data scoring pilot remain pending. Model filters,
+TE flags and optional refinement are subsequent increments.
