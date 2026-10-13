@@ -13,14 +13,18 @@ RNA+protein acceptance passed on Crest with Nextflow 23.10.1 in
 `testing/braker_contracts_01`: Python contracts, connected recovery/resume and
 prediction-only recovery/resume all passed. This confirms the handoff and actual
 BRAKER3 software checks, not training, predictions or biological model quality.
-The expanded four-mode and genome-only fixtures still need cluster acceptance.
+Expanded four-mode and genome-only acceptance passed on Crest on 12 October
+2026 in `testing/braker_contracts_04`. All eight fresh/resume runs passed across
+the connected and prediction-only entry points, including genome-only inputs
+without optional evidence reports. These runs checked actual BRAKER3 software
+readiness, not training or prediction.
 
 From the consuming project directory, using Nextflow 23.10.1 and the same
 Slurm/Conda/Singularity setup as earlier stage validators:
 
 ```bash
 python gcl_genome_annotation/tests/validate_braker_cluster.py \
-  --outdir testing/braker_contracts_02
+  --outdir testing/braker_contracts_04
 ```
 
 The fixture runs the connected `main.nf` with tiny local proteins, synthetic reads
@@ -43,6 +47,17 @@ construction, separate BAMs, output coordinate/parent checks and matching predic
 protein/CDS identifiers. They do not demonstrate biological prediction quality.
 
 ## Real-data pilot
+
+The user-supplied report on 13 October 2026 confirms that the real
+`Sfl-n_primary` pilot completed in RNA+protein (ETP) mode and passed prediction
+integrity validation. It produced 21,528 genes and 45,399 coding transcripts,
+with 45,399 matching protein and CDS records. Both separate paired-end readsets
+(`IBC1_S123_L006`, `IBC2_S124_L006`) were included with reverse strand metadata;
+the input protein evidence contained 19,445,987 sequences. Validation covered
+nonempty outputs, reference bounds, feature IDs/parents and matching sequence IDs.
+These are unfiltered BRAKER outputs; biological quality and downstream filtering
+remain to be assessed. Actual training of the other three evidence modes has not
+been validated by this pilot.
 
 Keep the existing sbatch setup and Nextflow arguments. Change the script argument
 from `rna_alignment.nf` to `braker_prediction.nf`, retaining `-resume` and the same

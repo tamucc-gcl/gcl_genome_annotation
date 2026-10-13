@@ -248,3 +248,38 @@ and defaults false; ES prediction is intrinsically ab initio. Expanded Python te
 pass locally. The cluster validator now covers mixed evidence modes and a completely
 genome-only workflow with unchanged resume. Its updated fixtures require a new
 output directory; expanded cluster and real training acceptance remain pending.
+
+12 October 2026: expanded BRAKER acceptance passed on Crest with Nextflow 23.10.1
+in `testing/braker_contracts_04` (user-supplied acceptance.json). Python tests and
+all eight fresh/resume runs passed: mixed ETP/ET/EP/ES assemblies through both
+entry points, plus genome-only connected and prediction-only runs without optional
+evidence reports. The fresh protein-store handoff passed with store finalization
+on the local executor without scratch; acquisition and scientific tasks remain
+on Slurm. Actual BRAKER3 software checks passed for the selected routes. Training,
+prediction output validation and biological assessment remain untested. The user
+confirmed that additional AUGUSTUS predictions without hints should remain off
+by default; this does not disable ES prediction or the trained models used with
+evidence. Next is the real RNA+protein prediction pilot using accepted stage outputs.
+
+13 October 2026: the user supplied the real structural_annotation README and
+prediction_status.json. Sfl-n_primary completed BRAKER3 ETP training/prediction
+with both paired RNA readsets and 19,445,987 evidence proteins. The ready report
+records 21,528 genes, 45,399 coding transcripts, 45,399 proteins and 45,399 CDS
+sequences. Structural validation passed for nonempty predictions, reference
+bounds, feature IDs/parents and matching protein/CDS IDs. These are unfiltered
+predictions; downstream filtering, functional annotation and biological quality
+assessment remain pending. Other evidence modes have software/handoff acceptance,
+not real training acceptance. Additional AUGUSTUS predictions remain disabled.
+
+13 October 2026: start downstream implementation by reconnecting existing AGAT,
+BUSCO and OMArk modules for an unfiltered baseline. AGAT retains all isoforms;
+BUSCO/OMArk use a deterministic longest protein per coding gene without changing
+the original predictions. Per-assembly lineage/taxid and enabled analysis settings
+replace global species settings. Missing requested outputs block reporting; disabled
+analyses remain explicit. The new QC-only development entry reads accepted outputs,
+while main.nf uses native prediction channels. Database acquisition keeps shared
+storeDir semantics; user confirmed actinopterygii_odb10 and LUCA/taxa.sqlite exist.
+Python contracts passed; actual AGAT contracts and real BUSCO/OMArk execution remain
+pending. MAKER AED uses available transcript/protein evidence; the legacy best-hit
+protein-based CDS score is retained as an explicitly named baseline for subsequent
+filter implementation, not claimed as a combined-evidence MAKER score.

@@ -163,8 +163,10 @@ without scratch, on the Nextflow driver host. It validates the ready marker and
 lets Nextflow stage the bundle into `storeDir`; downloads and normalization still
 run through Slurm. This avoids a cross-node metadata visibility gap between the
 store transfer and Nextflow's immediate output check. The store parent is created
-by the driver before acquisition. Fresh cluster acceptance of this change remains
-pending; resuming a run with an already stored bundle does not exercise that path.
+by the driver before acquisition. Fresh connected cluster acceptance passed in
+`testing/braker_contracts_04` on 12 October 2026, followed by unchanged resume.
+This validates the fresh storage path in the connected fixture; earlier failed
+standalone protein fixture runs are not relabeled as passed.
 
 NCBI spike-ins and local proteins use the project-level `protein_source_store`
 parameter, default `${launchDir}/protein_source_store/normalization-v1/`.

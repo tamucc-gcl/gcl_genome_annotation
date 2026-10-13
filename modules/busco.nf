@@ -10,32 +10,34 @@
 process BUSCO {
     tag "${assembly_id}"
     label 'busco'
-    publishDir "${params.outdir}/qc/busco", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/qc/baseline/${assembly_id}/busco", mode: params.publish_dir_mode
     
     input:
-    tuple val(assembly_id), path(protein_fasta)
-    path(busco_db)
+    tuple val(assembly_id), val(lineage), path(protein_fasta), path(busco_db)
     
     output:
     tuple val(assembly_id), path("${assembly_id}_busco.txt"), emit: busco
+    tuple val(assembly_id), path("${assembly_id}_busco"), emit: results
     
     script:
-    def lineage = params.busco_lineage ?: "auto"
     """
+    set -euo pipefail
     busco \\
         --in ${protein_fasta} \\
         --out ${assembly_id}_busco \\
         --mode proteins \\
-        --lineage_dataset ${lineage} \\
+        --lineage_dataset '${busco_db}' \\
         --cpu ${task.cpus} \\
         --offline \\
         --download_path ${params.busco_database ?: '/path/to/busco_downloads'}
-    mv ${assembly_id}_busco/short_summary.specific.${lineage}.${assembly_id}_busco.txt ${assembly_id}_busco.txt 
+    cp ${assembly_id}_busco/short_summary.specific.${lineage}.${assembly_id}_busco.txt ${assembly_id}_busco.txt
+    busco --version > ${assembly_id}_busco/version.txt
     """
     
     stub:
     """
     touch ${assembly_id}_busco.txt
+    mkdir -p ${assembly_id}_busco
     """
 }
 
@@ -61,7 +63,7 @@ process DOWNLOAD_BUSCO_DB {
     val(lineage)
     
     output:
-    path("lineages/${lineage}"), emit: db
+    tuple val(lineage), path("lineages/${lineage}"), emit: db
     
     script:
     """

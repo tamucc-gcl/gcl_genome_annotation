@@ -1,10 +1,15 @@
 # gcl_genome_annotation
 Pipeline for Genome Annotation
 
+[Unfiltered annotation baseline](docs/annotation-baseline.md) reconnects the existing
+AGAT, BUSCO and OMArk modules after validated predictions. `annotation_qc.nf`
+assesses completed BRAKER outputs without rerunning prediction. Local contracts
+pass; cluster acceptance and real baseline metrics remain pending.
+
 ![](assets/genome_annotation_pipeline.png)
 ## Pipeline rework
 
-The new [input and taxonomy preflight](docs/foundation-preflight.md) supports two-sheet validation, global defaults, per-assembly overrides and taxonomy-derived settings. The integrated `main.nf` now connects preparation, repeats, alignment and BRAKER3 prediction. Downstream annotation and model filtering have not yet been connected. Standalone entries remain available for development and testing.
+The new [input and taxonomy preflight](docs/foundation-preflight.md) supports two-sheet validation, global defaults, per-assembly overrides and taxonomy-derived settings. The integrated `main.nf` now connects preparation, repeats, alignment, BRAKER3 prediction and unfiltered baseline QC. Functional annotation and model filtering have not yet been connected. Standalone entries remain available for development and testing.
 Input-contract acceptance passed on Nextflow 23.10.1.
 
 [Protein evidence preparation](docs/protein-evidence.md) adds validated,
@@ -47,5 +52,9 @@ Input checks, runtime checks and prediction integrity reporting are implemented.
 RNA+protein connected and prediction-only cluster acceptance passed on Nextflow
 23.10.1, including unchanged resume and actual BRAKER3 software checks. The stage
 now also routes RNA-only, protein-only and genome-only assemblies through BRAKER's
-ET, EP and ES modes. Expanded four-mode cluster acceptance and real
-training/prediction remain pending.
+ET, EP and ES modes. Expanded four-mode cluster acceptance passed on Crest in
+`testing/braker_contracts_04`, including fresh/resume runs of both entry points
+and genome-only runs without optional evidence reports. The real flounder ETP
+pilot passed prediction integrity validation on 13 October 2026: 21,528 genes
+and 45,399 coding transcripts with matching protein/CDS records. Downstream
+filtering and biological evaluation remain pending.

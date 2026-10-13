@@ -9,21 +9,21 @@
 process OMARK {
     tag "${assembly_id}"
     label 'omark'
-    publishDir "${params.outdir}/qc/omark", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/qc/baseline/${assembly_id}/omark", mode: params.publish_dir_mode
     
     input:
-    tuple val(assembly_id), path(protein_fasta)
-    path(omamer_db)
-    path(taxa_db)
+    tuple val(assembly_id), val(taxid), path(protein_fasta), path(omamer_db), path(taxa_db)
     
     output:
     tuple val(assembly_id), path("${assembly_id}.png"), emit: omark_plot
     tuple val(assembly_id), path("${assembly_id}_detailed.txt"), emit: omark_detailed
     tuple val(assembly_id), path("${assembly_id}.summary.txt"), emit: omark_summary
     tuple val(assembly_id), path("${assembly_id}.ump"),          emit: omark_ump
+    tuple val(assembly_id), path('omark_output'), emit: results
     
     script:
     """
+    set -euo pipefail
     omamer search \
         --nthreads ${task.cpus} \\
         --db ${omamer_db} \\
@@ -34,21 +34,24 @@ process OMARK {
         --file ${assembly_id}.omamer \\
         --database ${omamer_db} \\
         --ete_ncbi_db ${taxa_db} \\
-        --taxid ${params.ncbi_speciesID} \\
+        --taxid '${taxid}' \\
         --og_fasta ${protein_fasta}
     
-    mv omark_output/${assembly_id}.png ${assembly_id}.png
-    mv omark_output/${assembly_id}_detailed_summary.txt ${assembly_id}_detailed.txt
-    mv omark_output/${assembly_id}.sum ${assembly_id}.summary.txt
-    mv omark_output/${assembly_id}.ump ${assembly_id}.ump
+    cp omark_output/${assembly_id}.png ${assembly_id}.png
+    cp omark_output/${assembly_id}_detailed_summary.txt ${assembly_id}_detailed.txt
+    cp omark_output/${assembly_id}.sum ${assembly_id}.summary.txt
+    cp omark_output/${assembly_id}.ump ${assembly_id}.ump
+    omark --version > omark_output/version.txt
+    python -c "from importlib.metadata import version; print(version('omamer'))" > omark_output/omamer_version.txt
     """
     
     stub:
     """
     touch ${assembly_id}.png
     touch ${assembly_id}_detailed.txt
-    touch ${assembly_id}.sum
+    touch ${assembly_id}.summary.txt
     touch ${assembly_id}.ump
+    mkdir -p omark_output
     """
 }
 
@@ -75,6 +78,7 @@ process DOWNLOAD_OMARK_DB {
     output:
     path("${oma_db_name}.h5"), emit: omamer_db
     path("taxa.sqlite"), emit: taxa_db
+    tuple val(oma_db_name), path("${oma_db_name}.h5"), path('taxa.sqlite'), emit: databases
     
     script:
     """

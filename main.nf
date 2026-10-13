@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 // Integrated rework: inputs -> proteins/RNA/reference/repeats -> alignment -> BRAKER3.
-// This milestone stops at validated predictions. Existing downstream modules remain for extension.
+// This milestone includes unfiltered baseline QC. Existing downstream modules remain for extension.
 nextflow.enable.dsl = 2
 include { RESOLVE_ANNOTATION_INPUTS; ASSERT_ANNOTATION_INPUTS } from './modules/annotationInputs.nf'
 include { PLAN_PROTEIN_EVIDENCE; ACQUIRE_PROTEIN_SOURCE; PUBLISH_FAILED_PROTEIN_SOURCE; STORE_PROTEIN_SOURCE; COMBINE_PROTEIN_EVIDENCE; REPORT_PROTEIN_EVIDENCE; ASSERT_PROTEIN_EVIDENCE } from './modules/proteinEvidence.nf'
@@ -18,6 +18,7 @@ include { AUDIT_REPEAT_LIBRARY; VALIDATE_REFERENCE_REPEATS; COMPARE_REPEAT_MASKS
 include { INDEX_RNA_REFERENCE; ALIGN_RNA_READSET; QC_RNA_ALIGNMENT; RESOLVE_RNA_STRAND; REPORT_RNA_ALIGNMENT; ASSERT_RNA_ALIGNMENT } from './modules/rnaAlignment.nf'
 include { PLAN_BRAKER_INPUTS; VALIDATE_BRAKER_INPUTS; CHECK_BRAKER_SOFTWARE; BRAKER; VALIDATE_BRAKER_OUTPUTS; REPORT_BRAKER; ASSERT_BRAKER } from './modules/braker.nf'
 include { PLAN_CONNECTED_RNA_ALIGNMENT } from './modules/connectedRnaAlignment.nf'
+include { ANNOTATION_BASELINE } from './workflows/annotationBaseline.nf'
 
 workflow {
     if (!params.sample_sheet) error 'Provide --sample_sheet'
@@ -353,6 +354,21 @@ workflow {
             tuple(aid, spec, prediction, identity)
         }, brakerHelpers)
         predictionResults = VALIDATE_BRAKER_OUTPUTS.out.status.map { aid, path -> path }.toList()
+        if (params.run_baseline_qc) {
+            def baselineSettings = RESOLVE_ANNOTATION_INPUTS.out.bundle.flatMap { folder ->
+                parse(file("${folder}/resolved_inputs.json")).assemblies.collect { row ->
+                    tuple(row.assembly_id, [run_busco: row.settings.run_busco, run_omark: row.settings.run_omark,
+                        busco_lineage: row.settings.busco_lineage, taxid: row.settings.taxid])
+                }
+            }
+            def baselineModels = baselineSettings
+                .join(predictionInputs.map { aid, spec, genome, proteins, bams, indices, identity -> tuple(aid, genome) })
+                .join(BRAKER.out.braker_gff3).join(BRAKER.out.braker_proteins)
+                .join(VALIDATE_BRAKER_OUTPUTS.out.status)
+            ANNOTATION_BASELINE(baselineModels, ['annotation_baseline.py', 'prepare_protein_evidence.py', 'reference_repeats.py'].collect {
+                file("${projectDir}/py_scripts/${it}", checkIfExists: true)
+            })
+        }
     }
     REPORT_BRAKER(PLAN_BRAKER_INPUTS.out.plan, predictionResults,
         CHECK_BRAKER_SOFTWARE.out.runtime.map { aid, folder -> file("${folder}/inputs.json") }.toList(),

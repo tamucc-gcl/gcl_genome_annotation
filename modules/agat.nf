@@ -9,7 +9,7 @@
 process AGAT {
     tag "${assembly_id}"
     label 'agat'
-    publishDir "${params.outdir}/qc", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/qc/baseline/${assembly_id}/agat", mode: params.publish_dir_mode
     
     input:
     tuple val(assembly_id), path(assembly_path), path(gff)
@@ -17,9 +17,11 @@ process AGAT {
     output:
     tuple val(assembly_id), path("${assembly_id}_annotation_stats"), emit: annotation_stats
     tuple val(assembly_id), path("annotation_stats_distribution_plots/${assembly_id}"), emit: annotation_plots
+    tuple val(assembly_id), path("${assembly_id}_annotation_stats.yaml"), emit: annotation_yaml
     
     script:
     """
+    set -euo pipefail
     grep -P "\\t(gene|mRNA|exon|CDS|intron|start_codon|stop_codon|tRNA|rRNA)\\t" ${gff} \
     > genes_only.gff3
 
@@ -36,6 +38,7 @@ process AGAT {
     stub:
     """
     touch ${assembly_id}_annotation_stats
+    touch ${assembly_id}_annotation_stats.yaml
     mkdir -p annotation_stats_distribution_plots/${assembly_id}
     """
 }
