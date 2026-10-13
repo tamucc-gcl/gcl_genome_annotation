@@ -49,9 +49,9 @@ process STORE_PROTEIN_SOURCE {
     storeDir "${store_directory}"
     publishDir "${params.outdir}/protein_sources", mode: 'symlink', overwrite: true
     input:
-    tuple val(source_id), val(store_directory), path("${source_id}")
+    tuple val(source_id), val(store_directory), path("incoming/${source_id}")
     output:
-    tuple val(source_id), path("${source_id}", includeInputs: true), emit: source
+    tuple val(source_id), path("${source_id}"), emit: source
     script:
     """
     python - <<'PY'
@@ -60,10 +60,13 @@ process STORE_PROTEIN_SOURCE {
     # storeDir destinations can be new nested paths. Create the parent before
     # Nextflow's stage-out move; otherwise the script can succeed without a stored bundle.
     Path('${store_directory}').mkdir(parents=True, exist_ok=True)
-    source = Path('${source_id}')
+    source = Path('incoming/${source_id}')
     assert json.loads((source / 'source.json').read_text())['status'] == 'ready'
-    Path('${source_id}/STORE_READY.json').write_text('{"status":"ready","normalization_version":1}\\n')
+    (source / 'STORE_READY.json').write_text('{"status":"ready","normalization_version":1}\\n')
     PY
+    # Give the validated bundle an output name distinct from the staged input.
+    # Nextflow owns its transfer to storeDir, including scratch stage-out.
+    mv 'incoming/${source_id}' '${source_id}'
     """
 }
 
