@@ -24,7 +24,11 @@ polishing, eAED or QI. Evidence used for training is not independent validation.
 
 All four evidence combinations are supported. With a supplied source but no
 matching support, AED is 1; with neither source, AED is unavailable (`.`).
-Per-source scores and the old best-protein/CDS comparison are separate columns.
+Three transcript-level AED-style agreement scores are explicit columns:
+`rna_aed`, `protein_aed` and `combined_aed`. Lower is better; these are not
+probabilities of annotation correctness. `aed` remains a compatibility alias for
+`combined_aed`. The combined score uses the union of both evidence types, not
+an average of their scores. The old best-protein/CDS comparison is separate.
 Gene summaries use the lowest available transcript AED; transcript scores remain
 available so this aggregation can be evaluated before filtering.
 
@@ -56,12 +60,32 @@ Local acceptance covers interval arithmetic against an independent nucleotide
 set oracle, evidence union rather than best-hit/averaged scoring, absent versus
 unsupported evidence, opposite/ambiguous strands, UTR extensions, shared exon
 parents, unchanged predictions and checksum blocking. Nextflow/cluster execution
-is pending; local Python tests do not establish cluster acceptance.
+passed on Crest in `testing/evidence_aed_contracts_01`: fresh, resume and
+changed-model blocking, using actual miniprot and all four evidence combinations.
+Standalone StringTie fallback and full-database performance remain pending.
 
 Once the tiny cluster checks pass, run the real scoring pilot against the
 existing accepted output directory, with `--aed_inputs_root` pointing to it.
 Use the same work directory and `-resume` for subsequent runs. Large miniprot
 alignment retains the existing 64 CPU/300 GB/96h defaults; the fixture overrides
 them to 2 CPUs/8 GB/1h. Resources are parameters in the root config. Do not change
-the normal sbatch entry yet; filtering, TE flags and optional refinement remain
-the following increments.
+the normal integrated pipeline entry yet; run `evidence_scoring.nf` from the
+existing sbatch for this assessment. Filtering, TE flags and optional refinement
+remain the following increments.
+
+Replace the Nextflow command in the project sbatch with the following, retaining
+its existing setup and `outdir`/`logdir` variables:
+
+```bash
+nextflow -log "${logdir}/.nextflow_annotation_${SLURM_JOB_ID}.log" \
+  -C "${PROJECT_ROOT}/gcl_genome_annotation/nextflow.config" \
+  run "${PROJECT_ROOT}/gcl_genome_annotation/evidence_scoring.nf" \
+  -profile slurm -resume -w "${PROJECT_ROOT}/work" \
+  --aed_inputs_root "${outdir}" \
+  --outdir "${outdir}"
+```
+
+For this pilot `outdir` is `/work/birdlab/GCL/prj_seemann-flounder_genome/testing/genome_annotation`.
+The run reuses the retained StringTie GTF, performs a new miniprot alignment of
+the supplied protein evidence against the masked genome, computes the scores and
+stops. It does not rerun repeats, read mapping or BRAKER, or remove gene models.

@@ -379,3 +379,12 @@ No model filters or polishing are connected yet. All four evidence modes have
 local contracts; 102 Python tests passed. A tiny real-miniprot cluster validator
 checks four modes, retained RNA reuse, resume and changed-model blocking. Cluster
 execution, standalone StringTie fallback and the real database pilot are pending.
+
+The user reported passing Crest AED contracts in `testing/evidence_aed_contracts_01`
+(fresh, resume and changed-model blocking). They chose the existing simpler
+evidence-agreement method rather than reproducing MAKER's full clustering workflow.
+Report RNA, protein and combined AED-style scores separately; do not present them
+as probabilities or claim complete MAKER equivalence. Added explicit `combined_aed`
+while retaining `aed` as its compatibility alias. Evaluate the real distributions
+before applying the inherited cutoff; RNA junction support remains a subsequent
+targeted assessment. No full MAKER port is planned.

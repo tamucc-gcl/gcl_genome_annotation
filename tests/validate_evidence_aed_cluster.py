@@ -98,6 +98,9 @@ def run_case(root, suffix, resume=False, blocked=False):
                 row = next(csv.DictReader(handle, delimiter='\t'))
             assert status['evidence']['rna']['available'] == (aid in 'AB')
             assert status['evidence']['protein']['available'] == (aid in 'AC')
+            assert row['combined_aed'] == row['aed']
+            assert (row['rna_aed'] != '.') == (aid in 'AB')
+            assert (row['protein_aed'] != '.') == (aid in 'AC')
             if aid in 'AB':
                 assert float(row['aed']) == 0
             elif aid == 'C':

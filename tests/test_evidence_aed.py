@@ -1,3 +1,4 @@
+import csv
 import json
 from pathlib import Path
 import random
@@ -72,6 +73,11 @@ class AEDContracts(unittest.TestCase):
                     self.assertEqual(result['gene_aed']['g1'], expected)
                     self.assertEqual(models.read_bytes(), original)
                     self.assertEqual(result['transcripts'], 1)
+                    with (folder / (name + '_score') / 'aed_scores.tsv').open() as handle:
+                        row = next(csv.DictReader(handle, delimiter='\t'))
+                    self.assertEqual(row['combined_aed'], row['aed'])
+                    self.assertEqual(row['rna_aed'], '0.25000000' if r else '.')
+                    self.assertEqual(row['protein_aed'], '0.25000000' if p else '.')
 
     def test_opposite_strand_evidence_is_not_selected(self):
         with tempfile.TemporaryDirectory() as tmp:

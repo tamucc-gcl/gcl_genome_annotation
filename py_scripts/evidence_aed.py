@@ -234,6 +234,7 @@ def score(gff, identity, normalized, output, validation=None):
             result = nucleotide_aed(model['exons'], selected['rna'] + selected['protein'])
             row = dict(gene_id=model['gene_id'], transcript_id=tid,
                        aed=result['aed'] if any(available.values()) else None,
+                       combined_aed=result['aed'] if any(available.values()) else None,
                        status='scored' if any(available.values()) else 'unavailable',
                        **{k: result[k] for k in ('sensitivity', 'specificity', 'model_bp', 'evidence_bp', 'overlap_bp')},
                        rna_hits=hits['rna'], protein_hits=hits['protein'])
@@ -267,6 +268,9 @@ def score(gff, identity, normalized, output, validation=None):
         '# Evidence AED assessment\n\nStatus: **ready**\n\n'
         f"Scored {len(rows)} transcripts from {len(genes)} genes. Gene summaries use the lowest available transcript AED.\n\n"
         '[Transcript scores](aed_scores.tsv) | [Scoring definition and provenance](aed_status.json)\n\n'
+        'The three evidence-agreement scores are `rna_aed`, `protein_aed` and `combined_aed`. '
+        'Lower values indicate greater agreement (0 = complete agreement; 1 = no overlap). '
+        '`aed` is retained as an alias of `combined_aed`. These are AED-style agreement scores, not probabilities of correctness.\n\n'
         'AED = 1 − (sensitivity + specificity) / 2. RNA exon blocks and protein alignment blocks are unioned before scoring; repeated hits do not add weight. '
         'Models are unchanged. Scores use transcript exons, including annotated UTRs, and full selected evidence blocks.\n\n'
         'Evidence selection requires matching contig and strand and overlap with the transcript span. '
