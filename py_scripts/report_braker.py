@@ -11,7 +11,7 @@ def summarize(plan, predictions, runtimes, check_only, outdir, rna_qc_link='../r
     rows = []
     for job in plan['jobs']:
         aid = job['assembly_id']
-        row = {'assembly_id': aid, 'mode': job['mode'], 'readsets': job['readsets'],
+        row = {'assembly_id': aid, 'mode': job['mode'], 'training_mode': job.get('training_mode'), 'readsets': job['readsets'],
                'protein_count': job['protein_count'], 'reference_identity': job['reference_identity']}
         if aid not in checks:
             row.update(status='blocked', reason='BRAKER software check missing')
@@ -29,10 +29,10 @@ def summarize(plan, predictions, runtimes, check_only, outdir, rna_qc_link='../r
     outdir.mkdir(exist_ok=True)
     (outdir / 'prediction_status.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     lines = ['# BRAKER3 prediction', '', f'Status: **{status}**', '',
-             '| Assembly | Status | Genes | Coding transcripts |', '|---|---|---:|---:|']
+             '| Assembly | Evidence mode | Status | Genes | Coding transcripts |', '|---|---|---|---:|---:|']
     for row in rows:
         aid = row['assembly_id']
-        lines.append(f'| {aid} | {row["status"]} | {row.get("genes", "pending")} | {row.get("coding_transcripts", "pending")} |')
+        lines.append(f'| {aid} | {row["mode"]} | {row["status"]} | {row.get("genes", "pending")} | {row.get("coding_transcripts", "pending")} |')
         lines.extend(['', f'[{aid}: runtime log](braker_runtime/{aid}/console.log)',
                       f'[{aid}: validated input handoff](braker_inputs/{aid}.inputs.json)'])
         if row['status'] == 'ready':
@@ -43,9 +43,12 @@ def summarize(plan, predictions, runtimes, check_only, outdir, rna_qc_link='../r
                           f'[{aid}: command and evidence provenance](braker/{aid}/inputs.json)'])
         if row.get('reason'):
             lines.extend(['', row['reason']])
-    lines.extend(['', '[Resolved prediction status](prediction_status.json)',
-                  f'[RNA alignment QC]({rna_qc_link})', '',
-                  'Readset BAMs remain separate. BRAKER3 handles transcript assembly internally.',
+    lines.extend(['', '[Resolved prediction status](prediction_status.json)'])
+    if any(job['readsets'] for job in plan['jobs']):
+        lines.extend([f'[RNA alignment QC]({rna_qc_link})'])
+    lines.extend(['',
+                  'RNA readset BAMs remain separate. BRAKER handles transcript assembly internally in RNA+protein mode.',
+                  'Genome-only mode uses GeneMark-ES self-training and ab initio prediction.',
                   'Library strand metadata is retained; UTR prediction and strand-separated BAM flags are not enabled.',
                   'These are BRAKER outputs before the pipeline model filters. Structural and functional evaluation follow.', ''])
     (outdir / 'README.md').write_text('\n'.join(lines), encoding='utf-8')

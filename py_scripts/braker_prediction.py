@@ -13,6 +13,14 @@ from urllib.parse import unquote
 from reference_repeats import fasta, sha
 from prepare_protein_evidence import records
 
+MODES = {'rna_protein': 'ETP', 'rna': 'ET', 'protein': 'EP', 'ab_initio': 'ES'}
+
+
+def evidence(mode):
+    if mode not in MODES:
+        raise ValueError(f'Unknown prediction mode: {mode}')
+    return mode in ('rna', 'rna_protein'), mode in ('protein', 'rna_protein')
+
 
 def load(path):
     return json.loads(Path(path).read_text(encoding='utf-8'))
@@ -28,18 +36,24 @@ def decode(value):
 
 def plan(preflight, repeats, proteins, rna):
     """Select matched, ready evidence; never silently downgrade a prediction mode."""
-    for label, data in (('preflight', preflight), ('reference/repeats', repeats),
-                        ('proteins', proteins), ('RNA alignment', rna)):
+    for label, data in (('preflight', preflight), ('reference/repeats', repeats)):
         if data.get('status') != 'ready':
+            raise ValueError(f'{label} is not ready')
+    for label, data, modes in (('proteins', proteins, ('protein', 'rna_protein')),
+                               ('RNA alignment', rna, ('rna', 'rna_protein'))):
+        if any(row['prediction_mode'] in modes for row in preflight['assemblies']) and data.get('status') != 'ready':
             raise ValueError(f'{label} is not ready')
     refs = {r['assembly_id']: r for r in repeats['assemblies']}
     prots = {r['assembly_id']: r for r in proteins['assemblies']}
     alignments = {(r['assembly_id'], r['readset_id']): r for r in rna['readsets']}
     requested_reads = {r['readset_id']: r for r in preflight['rna_readsets']}
+    requested_pairs = {(row['assembly_id'], rid) for row in preflight['assemblies'] for rid in row['rna_readsets']}
     bam_paths = {}
     for library in rna['libraries']:
+        if not any((library['assembly_id'], rid) in requested_pairs for rid in library['readsets']):
+            continue
         if library['status'] != 'ready':
-            raise ValueError('RNA library is not ready')
+            continue
         if len(library['readsets']) != len(library['bams']) or len(library['bams']) != len(library['bam_indices']):
             raise ValueError('RNA library BAM/index count differs from readsets')
         for rid, bam, index in zip(library['readsets'], library['bams'], library['bam_indices']):
@@ -52,16 +66,18 @@ def plan(preflight, repeats, proteins, rna):
         aid = row['assembly_id']
         if int(row['settings']['genetic_code']) != 1:
             raise ValueError(f'{aid}: this BRAKER3 stage supports the standard genetic code only')
-        if row['prediction_mode'] != 'rna_protein':
-            raise ValueError(f'{aid}: this BRAKER3 stage requires RNA and proteins; mode {row["prediction_mode"]} is not implemented yet')
-        ref, prot = refs[aid], prots[aid]
-        if ref['status'] != 'ready' or prot['status'] != 'ready' or prot['protein_count'] < 1:
+        mode = row['prediction_mode']
+        has_rna, has_proteins = evidence(mode)
+        ref, prot = refs[aid], prots.get(aid, {}) if has_proteins else {}
+        if ref['status'] != 'ready' or (has_proteins and (prot.get('status') != 'ready' or prot.get('protein_count', 0) < 1)):
             raise ValueError(f'{aid}: reference/repeat or protein evidence is not ready')
         rid_list = sorted(row['rna_readsets'])
-        if not rid_list or len(rid_list) != len(set(rid_list)):
+        if bool(rid_list) != has_rna or len(rid_list) != len(set(rid_list)):
             raise ValueError(f'{aid}: missing or duplicate RNA readsets')
         selected = []
         for rid in rid_list:
+            if (aid, rid) not in alignments or (aid, rid) not in bam_paths:
+                raise ValueError(f'{aid}/{rid}: accepted RNA BAM/QC missing')
             alignment = alignments[(aid, rid)]
             current = requested_reads[rid]
             if any(current.get(key) != alignment.get(key) for key in ('library_id', 'sample_id', 'layout')):
@@ -88,21 +104,23 @@ def plan(preflight, repeats, proteins, rna):
             if prior != readset['strandedness']:
                 raise ValueError(f'{aid}: conflicting lane strands within a library')
         token = hashlib.sha256(aid.encode()).hexdigest()[:10]
-        jobs.append(dict(assembly_id=aid, mode='rna_protein',
+        jobs.append(dict(assembly_id=aid, mode=mode, training_mode=MODES[mode],
                          species=re.sub(r'[^A-Za-z0-9_]', '_', aid) + '_braker_' + token,
                          genetic_code=row['settings']['genetic_code'],
                          reference_identity=ref['repeats']['reference_identity'],
                          masked_sha256=ref['repeats']['masked_sha256'],
-                         proteins_sha256=prot['proteins_sha256'], protein_count=prot['protein_count'],
-                         protein_source_ids=prot['source_ids'], readsets=selected))
+                         proteins_sha256=prot.get('proteins_sha256'), protein_count=prot.get('protein_count', 0),
+                         protein_source_ids=prot.get('source_ids', []), readsets=selected))
     return {'schema_version': 1, 'status': 'ready', 'jobs': jobs}
 
 
 def validate_inputs(spec, genome, proteins, bams, indices, identity):
-    import pysam
-    if not bams or len(bams) != len(spec['readsets']) or len(indices) != len(bams):
+    has_rna, has_proteins = evidence(spec['mode'])
+    if bool(bams) != has_rna or len(bams) != len(spec['readsets']) or len(indices) != len(bams):
         raise ValueError('BRAKER BAM/index/readset count mismatch')
-    if sha(genome) != spec['masked_sha256'] or sha(proteins) != spec['proteins_sha256']:
+    if bool(proteins) != has_proteins:
+        raise ValueError('BRAKER protein input does not match selected evidence mode')
+    if sha(genome) != spec['masked_sha256'] or (has_proteins and sha(proteins) != spec['proteins_sha256']):
         raise ValueError('BRAKER genome/protein bytes differ from accepted evidence')
     expected = identity['contigs']
     if identity['reference_identity'] != spec['reference_identity']:
@@ -113,6 +131,8 @@ def validate_inputs(spec, genome, proteins, bams, indices, identity):
     if observed != expected:
         raise ValueError('BRAKER softmasked genome changed contig IDs/order/lengths/bases')
     dictionary = [(r['id'], r['length']) for r in expected]
+    if bams:
+        import pysam
     for path, index, readset in zip(bams, indices, spec['readsets']):
         if not Path(index).is_file():
             raise ValueError('BRAKER BAM index missing')
@@ -129,18 +149,23 @@ def validate_inputs(spec, genome, proteins, bams, indices, identity):
 
 
 def command(spec, genome, proteins, bams, threads, rounds, workdir, augustus, ab_initio=False, check=False):
-    if spec['mode'] != 'rna_protein' or not bams:
-        raise ValueError('BRAKER3 requires RNA and protein evidence')
+    has_rna, has_proteins = evidence(spec['mode'])
+    if bool(bams) != has_rna or bool(proteins) != has_proteins:
+        raise ValueError('BRAKER inputs do not match selected evidence mode')
     if not 1 <= threads <= 48 or rounds < 1:
         raise ValueError('BRAKER requires 1..48 tool threads and positive training rounds')
     # --stranded is for strand-separated coverage BAMs/UTRs, not library protocols.
     args = ['braker.pl', f'--threads={threads}', f'--genome={Path(genome).resolve()}',
-            f'--prot_seq={Path(proteins).resolve()}',
-            '--bam=' + ','.join(str(Path(p).resolve()) for p in bams),
             f'--species={spec["species"]}', '--gff3',
             f'--AUGUSTUS_CONFIG_PATH={Path(augustus).resolve()}',
             f'--workingdir={Path(workdir).resolve()}', f'--rounds={rounds}',
             f'--translation_table={spec["genetic_code"]}', '--verbosity=3']
+    if has_proteins:
+        args.append(f'--prot_seq={Path(proteins).resolve()}')
+    if has_rna:
+        args.append('--bam=' + ','.join(str(Path(p).resolve()) for p in bams))
+    if spec['mode'] == 'ab_initio':
+        args.append('--esmode')
     if ab_initio:
         args.append('--AUGUSTUS_ab_initio')
     if check:
@@ -162,7 +187,8 @@ def run(spec, request, output):
     dump(output / 'command.json', args)
     dump(output / 'inputs.json', {**spec, 'execution_mode': 'software_check' if request['check'] else 'prediction',
                                  'container': request['container'], 'threads': request['threads'],
-                                 'rounds': request['rounds'], 'augustus_ab_initio': request['ab_initio'],
+                                 'rounds': request['rounds'], 'augustus_ab_initio': request['ab_initio'] or spec['mode'] == 'ab_initio',
+                                 'additional_augustus_ab_initio_requested': request['ab_initio'],
                                  'strand_handling': 'Splice-derived XS tags; no UTR prediction or strand-separated BAM flag'})
     print(shlex.join(args), flush=True)
     # Stream diagnostics into native Nextflow output, including failed scratch tasks.
@@ -239,7 +265,9 @@ def main():
         parser.add_argument('--' + key)
     args = parser.parse_args()
     if args.action == 'plan':
-        dump(args.output, plan(load(args.preflight), load(args.repeats), load(args.protein_status), load(args.rna_status)))
+        empty = {'status': 'ready', 'assemblies': [], 'readsets': [], 'libraries': []}
+        optional = lambda value: load(value) if value not in (None, '', '[]') else empty
+        dump(args.output, plan(load(args.preflight), load(args.repeats), optional(args.protein_status), optional(args.rna_status)))
     elif args.action == 'run':
         run(decode(args.spec), decode(args.request), args.output)
     elif args.action == 'validate-inputs':

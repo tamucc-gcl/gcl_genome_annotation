@@ -224,3 +224,27 @@ BRAKER's strand-separated UTR BAM flag is not used. The current connected milest
 stops after prediction integrity reporting. Scientific downstream modules remain
 available for the next filtering/annotation steps. Python contract validation
 passes locally; connected cluster acceptance and real BRAKER training are pending.
+
+BRAKER handoff cluster acceptance subsequently passed on Crest, Nextflow 23.10.1,
+in `testing/braker_contracts_01` (user-supplied acceptance.json). Python contracts,
+integrated recovery and unchanged resume, and prediction-only recovery and
+unchanged resume all passed. The fixture used actual preparation/alignment tools
+and BRAKER3 software checks; it did not train or predict genes. Corrections
+separated the protein store output from its staged input, preserved native reference
+paths through the connected planner, and distinguished first standalone recovery
+from unchanged resume in the validator. Proceed to the real-data prediction-only
+pilot using the accepted published stage outputs. Real training and biological
+prediction quality remain unvalidated.
+
+The user reaffirmed the original requirement to support every RNA/protein evidence
+combination. The initial RNA+protein-only restriction was incomplete and is removed.
+BRAKER now selects ETP, ET, EP or explicit `--esmode` per assembly. Optional evidence
+files are staged only when requested; missing requested evidence blocks rather
+than downgrades a route. The integrated join now retains RNA-free assemblies.
+Prediction-only genome runs require only accepted reference/repeat outputs, with
+no placeholder RNA/protein reports. Genome-only training uses BRAKER's documented
+GeneMark-ES/AUGUSTUS route. The additional AUGUSTUS output flag remains configurable
+and defaults false; ES prediction is intrinsically ab initio. Expanded Python tests
+pass locally. The cluster validator now covers mixed evidence modes and a completely
+genome-only workflow with unchanged resume. Its updated fixtures require a new
+output directory; expanded cluster and real training acceptance remain pending.

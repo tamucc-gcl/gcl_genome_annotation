@@ -320,16 +320,19 @@ workflow {
         REPORT_PROTEIN_EVIDENCE.out.status, REPORT_RNA_ALIGNMENT.out.status, brakerHelpers)
     def predictionRequests = PLAN_BRAKER_INPUTS.out.plan.flatMap { path -> parse(path).jobs }
         .map { row -> tuple(row.assembly_id, encode(row), row) }
+    // Gather BAM tuples as optional evidence: an inner join would drop RNA-free assemblies.
+    def nativeAlignments = ALIGN_RNA_READSET.out.alignment.toList().map { rows -> [rows] }
     def predictionFiles = REPEAT_MASK_PARALLEL.out.masked_fasta
         .join(COMBINE_PROTEIN_EVIDENCE.out.evidence).join(FILTER_ASSEMBLY.out.bundle)
-        .join(ALIGN_RNA_READSET.out.alignment.groupTuple(by: 0))
-    def predictionInputs = predictionRequests.join(predictionFiles).map { aid, spec, row, genome, proteins, reference, rids, folders ->
+        .combine(nativeAlignments)
+    def predictionInputs = predictionRequests.join(predictionFiles).map { aid, spec, row, genome, proteins, reference, alignmentRows ->
         def selected = row.readsets.collect { readset ->
-            def index = rids.indexOf(readset.readset_id)
-            if (index < 0) error "Missing native BAM for ${aid}/${readset.readset_id}"
-            folders[index]
+            def found = alignmentRows.find { item -> item[0] == aid && item[1] == readset.readset_id }
+            if (!found) error "Missing native BAM for ${aid}/${readset.readset_id}"
+            found[2]
         }
-        tuple(aid, spec, genome, file("${proteins}/proteins.fa", checkIfExists: true),
+        tuple(aid, spec, genome,
+            row.mode in ['protein', 'rna_protein'] ? file("${proteins}/proteins.fa", checkIfExists: true) : [],
             selected.collect { file("${it}/aligned.bam", checkIfExists: true) },
             selected.collect { file("${it}/aligned.bam.csi", checkIfExists: true) },
             file("${reference}/${aid}.contigs.json", checkIfExists: true))

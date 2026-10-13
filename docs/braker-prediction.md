@@ -1,27 +1,38 @@
 # BRAKER3 prediction
 
 This stage joins the accepted softmasked reference, combined proteins and separate
-coordinate-sorted RNA readset BAMs by assembly. It uses BRAKER3 in RNA+protein
-ETP mode, with transcript assembly handled internally. There is no pipeline BAM
+coordinate-sorted RNA readset BAMs by assembly when requested. It selects the
+BRAKER training route from the evidence available for each assembly. There is no pipeline BAM
 merge or standalone StringTie stage. The current milestone stops after validated
 coding-gene predictions; downstream model filters, functional annotation and
 biological evaluation are still to be connected.
 
 ## First cluster acceptance
 
+RNA+protein acceptance passed on Crest with Nextflow 23.10.1 in
+`testing/braker_contracts_01`: Python contracts, connected recovery/resume and
+prediction-only recovery/resume all passed. This confirms the handoff and actual
+BRAKER3 software checks, not training, predictions or biological model quality.
+The expanded four-mode and genome-only fixtures still need cluster acceptance.
+
 From the consuming project directory, using Nextflow 23.10.1 and the same
 Slurm/Conda/Singularity setup as earlier stage validators:
 
 ```bash
 python gcl_genome_annotation/tests/validate_braker_cluster.py \
-  --outdir testing/braker_contracts_01
+  --outdir testing/braker_contracts_02
 ```
 
 The fixture runs the connected `main.nf` with tiny local proteins, synthetic reads
 and a supplied repeat library. It runs actual preparation/QC, RepeatMasker and
 HISAT2, validates the separate BAM handoff, and calls the real BRAKER3
 `--checkSoftware` command. It then checks unchanged resume and the prediction-only
-entry. This test downloads the BRAKER container if needed, but does not run de novo
+entry. The mixed sample sheet includes all four modes and checks each mode's
+evidence flags. Additional genome-only runs have no RNA sheet; the standalone
+genome-only input root has no RNA/protein status reports or files. Unchanged resume
+must cache the handoff and runtime checks in each case. Use a new directory for this
+expanded fixture; the old two-assembly fixtures cannot be resumed with it.
+This test downloads the BRAKER container if needed, but does not run de novo
 repeat discovery or gene training. Expect container/environment setup and queue
 time to dominate. `acceptance.json` records success/failure and console/log files
 remain in the fixture directory. An interrupted test can be recovered with the
@@ -41,8 +52,12 @@ The prediction-only entry resolves the current sample sheets and loads:
 
 - `reference_repeats/reference_repeat_status.json` and `repeats/<assembly>.masked.fasta`;
 - `filtered_assemblies/<assembly>/<assembly>.contigs.json`;
-- `protein_evidence/protein_status.json` and `protein_evidence/assemblies/<assembly>/proteins.fa`;
-- `rna_alignment/rna_alignment_status.json` and its listed BAMs/CSI indices.
+- `protein_evidence/protein_status.json` and `protein_evidence/assemblies/<assembly>/proteins.fa` when proteins are requested;
+- `rna_alignment/rna_alignment_status.json` and its listed BAMs/CSI indices when RNA is requested.
+
+Optional status reports may be absent when their evidence type is unused by every
+requested assembly. Requested evidence that is missing or invalid is blocked;
+the pipeline does not silently downgrade the selected mode.
 
 It does not rerun protein acquisition, repeats, preparation or alignment. It
 checks reference/protein checksums, normalized reference identity, BAM dictionaries,
@@ -71,10 +86,27 @@ BAMs are passed as a comma-separated list in stable readset order. Strand metada
 is retained, and the accepted HISAT2 splice-derived XS tags are used. BRAKER's
 `--stranded` option refers to strand-separated coverage BAMs for UTR prediction;
 it does not encode a reverse-stranded library protocol. UTR prediction is disabled.
-The initial connected prediction stage explicitly requires RNA+proteins and the
-standard genetic code; other input modes are blocked until implemented. The
+The standard genetic code remains required. Per-assembly routes are:
+
+| RNA readsets | Protein evidence enabled | Route | BRAKER evidence arguments |
+|---|---|---|---|
+| Present | Yes | ETP | `--bam` and `--prot_seq` |
+| Present | No | ET | `--bam` |
+| Absent | Yes | EP | `--prot_seq` |
+| Absent | No | ES | `--esmode` |
+
+Use `rna_readsets` and `use_protein_evidence` in the assembly sample sheet (or the
+existing global protein setting) to select evidence. Enabled proteins must have a
+valid configured source. No new mode config files or manual route switches are
+needed. Genome-only ES trains GeneMark-ES on the assembly and trains AUGUSTUS
+from those predictions; it needs no pretrained species setting.
+`braker_ab_initio` remains the optional additional AUGUSTUS output flag for
+evidence-supported runs, default false. Genome-only predictions are inherently
+ab initio regardless of that additional-output flag. The
 [BRAKER3 v3.0.8 source](https://github.com/Gaius-Augustus/BRAKER/blob/v3.0.8/scripts/braker.pl)
-documents these options and the incomplete nonstandard-code support.
+documents these options and the incomplete nonstandard-code support. The
+[official genome-only example](https://github.com/Gaius-Augustus/BRAKER/blob/v3.0.8/README.md#testing-braker-with-genome-sequence)
+uses `--esmode`.
 
 ## Results and subsequent runs
 

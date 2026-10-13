@@ -43,5 +43,9 @@ pilot passed; both flounder readsets have validated BAMs and confidently reverse
 protein evidence and separate readset BAMs. `braker_prediction.nf` starts from
 completed published stage outputs for the first real pilot, avoiding repeat discovery
 and remapping. The integrated `main.nf` uses native task outputs throughout.
-Input checks, runtime checks and prediction integrity reporting are implemented;
-cluster wiring acceptance and the real training/prediction pilot remain pending.
+Input checks, runtime checks and prediction integrity reporting are implemented.
+RNA+protein connected and prediction-only cluster acceptance passed on Nextflow
+23.10.1, including unchanged resume and actual BRAKER3 software checks. The stage
+now also routes RNA-only, protein-only and genome-only assemblies through BRAKER's
+ET, EP and ES modes. Expanded four-mode cluster acceptance and real
+training/prediction remain pending.

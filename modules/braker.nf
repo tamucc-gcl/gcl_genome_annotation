@@ -27,7 +27,8 @@ process VALIDATE_BRAKER_INPUTS {
     tuple val(aid), path("${aid}.inputs.json"), emit: status
     script:
     def bamList = bams instanceof Collection ? bams : [bams]
-    def request = groovy.json.JsonOutput.toJson([genome: genome.toString(), proteins: proteins.toString(),
+    def proteinList = proteins instanceof Collection ? proteins : [proteins]
+    def request = groovy.json.JsonOutput.toJson([genome: genome.toString(), proteins: proteinList ? proteinList[0].toString() : null,
         bams: bamList.collect { it.toString() }, indices: (indices instanceof Collection ? indices : [indices]).collect { it.toString() }]).getBytes('UTF-8').encodeBase64().toString()
     """
     python braker_prediction.py validate-inputs --spec '${spec}' --request '${request}' --identity '${identity}' --output '${aid}.inputs.json'
@@ -45,7 +46,8 @@ process CHECK_BRAKER_SOFTWARE {
     tuple val(aid), path("${aid}"), emit: runtime
     script:
     def bamList = bams instanceof Collection ? bams : [bams]
-    def request = groovy.json.JsonOutput.toJson([genome: genome.toString(), proteins: proteins.toString(),
+    def proteinList = proteins instanceof Collection ? proteins : [proteins]
+    def request = groovy.json.JsonOutput.toJson([genome: genome.toString(), proteins: proteinList ? proteinList[0].toString() : null,
         bams: bamList.collect { it.toString() }, threads: 1, rounds: params.braker_rounds as int,
         workdir: 'software_check', augustus: 'augustus_config', ab_initio: false,
         check: true, container: params.braker_container]).getBytes('UTF-8').encodeBase64().toString()
@@ -73,7 +75,8 @@ process BRAKER {
     script:
     def threads = Math.min(params.braker_threads as int, task.cpus as int)
     def bamList = bams instanceof Collection ? bams : [bams]
-    def request = groovy.json.JsonOutput.toJson([genome: genome.toString(), proteins: proteins.toString(),
+    def proteinList = proteins instanceof Collection ? proteins : [proteins]
+    def request = groovy.json.JsonOutput.toJson([genome: genome.toString(), proteins: proteinList ? proteinList[0].toString() : null,
         bams: bamList.collect { it.toString() }, threads: threads, rounds: params.braker_rounds as int,
         workdir: 'braker', augustus: 'augustus_config', ab_initio: params.braker_ab_initio,
         check: false, container: params.braker_container]).getBytes('UTF-8').encodeBase64().toString()

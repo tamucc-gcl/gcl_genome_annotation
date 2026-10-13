@@ -20,14 +20,18 @@ workflow {
         file("${projectDir}/assets/taxonomy_rules.json"))
     ASSERT_ANNOTATION_INPUTS(RESOLVE_ANNOTATION_INPUTS.out.bundle)
     def accepted = RESOLVE_ANNOTATION_INPUTS.out.bundle.combine(ASSERT_ANNOTATION_INPUTS.out).map { bundle, passed -> bundle }
+    def optionalStatus = { relative ->
+        def candidate = file("${root}/${relative}")
+        candidate.exists() ? candidate : []
+    }
     PLAN_BRAKER_INPUTS(accepted, file("${root}/reference_repeats/reference_repeat_status.json", checkIfExists: true),
-        file("${root}/protein_evidence/protein_status.json", checkIfExists: true),
-        file("${root}/rna_alignment/rna_alignment_status.json", checkIfExists: true), helpers)
+        optionalStatus('protein_evidence/protein_status.json'),
+        optionalStatus('rna_alignment/rna_alignment_status.json'), helpers)
     def jobs = PLAN_BRAKER_INPUTS.out.plan.flatMap { path -> new groovy.json.JsonSlurper().parse(path.toFile()).jobs }
     def inputs = jobs.map { row ->
         def aid = row.assembly_id
         tuple(aid, encode(row), file("${root}/repeats/${aid}.masked.fasta", checkIfExists: true),
-            file("${root}/protein_evidence/assemblies/${aid}/proteins.fa", checkIfExists: true),
+            row.mode in ['protein', 'rna_protein'] ? file("${root}/protein_evidence/assemblies/${aid}/proteins.fa", checkIfExists: true) : [],
             row.readsets.collect { file("${root}/rna_alignment/${it.bam}", checkIfExists: true) },
             row.readsets.collect { file("${root}/rna_alignment/${it.bam_index}", checkIfExists: true) },
             file("${root}/filtered_assemblies/${aid}/${aid}.contigs.json", checkIfExists: true))

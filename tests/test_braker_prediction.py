@@ -38,7 +38,7 @@ class BrakerHandoff(unittest.TestCase):
         self.assertEqual(bam_arg.count(','), 1)
         self.assertIn('--rounds=8', args)
         self.assertFalse(any(a.startswith(('--stranded', '--UTR', '--busco_lineage')) for a in args))
-        self.assertEqual(args[-1], '--verbosity=3')
+        self.assertIn('--verbosity=3', args)
 
     def test_incomplete_reference_and_wrong_assembly_identity_block(self):
         for index in range(4):
@@ -82,6 +82,36 @@ class BrakerHandoff(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'RNA sheet differs'): braker.plan(*data)
         data = inputs(); data[0]['rna_readsets'][0]['strandedness'] = 'forward'
         with self.assertRaisesRegex(ValueError, 'strand setting differs'): braker.plan(*data)
+
+    def test_all_evidence_combinations_select_matching_flags(self):
+        for mode in braker.MODES:
+            with self.subTest(mode=mode):
+                data = list(inputs())
+                has_rna, has_proteins = braker.evidence(mode)
+                data[0]['assemblies'][0]['prediction_mode'] = mode
+                if not has_rna:
+                    data[0]['assemblies'][0]['rna_readsets'] = []
+                    data[3] = dict(status='ready', readsets=[], libraries=[])
+                if not has_proteins:
+                    data[2] = dict(status='ready', assemblies=[])
+                job = braker.plan(*data)['jobs'][0]
+                self.assertEqual(job['training_mode'], braker.MODES[mode])
+                self.assertEqual(bool(job['readsets']), has_rna)
+                self.assertEqual(bool(job['protein_count']), has_proteins)
+                args = braker.command(job, 'g', 'p' if has_proteins else None,
+                                      ['b'] if has_rna else [], 2, 8, 'w', 'a', check=True)
+                self.assertEqual(any(a.startswith('--bam=') for a in args), has_rna)
+                self.assertEqual(any(a.startswith('--prot_seq=') for a in args), has_proteins)
+                self.assertEqual('--esmode' in args, mode == 'ab_initio')
+                self.assertIn('--checkSoftware', args)
+
+    def test_requested_missing_evidence_never_silently_downgrades(self):
+        data = inputs(); data[2]['assemblies'] = []
+        with self.assertRaises(ValueError): braker.plan(*data)
+        data = inputs(); data[3]['readsets'] = []
+        with self.assertRaises(ValueError): braker.plan(*data)
+        with self.assertRaises(ValueError):
+            braker.command({'mode': 'ab_initio'}, 'g', 'p', [], 2, 8, 'w', 'a')
 
 
 class PredictionIntegrity(unittest.TestCase):
@@ -135,7 +165,7 @@ class BamHandoffIntegrity(unittest.TestCase):
         self.identity = braker.load(self.root/'ref/A.contigs.json')
         self.protein = self.root/'proteins.fa'; self.protein.write_text('>p\nMFK\n')
         self.index = self.root/'reads.bam.csi'; self.index.write_text('mock index')
-        self.spec = dict(assembly_id='A', reference_identity=self.identity['reference_identity'],
+        self.spec = dict(assembly_id='A', mode='rna_protein', reference_identity=self.identity['reference_identity'],
                          masked_sha256=braker.sha(self.genome), proteins_sha256=braker.sha(self.protein),
                          readsets=[dict(readset_id='R', library_id='L', sample_id='S')])
         self.header = {'HD': {'SO': 'coordinate'}, 'RG': [{'ID': 'R', 'LB': 'L', 'SM': 'S'}]}
@@ -163,6 +193,12 @@ class BamHandoffIntegrity(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'dictionary'): self.validate()
         self.bam.lengths = (8,); self.header['RG'][0]['SM'] = 'wrong'
         with self.assertRaisesRegex(ValueError, 'wrong readset'): self.validate()
+
+    def test_genome_only_validates_without_optional_files_or_pysam(self):
+        self.spec.update(mode='ab_initio', readsets=[], proteins_sha256=None)
+        with patch.dict(sys.modules, {'pysam': None}):
+            result = braker.validate_inputs(self.spec, self.genome, None, [], [], self.identity)
+        self.assertEqual(result['status'], 'ready')
 
 
 if __name__ == '__main__':
