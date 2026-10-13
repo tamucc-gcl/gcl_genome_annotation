@@ -292,3 +292,10 @@ comparison, not the final evidence policy. Baseline contracts_01 stopped before 
 at a Nextflow 23.10.1 subworkflow declaration error. Workflow-level channel bindings
 now follow the working repeat/Infernal subworkflows; corrected cluster execution
 remains pending.
+
+The real baseline run published AGAT, BUSCO and representative selection but
+aborted in OMArk with exit 2. OMAmer successfully searched 21,524 proteins. The
+post-analysis `omark --version` probe invoked argument validation requiring a
+database; version recording now reads installed package metadata, as for OMAmer.
+Existing database files are retained. The baseline report and final real OMArk
+acceptance remain pending recovery with native -resume.

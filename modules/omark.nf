@@ -41,7 +41,9 @@ process OMARK {
     cp omark_output/${assembly_id}_detailed_summary.txt ${assembly_id}_detailed.txt
     cp omark_output/${assembly_id}.sum ${assembly_id}.summary.txt
     cp omark_output/${assembly_id}.ump ${assembly_id}.ump
-    omark --version > omark_output/version.txt
+    # OMArk's version flag still requires analysis inputs in some releases.
+    # Read package metadata without invoking its argument parser.
+    python -c "from importlib.metadata import version; print(version('omark'))" > omark_output/version.txt
     python -c "from importlib.metadata import version; print(version('omamer'))" > omark_output/omamer_version.txt
     """
     
