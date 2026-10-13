@@ -13,27 +13,29 @@ workflow ANNOTATION_BASELINE {
     PREPARE_ANNOTATION_BASELINE(models.map { aid, settings, genome, gff, proteins, validation ->
         tuple(aid, settings, genome, gff, proteins, validation)
     }, helpers)
-    def ready = models.join(PREPARE_ANNOTATION_BASELINE.out.selection)
+    // Use workflow bindings, as in the other subworkflows. Nextflow 23.10.1's
+    // reference visitor also visits a def assignment's RHS as a declaration.
+    ready = models.join(PREPARE_ANNOTATION_BASELINE.out.selection)
     AGAT(ready.map { aid, settings, genome, gff, proteins, validation, selection -> tuple(aid, genome, gff) })
-    def buscoModels = ready.filter { it[1].run_busco }
-    def lineages = buscoModels.map { it[1].busco_lineage.toString() }.unique()
-    def lineageRequests = lineages.map { lineage ->
+    buscoModels = ready.filter { it[1].run_busco }
+    lineages = buscoModels.map { it[1].busco_lineage.toString() }.unique()
+    lineageRequests = lineages.map { lineage ->
         java.nio.file.Files.createDirectories(file(params.busco_database))
         lineage
     }
     DOWNLOAD_BUSCO_DB(lineageRequests)
-    def buscoRequests = buscoModels.map { aid, settings, genome, gff, proteins, validation, selection ->
+    buscoRequests = buscoModels.map { aid, settings, genome, gff, proteins, validation, selection ->
         tuple(settings.busco_lineage.toString(), aid, file("${selection}/${aid}.fa", checkIfExists: true))
     }.combine(DOWNLOAD_BUSCO_DB.out.db, by: 0).map { lineage, aid, proteins, database ->
         tuple(aid, lineage, proteins, database)
     }
     BUSCO(buscoRequests)
-    def omarkModels = ready.filter { it[1].run_omark }
+    omarkModels = ready.filter { it[1].run_omark }
     DOWNLOAD_OMARK_DB(omarkModels.map { params.oma_db_name.toString() }.unique().map { name ->
         java.nio.file.Files.createDirectories(file(params.omark_database))
         name
     })
-    def omarkRequests = omarkModels.map { aid, settings, genome, gff, proteins, validation, selection ->
+    omarkRequests = omarkModels.map { aid, settings, genome, gff, proteins, validation, selection ->
         tuple(aid, settings.taxid.toString(), file("${selection}/${aid}.fa", checkIfExists: true))
     }.combine(DOWNLOAD_OMARK_DB.out.databases).map { aid, taxid, proteins, name, db, taxonomy ->
         tuple(aid, taxid, proteins, db, taxonomy)
@@ -41,9 +43,9 @@ workflow ANNOTATION_BASELINE {
     OMARK(omarkRequests)
     // Sort each collection once, carrying its assembly IDs with its paths.
     // Empty optional channels become bound empty lists, never an inner join.
-    def agatRows = AGAT.out.annotation_stats.toList().map { rows -> rows.sort { it[0] } }
-    def buscoRows = BUSCO.out.busco.toList().map { rows -> rows.sort { it[0] } }
-    def omarkRows = OMARK.out.omark_detailed.toList().map { rows -> rows.sort { it[0] } }
+    agatRows = AGAT.out.annotation_stats.toList().map { rows -> rows.sort { it[0] } }
+    buscoRows = BUSCO.out.busco.toList().map { rows -> rows.sort { it[0] } }
+    omarkRows = OMARK.out.omark_detailed.toList().map { rows -> rows.sort { it[0] } }
     REPORT_ANNOTATION_BASELINE(agatRows.map { it.collect { row -> row[0] } },
         PREPARE_ANNOTATION_BASELINE.out.selection.map { aid, folder -> file("${folder}/selection.json") }.toList(),
         agatRows.map { it.collect { row -> row[1] } },

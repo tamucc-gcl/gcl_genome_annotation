@@ -283,3 +283,12 @@ Python contracts passed; actual AGAT contracts and real BUSCO/OMArk execution re
 pending. MAKER AED uses available transcript/protein evidence; the legacy best-hit
 protein-based CDS score is retained as an explicitly named baseline for subsequent
 filter implementation, not claimed as a combined-evidence MAKER score.
+
+13 October 2026 clarification: final AED must use all available supplied evidence,
+including RNA when present. Transcript assembly (potentially StringTie) and
+annotation polishing (potentially PASA or an alternative) will be discussed later;
+no tool or assembly strategy is selected yet. Protein-based AED remains a historical
+comparison, not the final evidence policy. Baseline contracts_01 stopped before QC
+at a Nextflow 23.10.1 subworkflow declaration error. Workflow-level channel bindings
+now follow the working repeat/Infernal subworkflows; corrected cluster execution
+remains pending.

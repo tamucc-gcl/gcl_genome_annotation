@@ -70,9 +70,12 @@ MAKER AED measures agreement with available transcript and protein evidence; a
 protein-only score is an evidence-specific assessment, not a reproduction of
 MAKER's combined-evidence score. The existing COMPUTE_AED module compares BRAKER
 CDS coordinates against the best overlapping miniprot protein alignment. Retain
-it explicitly as protein-based AED when restoring the legacy filter baseline.
-Absent protein AED is unavailable, never substituted with 1.0. RNA-inclusive
-support scoring requires separate validation before applying the legacy 0.7 cutoff.
+it explicitly as protein-based AED for historical comparison. The user clarified
+that the final AED output must assess all supplied evidence, including RNA when
+available. Its implementation and transcript assembly/polishing choices are deferred
+until after baseline QC. Missing evidence is unavailable, never substituted with
+1.0. Combined-evidence scoring requires separate validation before interpreting
+the legacy 0.7 cutoff; protein-only scoring is not the final RNA-inclusive policy.
 
 Sources: [MAKER-P paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC3912085/),
 [AGAT statistics implementation](https://github.com/NBISweden/AGAT/blob/master/bin/agat_sp_statistics.pl),
