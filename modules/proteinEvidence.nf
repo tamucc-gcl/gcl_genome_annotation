@@ -57,9 +57,6 @@ process STORE_PROTEIN_SOURCE {
     python - <<'PY'
     import json
     from pathlib import Path
-    # storeDir destinations can be new nested paths. Create the parent before
-    # Nextflow's stage-out move; otherwise the script can succeed without a stored bundle.
-    Path('${store_directory}').mkdir(parents=True, exist_ok=True)
     source = Path('incoming/${source_id}')
     assert json.loads((source / 'source.json').read_text())['status'] == 'ready'
     (source / 'STORE_READY.json').write_text('{"status":"ready","normalization_version":1}\\n')

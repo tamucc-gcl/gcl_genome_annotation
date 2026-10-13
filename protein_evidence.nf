@@ -24,6 +24,13 @@ workflow {
     def plan_sources = PLAN_PROTEIN_EVIDENCE.out.bundle.flatMap { directory ->
         def data = new groovy.json.JsonSlurper().parse(new File("${directory}/plan.json"))
         data.sources.collect { source ->
+            // Create the shared store parent on the driver before acquisition.
+            // A parent first created by a scratch worker can be temporarily
+            // invisible to the driver's immediate storeDir output check.
+            def root = source.kind == 'orthodb' ?
+                "${params.orthodb_database}/validated/${source.release}/normalization-v1" :
+                "${params.protein_source_store}/normalization-v1"
+            java.nio.file.Files.createDirectories(file(root))
             tuple(source.source_id, encode(source),
                   source.local_path ? [file(source.local_path, checkIfExists: true)] : [])
         }
