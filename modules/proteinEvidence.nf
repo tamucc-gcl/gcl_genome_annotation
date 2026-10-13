@@ -62,7 +62,7 @@ process STORE_PROTEIN_SOURCE {
     (source / 'STORE_READY.json').write_text('{"status":"ready","normalization_version":1}\\n')
     PY
     # Give the validated bundle an output name distinct from the staged input.
-    # Nextflow owns its transfer to storeDir, including scratch stage-out.
+    # Nextflow owns its transfer to storeDir.
     mv 'incoming/${source_id}' '${source_id}'
     """
 }

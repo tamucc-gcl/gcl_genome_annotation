@@ -158,6 +158,14 @@ The successful-bundle process uses Nextflow `storeDir` and is skipped when its
 required output already exists. Output `protein_sources/` entries are links to
 those bundles. Assembly-specific combinations remain in each run's output.
 
+Only the successful-bundle finalization task runs with the local executor and
+without scratch, on the Nextflow driver host. It validates the ready marker and
+lets Nextflow stage the bundle into `storeDir`; downloads and normalization still
+run through Slurm. This avoids a cross-node metadata visibility gap between the
+store transfer and Nextflow's immediate output check. The store parent is created
+by the driver before acquisition. Fresh cluster acceptance of this change remains
+pending; resuming a run with an already stored bundle does not exercise that path.
+
 NCBI spike-ins and local proteins use the project-level `protein_source_store`
 parameter, default `${launchDir}/protein_source_store/normalization-v1/`.
 Launch from the project root, or supply an absolute `--protein_source_store` when
