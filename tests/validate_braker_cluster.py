@@ -131,7 +131,10 @@ def main():
             fixtures(inputs)
         summary['checks'].append(run_case(root, inputs, 'main.nf', 'recover' if args.resume else 'fresh', args.resume))
         summary['checks'].append(run_case(root, inputs, 'main.nf', 'resume', True))
-        summary['checks'].append(run_case(root, inputs, 'braker_prediction.nf', 'fresh', args.resume))
+        # Recovery may reach this entry for the first time. Its cache is separate
+        # from main.nf; only the following unchanged run must be fully cached.
+        summary['checks'].append(run_case(root, inputs, 'braker_prediction.nf',
+                                         'recover' if args.resume else 'fresh', args.resume))
         summary['checks'].append(run_case(root, inputs, 'braker_prediction.nf', 'resume', True))
         summary['status'] = 'passed'
     except (AssertionError, ValueError, OSError, RuntimeError) as exc:
