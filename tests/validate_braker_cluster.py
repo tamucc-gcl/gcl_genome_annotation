@@ -81,17 +81,23 @@ def run_case(root, inputs, entry, suffix, resume=False):
         assert handoff['status'] == 'ready'
     with (output / 'pipeline/pipeline_trace.txt').open() as handle:
         trace = list(csv.DictReader(handle, delimiter='\t'))
+    # Preserve each run's trace before the next run overwrites the shared report.
+    (case / f'{suffix}.trace.json').write_text(json.dumps(trace, indent=2) + '\n')
+    cache_details = '; '.join(f"{r['name']}: {r['status']} ({r.get('hash', '?')})" for r in trace
+                             if r['name'].startswith(('FILTER_ASSEMBLY', 'COMBINE_PROTEIN_EVIDENCE',
+                                                      'INDEX_RNA_REFERENCE', 'ALIGN_RNA_READSET',
+                                                      'VALIDATE_BRAKER_INPUTS', 'CHECK_BRAKER_SOFTWARE')))
     assert not any(r['name'].split(' (')[0] == 'BRAKER' for r in trace), 'Unexpected training task'
     for name in ('VALIDATE_BRAKER_INPUTS', 'CHECK_BRAKER_SOFTWARE'):
         tasks = [r for r in trace if r['name'].startswith(name)]
         assert len(tasks) == 2
         if resume and suffix != 'recover':
-            assert all(r['status'] == 'CACHED' for r in tasks), f'{name} not cached'
+            assert all(r['status'] == 'CACHED' for r in tasks), f'{name} not cached. Task cache details: {cache_details}'
     if entry == 'main.nf':
         alignments = [r for r in trace if r['name'].startswith('ALIGN_RNA_READSET')]
         assert len(alignments) == 4
         if resume and suffix != 'recover':
-            assert all(r['status'] == 'CACHED' for r in alignments), 'Alignment unexpectedly reran'
+            assert all(r['status'] == 'CACHED' for r in alignments), f'Alignment unexpectedly reran. Task cache details: {cache_details}'
     print(f'PASS: {entry} ({suffix})', flush=True)
     return dict(entry=entry, run=suffix, passed=True, exit_code=process.returncode)
 
