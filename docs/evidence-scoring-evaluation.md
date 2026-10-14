@@ -1,5 +1,9 @@
 # Evaluate evidence alignment and AED before filtering
 
+The governing target is now [MAKER-matched AED](aed-requirements.md), including
+prepared evidence bags. This evaluation supports that requirement; the custom
+best-chain pilot does not establish MAKER compatibility.
+
 The original broad union compressed combined AED near 0.45. Intact-chain
 selection reduces that effect, but selecting the closest chain from a large
 database is optimistic. A lower or wider score distribution does not establish

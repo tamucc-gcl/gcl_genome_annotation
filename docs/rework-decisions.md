@@ -427,3 +427,34 @@ production scores, supporting fields and this one legacy comparison. The legacy
 formula is valid for its best-protein/CDS scope, but was not a combined-evidence
 or complete MAKER assessment. Equality to new protein AED in this pilot does not
 guarantee equality when model CDS and exon blocks differ.
+
+The user explicitly reaffirmed MAKER as the reference for correct AED, including
+evidence preparation, and authorized a full requirements specification plus
+comparison with other AED tools. This supersedes accepting the best-chain pilot
+as the final method. Pinned source confirms transcript-HSP scoring rather than
+an automatic protein-only CDS denominator. Added docs/aed-requirements.md with
+coordinate scope, alignment/conversion eligibility, profile-dependent clustering
+and model association, component reporting, reference-bag/score comparisons and
+real-data acceptance. InGenAnnot, GFFtk and Panoramic are candidates to inspect,
+not proven compatible substitutes. No production calculation was changed by
+this requirements step; current runs remain pilot assessments and filtering is
+disabled. Full MAKER prediction/polishing installation is not a production
+requirement; an isolated reference harness is a development dependency.
+
+The user clarified that a good peer-reviewed existing method is preferred over
+exact MAKER equivalence and selected InGenAnnot. Skip native combined AED.
+Implemented a native InGenAnnot 0.0.20 benchmark entry that uses completed models
+and the same RNA/protein alignments, validates checksums and unchanged structures,
+and reports matched current/native RNA/protein scores. The paper profile uses
+CDS-only transcript comparison and RNA discrepancy penalty 0.25; these are not
+assumed fish filtering thresholds. All parameters/process resources remain in
+root nextflow.config. Native cluster acceptance is pending.
+
+The user approved UTR refinement before final AGAT/AED/QC, with the current coding
+baseline retained. Final order: BRAKER, coding baseline, native RNA-supported UTR
+refinement, structural/sequence validation, final AED/QC, model filtering and
+post-filter QC, then functional annotation. CDS/protein identity must be preserved
+by UTR-only refinement. Native clusterize/isoform_ranking/utr_refine rank workflow
+is the next integration after the unchanged-model benchmark, rather than blind
+longest-transcript extension or a custom UTR algorithm. Portcullis is a separate
+planned assessment; no raw BRAKER model changes are made by the benchmark.

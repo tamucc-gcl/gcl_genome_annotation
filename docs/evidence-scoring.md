@@ -4,6 +4,17 @@
 repeats or read alignment. It does not apply model filters or refine annotations.
 This development entry is not yet connected to the normal `main.nf` run.
 
+The user has now specified MAKER compatibility as the target, including evidence
+use. The current best-chain scorer remains an evaluation pilot, not the final
+MAKER-matched implementation. See [the complete requirements](aed-requirements.md)
+for scope, evidence preparation, external-tool comparison and acceptance gates.
+
+The user subsequently selected [InGenAnnot](ingenannot.md) as a peer-reviewed
+alternative and deferred combined AED. `ingenannot_benchmark.nf` compares native
+RNA/protein AED with this current method on unchanged models. This entry remains
+the historical/current benchmark baseline; its implementation is not changed
+by introducing the new tool.
+
 It starts with the existing miniprot alignment command and accepted protein
 database. Current ETP runs reuse the retained StringTie merged GTF. When that
 file is unavailable, or `--aed_reassemble_rna true` is requested, StringTie 2.2.1

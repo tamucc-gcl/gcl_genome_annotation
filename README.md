@@ -69,3 +69,10 @@ formula, without installing MAKER or changing the predictions. Full MAKER eviden
 clustering is not reproduced. Local Python acceptance passed; tiny real-miniprot
 cluster acceptance and the real-data scoring pilot remain pending. Model filters,
 TE flags and optional refinement are subsequent increments.
+
+[InGenAnnot](docs/ingenannot.md) is the selected peer-reviewed evaluation candidate.
+The new `ingenannot_benchmark.nf` entry compares native RNA/protein AED with the
+current method using unchanged predictions and existing alignments. Combined
+AED is deferred for this method. Native cluster acceptance is pending. RNA-supported
+UTR refinement is planned after BRAKER and before final AED/QC and filtering,
+with preservation of coding sequences required.
