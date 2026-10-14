@@ -95,7 +95,7 @@ process SCORE_EVIDENCE_AED {
     tuple val(aid), path('README.md'), emit: report
     script:
     """
-    python evidence_aed.py score --models '${models}' --identity '${identity}' \
-        --normalized '${evidence}' --validation '${validation}' --outdir .
+    python evidence_aed_selection.py --models '${models}' --identity '${identity}' \
+        --normalized '${evidence}' --validation '${validation}' --selection '${params.aed_selection}' --outdir .
     """
 }

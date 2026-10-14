@@ -388,3 +388,20 @@ as probabilities or claim complete MAKER equivalence. Added explicit `combined_a
 while retaining `aed` as its compatibility alias. Evaluate the real distributions
 before applying the inherited cutoff; RNA junction support remains a subsequent
 targeted assessment. No full MAKER port is planned.
+
+14 October: reviewed the real AED pilot (45,399 transcripts / 21,528 genes).
+82.9% of combined scores were 0.4–0.5; 98.3% had full model coverage but the
+median full evidence union was 9.7 times the model length. This identifies broad
+alignment-chain union as a source of compression. The user deferred Portcullis
+junction support until AED selection is resolved and explicitly selected
+Portcullis rather than a custom junction tool for that later increment.
+
+Implemented a comparison selector using the closest intact RNA chain and protein
+chain separately, then their union. No clipping, score rescaling or averaging is
+introduced. Retain original all_union columns, selected source/alignment IDs and
+chain counts. Single-chain selection is optimistic and can miss complementary
+fragments within one type; scores remain agreement, not accuracy probabilities.
+Keep alignments and normalization unchanged and separately cached. Validate
+policy-change cache reuse, compare real distributions and inspect selected chains
+before enabling removal. The revised method has not yet passed cluster or real
+data acceptance; it does not promise a particular distribution.

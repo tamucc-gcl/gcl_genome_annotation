@@ -229,3 +229,10 @@ before scoring. This pilot explicitly uses direct same-strand transcript-span
 selection instead; it reproduces the nucleotide arithmetic on identical selected
 blocks, not all upstream MAKER decisions. Evaluate that selection policy and the
 score distributions before reconnecting AED removal thresholds.
+
+14 October update: the real broad-union pilot compressed scores around 0.45
+because selected evidence extended far beyond individual model blocks. A revised
+intact-chain comparison is implemented and documented in evidence-scoring.md;
+its scientific usefulness remains subject to real-data assessment. Portcullis
+is the accepted next junction-support tool, deferred until selection is resolved.
+Do not proceed with a full MAKER port or automatic AED filtering for this change.
