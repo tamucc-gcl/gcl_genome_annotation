@@ -69,15 +69,14 @@ def fixtures(root):
     write_json(accepted / 'structural_annotation/prediction_status.json', dict(status='ready', assemblies=predictions))
 
 
-def run_case(root, suffix, resume=False, blocked=False, selection='best_chain'):
+def run_case(root, suffix, resume=False, blocked=False):
     case = root / 'pilot'
     case.mkdir(exist_ok=True)
     results = case / 'results'
     command = ['nextflow', '-log', str(case / f'{suffix}.nextflow.log'), '-C', str(ROOT / 'nextflow.config'),
                'run', str(ROOT / 'evidence_scoring.nf'), '-profile', 'slurm', '-w', str(case / 'work'),
                '--aed_inputs_root', str(root / 'accepted'), '--outdir', str(results),
-               '--aed_alignment_cpus', '2', '--aed_alignment_memory', '8 GB', '--aed_alignment_time', '1h',
-               '--aed_selection', selection]
+               '--aed_alignment_cpus', '2', '--aed_alignment_memory', '8 GB', '--aed_alignment_time', '1h']
     if resume:
         command.append('-resume')
     write_json(case / f'{suffix}.command.json', command)
@@ -95,22 +94,27 @@ def run_case(root, suffix, resume=False, blocked=False, selection='best_chain'):
             folder = results / f'structural_annotation/evidence_aed/{aid}'
             status = json.loads((folder / 'aed_status.json').read_text())
             assert status['status'] == 'ready' and status['genes'] == status['transcripts'] == 1
-            assert status['selection_policy'] == selection
+            assert status['selection_policy'] == 'best_chain'
             with (folder / 'aed_scores.tsv').open() as handle:
                 row = next(csv.DictReader(handle, delimiter='\t'))
             assert status['evidence']['rna']['available'] == (aid in 'AB')
             assert status['evidence']['protein']['available'] == (aid in 'AC')
-            assert row['combined_aed'] == row['aed']
+            assert {k for k in row if k.endswith('_aed')} == {'rna_aed','protein_aed','combined_aed','legacy_protein_cds_aed'}
+            assert 'aed' not in row
+            assert {'sensitivity','specificity','model_bp','evidence_bp','overlap_bp','rna_hits','protein_hits'} <= set(row)
             assert (row['rna_aed'] != '.') == (aid in 'AB')
             assert (row['protein_aed'] != '.') == (aid in 'AC')
-            assert row['selection_policy'] == selection
-            assert 'all_union_combined_aed' in row
+            with (folder / 'aed_diagnostics.tsv').open() as handle:
+                diagnostics = next(csv.DictReader(handle, delimiter='\t'))
+            assert row['selection_policy'] == 'best_chain'
+            assert diagnostics['transcript_id'] == row['transcript_id']
+            assert 'model_exon_blocks' in diagnostics and 'all_union_combined_aed' in diagnostics
             if aid in 'AB':
-                assert float(row['aed']) == 0
+                assert float(row['combined_aed']) == 0
             elif aid == 'C':
-                assert 0 <= float(row['aed']) < .05 and status['evidence']['protein']['hits'] > 0
+                assert 0 <= float(row['combined_aed']) < .05 and status['evidence']['protein']['hits'] > 0
             else:
-                assert row['aed'] == '.' and row['status'] == 'unavailable'
+                assert row['combined_aed'] == '.' and row['status'] == 'unavailable'
             assert (folder / 'README.md').is_file()
         with (results / 'pipeline/pipeline_trace.txt').open() as handle:
             tasks = list(csv.DictReader(handle, delimiter='\t'))
@@ -120,12 +124,6 @@ def run_case(root, suffix, resume=False, blocked=False, selection='best_chain'):
             for name, count in expected.items():
                 found = [t for t in tasks if t['name'].startswith(name + ' (')]
                 assert len(found) == count and all(t['status'] == 'CACHED' for t in found), f'{name} not cached: {found}'
-        if suffix == 'policy_change':
-            for name, count in [('ALIGN_AED_PROTEINS',2),('NORMALIZE_AED_EVIDENCE',4)]:
-                found = [t for t in tasks if t['name'].startswith(name + ' (')]
-                assert len(found) == count and all(t['status']=='CACHED' for t in found), f'Policy change reran {name}: {found}'
-            found = [t for t in tasks if t['name'].startswith('SCORE_EVIDENCE_AED (')]
-            assert len(found)==4 and all(t['status']=='COMPLETED' for t in found), f'Policy change did not rescore: {found}'
     print(f'PASS: evidence AED {suffix}', flush=True)
     return dict(case=suffix, passed=True, exit_code=result.returncode)
 
@@ -143,7 +141,7 @@ def main():
         parser.error('--outdir must be empty')
     if args.resume and not (root / 'accepted/preflight/resolved_inputs.json').is_file():
         parser.error('--resume requires the original fixtures')
-    summary = dict(status='failed', checks=[], scope='Real miniprot, four modes, intact-chain selection, policy-change cache reuse and changed-model blocking; StringTie fallback and revised real-data selection pending')
+    summary = dict(status='failed', checks=[], scope='Real miniprot, four modes, three production scores plus temporary legacy comparison, evaluation diagnostics, resume and changed-model blocking; StringTie fallback and biological evaluation pending')
     try:
         version = subprocess.run(['nextflow', '-version'], capture_output=True, text=True)
         if version.returncode or not re.search(r'\bversion\s+23\.10\.1\b', version.stdout + version.stderr):
@@ -158,7 +156,6 @@ def main():
             fixtures(root)
         summary['checks'].append(run_case(root, 'recover' if args.resume else 'fresh', args.resume))
         summary['checks'].append(run_case(root, 'resume', True))
-        summary['checks'].append(run_case(root, 'policy_change', True, selection='all_union'))
         gff = root / 'accepted/structural_annotation/braker/A/A.gff3'
         original = gff.read_bytes()
         try:

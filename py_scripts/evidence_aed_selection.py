@@ -93,17 +93,39 @@ def score(gff, identity, normalized, output, validation=None, selection='best_ch
                 row[f'{kind}_best_source_id'] = hit['target'] if hit else None
                 row[f'{kind}_selected_hits'] = int(hit is not None) if selection == 'best_chain' else len(candidates[kind])
             row['selection_policy'] = selection
+            row['reference_contig'] = model['seq']
+            row['strand'] = model['strand']
+            row['model_exon_blocks'] = json.dumps(merged(model['exons']), separators=(',', ':'))
+            row['model_cds_blocks'] = json.dumps(merged(model['cds']), separators=(',', ':'))
+            row['model_cds_bp'] = sum(e-s for s,e in merged(model['cds']))
+            row['model_exon_outside_cds_bp'] = row['model_bp'] - overlap_length(model['exons'], model['cds'])
+            for kind in ('rna', 'protein'):
+                blocks = selected[kind]
+                metrics = nucleotide_aed(model['exons'], blocks)
+                row[f'{kind}_selected_blocks'] = json.dumps(blocks, separators=(',', ':'))
+                row[f'{kind}_model_coverage'] = metrics['specificity'] if available[kind] else None
+                row[f'{kind}_evidence_outside_model_bp'] = metrics['evidence_bp']-metrics['overlap_bp'] if available[kind] else None
             rows.append(row)
     output.mkdir(parents=True, exist_ok=True)
-    with (output / 'aed_scores.tsv').open('w', newline='', encoding='utf-8') as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]), delimiter='\t')
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({k: '.' if v is None else f'{v:.8f}' if isinstance(v, float) else v for k,v in row.items()})
+    primary = ['gene_id', 'transcript_id', 'rna_aed', 'protein_aed', 'combined_aed', 'legacy_protein_cds_aed',
+        'status', 'sensitivity', 'specificity', 'model_bp', 'evidence_bp', 'overlap_bp',
+        'rna_hits', 'protein_hits', 'rna_distinct_overlapping_chains',
+        'rna_best_alignment_id', 'rna_best_source_id', 'rna_selected_hits',
+        'protein_distinct_overlapping_chains', 'protein_best_alignment_id',
+        'protein_best_source_id', 'protein_selected_hits', 'selection_policy',
+        'model_cds_bp', 'model_exon_outside_cds_bp', 'rna_model_coverage',
+        'rna_evidence_outside_model_bp', 'protein_model_coverage', 'protein_evidence_outside_model_bp']
+    diagnostics = ['gene_id', 'transcript_id'] + [k for k in rows[0] if k not in primary and k != 'aed']
+    for filename, fields in [('aed_scores.tsv', primary), ('aed_diagnostics.tsv', diagnostics)]:
+        with (output / filename).open('w', newline='', encoding='utf-8') as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields, delimiter='\t')
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({k: '.' if row[k] is None else f'{row[k]:.8f}' if isinstance(row[k], float) else row[k] for k in fields})
     genes = {}
     for row in rows:
         genes.setdefault(row['gene_id'], []).append(row['aed'])
-    summary = dict(schema_version=2, status='ready', transcripts=len(rows), genes=len(genes),
+    summary = dict(schema_version=3, status='ready', transcripts=len(rows), genes=len(genes),
         maker_revision=MAKER_REVISION, selection_policy=selection,
         definition='AED nucleotide arithmetic on intact selected evidence chains; not full MAKER AED',
         selection='Best individual full RNA and protein chain by transcript-exon AED; union these two for combined score' if selection == 'best_chain' else 'Original full union of same-contig/strand span-overlapping chains',
@@ -117,7 +139,7 @@ def score(gff, identity, normalized, output, validation=None, selection='best_ch
             for r in rows if all(r[k] is not None for k in ('combined_aed','rna_aed','protein_aed'))),
             full_model_coverage=sum(r['model_bp']==r['overlap_bp'] for r in rows)))
     summary['score_distributions'] = {}
-    for key in ('rna_aed','protein_aed','combined_aed','all_union_rna_aed','all_union_protein_aed','all_union_combined_aed','legacy_protein_cds_aed'):
+    for key in ('rna_aed','protein_aed','combined_aed'):
         values = [r[key] for r in rows if r[key] is not None]
         summary['score_distributions'][key] = dict(available=len(values),
             median=statistics.median(values) if values else None,
@@ -127,14 +149,17 @@ def score(gff, identity, normalized, output, validation=None, selection='best_ch
     (output / 'README.md').write_text(
         '# Evidence agreement assessment\n\nStatus: **ready**\n\n'
         f'Selection policy: `{selection}`. Models are unchanged; no filters are applied.\n\n'
-        '[Transcript scores](aed_scores.tsv) | [Definition and provenance](aed_status.json)\n\n'
+        '[Transcript scores](aed_scores.tsv) | [Definition and provenance](aed_status.json) | [Evaluation diagnostics](aed_diagnostics.tsv)\n\n'
         '`rna_aed`, `protein_aed`, and `combined_aed` are AED-style agreement scores (lower is better). '
-        '`aed` aliases `combined_aed`. Missing sources are `.`, supplied but unsupported sources score 1.\n\n'
+        'The score table retains supporting coverage, overlap, hit counts and selected evidence IDs. '
+        '`legacy_protein_cds_aed` is temporarily retained in the main table for validation; the duplicate `aed` alias is omitted. '
+        'Missing sources are `.`, supplied but unsupported sources score 1.\n\n'
         'With best_chain, select the closest intact RNA and protein alignment separately, then union those two for combined AED. '
         'Full blocks remain, including overhangs and conflicting exons; blocks are never clipped to the annotation. '
         'Identical chains are deduplicated for selection. Intronic span-only matches cannot supply exon support.\n\n'
-        'The `all_union_*` columns retain the original broad-union comparison. Best alignment/source IDs, '
-        'candidate counts and distinct overlapping chain counts allow selection review.\n\n'
+        'The separate diagnostics table retains historical comparisons and selected evidence/model coordinate blocks '
+        'for evaluation. Coordinates are 0-based half-open. '
+        'Historical scores are not additional production scores.\n\n'
         'This asks whether a matching evidence chain exists and can be optimistic. It can miss complementary '
         'fragments within one source type; combined evidence can still disagree. These scores are not full MAKER AED, '
         'a probability of correctness, or independent validation. Splice junction assessment follows separately.\n', encoding='utf-8')
@@ -145,10 +170,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for arg in ('models','identity','normalized','validation','outdir'):
         parser.add_argument('--'+arg, required=True)
-    parser.add_argument('--selection', choices=('best_chain','all_union'), default='best_chain')
     args = parser.parse_args()
     score(args.models, json.loads(Path(args.identity).read_text()), args.normalized, args.outdir,
-          json.loads(Path(args.validation).read_text()), args.selection)
+          json.loads(Path(args.validation).read_text()))
 
 
 if __name__ == '__main__':

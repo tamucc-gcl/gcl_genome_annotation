@@ -21,7 +21,7 @@ but the median evidence footprint was 9.7 times the model exon length. Hundreds
 of differing protein chains can occupy much more space than any individual model.
 This is a selection problem, not a reason to transform scores to a wider scale.
 
-The revised default `--aed_selection best_chain` selects the individual RNA chain
+The production method selects the individual RNA chain
 and individual protein chain with the lowest transcript-exon AED. Identical block
 chains are deduplicated before deterministic selection; span-only matches with no
 exon overlap cannot supply support. The combined score unions these two intact
@@ -35,25 +35,29 @@ agreement does not verify junctions, reading frame or amino-acid sequence. It is
 not full MAKER AED or independent biological validation. Lower or more dispersed
 scores alone are not evidence that the revised metric is better.
 
-The original comparison is preserved in `all_union_rna_aed`,
-`all_union_protein_aed`, `all_union_combined_aed`, and `all_union_evidence_bp`.
-Best alignment/source IDs and distinct overlapping chain counts make selection
-auditable. `--aed_selection all_union` restores the original policy. Normalization
-and alignment implementations are unchanged, so `-resume` can reuse them.
+Historical comparisons are retained in a separate `aed_diagnostics.tsv` for
+evaluation, not as additional production AED columns. The production selection
+switch has been removed. Best alignment/source IDs, counts, sensitivity,
+specificity and overlap lengths remain in the main table. Normalization and
+alignment implementations are unchanged, so `-resume` can reuse them.
 Ambiguous RNA strands continue to be excluded and counted.
 
 All four evidence combinations are supported. With a supplied source but no
 matching support, AED is 1; with neither source, AED is unavailable (`.`).
 Three transcript-level AED-style agreement scores are explicit columns:
 `rna_aed`, `protein_aed` and `combined_aed`. Lower is better; these are not
-probabilities of annotation correctness. `aed` remains a compatibility alias for
-`combined_aed`. The combined score uses the union of both evidence types, not
-an average of their scores. The old best-protein/CDS comparison is separate.
+probabilities of annotation correctness. There is no duplicate `aed` alias in
+the main table. The combined score uses the union of both evidence types, not
+an average of their scores. At the user's request, `legacy_protein_cds_aed` is
+temporarily retained in the main table while the calculation is evaluated.
+It is the best individual protein/CDS comparison, not full MAKER or combined AED.
+It matches the new protein score in the current pilot but can differ when model
+exon and CDS coordinates differ. The identical `aed` alias is removed.
 Gene summaries use the lowest available transcript AED; transcript scores remain
 available so this aggregation can be evaluated before filtering.
 
 Outputs are under `structural_annotation/evidence_aed/<assembly>/`:
-`aed_scores.tsv`, `aed_status.json`, `README.md`, and, when applicable, protein
+`aed_scores.tsv`, `aed_status.json`, `aed_diagnostics.tsv`, `README.md`, and, when applicable, protein
 alignments or new RNA assemblies. The status records reference/model/evidence
 checksums, source availability, accepted/excluded evidence counts and definition.
 Protein alignment verifies the genome dictionary and protein source manifest;
@@ -72,8 +76,9 @@ python gcl_genome_annotation/tests/validate_evidence_aed_cluster.py \
 
 The fixture uses one small protein, a retained GTF and four evidence modes. It
 runs actual miniprot, checks resumed results and blocks changed predictions. It
-also changes selection policy and checks that alignment/normalization stay cached
-while scoring reruns. An empty directory can instead test fresh execution.
+checks that the three production AED columns and temporary legacy comparison are present alongside their support fields
+and that evaluation diagnostics are published. An empty directory can instead
+test fresh execution.
 It stops after these tests. It does not run the 19.4-million-protein database or
 test the StringTie fallback. Failed tests can recover with the same directory
 and `--resume`.
@@ -84,9 +89,11 @@ unsupported evidence, opposite/ambiguous strands, UTR extensions, shared exon
 parents, unchanged predictions and checksum blocking. Nextflow/cluster execution
 passed on Crest in `testing/evidence_aed_contracts_01`: fresh, resume and
 changed-model blocking, using actual miniprot and all four evidence combinations.
-The original full-database pilot completed and its score distributions were
-reviewed. Revised selection still requires cluster acceptance and real-data
-comparison; standalone StringTie fallback is also pending.
+The original and revised full-database pilots completed and distributions were
+reviewed. The revised combined median was 0.198 versus 0.449, with 6.9% rather
+than 82.9% in 0.4–0.5. This verifies a distribution change, not biological
+usefulness. The simplified output contract still needs cluster verification;
+standalone StringTie fallback is also pending.
 
 Once the tiny cluster checks pass, run the real scoring pilot against the
 existing accepted output directory, with `--aed_inputs_root` pointing to it.
@@ -117,9 +124,13 @@ stops. It does not rerun repeats, read mapping or BRAKER, or remove gene models.
 For the completed real pilot, rerun this same sbatch with `-resume` after the
 revised tiny tests pass: only SCORE_EVIDENCE_AED should execute; alignment and
 normalization should report cached. Keep the same launch directory and work
-directory. The score table is replaced, with original all-union scores retained
-in the comparison columns. Do not enable automatic AED removal yet.
+directory. The main table keeps its support fields but drops historical and
+duplicate AED columns. Historical comparisons are retained in the diagnostics
+file. No mathematical or evidence-selection changes are made by this cleanup.
+Do not enable automatic AED removal yet.
 
 Next accepted addition: Portcullis-based junction assessment from existing BAMs,
 not a custom junction-extraction replacement. It is deliberately deferred until
 this AED selection comparison is resolved.
+
+Before that addition, follow the [alignment and scoring evaluation plan](evidence-scoring-evaluation.md).

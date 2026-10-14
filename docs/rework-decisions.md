@@ -405,3 +405,25 @@ Keep alignments and normalization unchanged and separately cached. Validate
 policy-change cache reuse, compare real distributions and inspect selected chains
 before enabling removal. The revised method has not yet passed cluster or real
 data acceptance; it does not promise a particular distribution.
+
+The revised real pilot completed: combined median 0.198 (previously 0.449),
+with 6.9% of transcripts at 0.4–0.5 (previously 82.9%). Best-protein scores
+matched legacy scores within rounding; this is not independent validation.
+The user requested evaluation of alignment/scoring usefulness before proceeding
+and clarified output cleanup means removing excess AED variants, not support
+fields. Keep RNA/protein/combined AED plus coverage, overlap and evidence IDs in
+the main table; move legacy/broad-union comparisons and coordinate blocks to a
+separate evaluation file. Remove the duplicate aed alias and production policy
+switch. Cleanup does not change scores or invalidate alignment/normalization.
+First evaluate coding-versus-full-transcript scope, selected alignment quality
+and representative supported/conflicting/unsupported structures. Portcullis
+initially complements AED after mapping; optional filtering/reassembly or use
+before BRAKER requires a separate evaluated experiment. Do not blend junction
+quality into nucleotide AED or turn on automatic filtering at this point.
+
+The user clarified that legacy_protein_cds_aed should remain temporarily in the
+main output during validation. Remove the identical aed alias; keep three
+production scores, supporting fields and this one legacy comparison. The legacy
+formula is valid for its best-protein/CDS scope, but was not a combined-evidence
+or complete MAKER assessment. Equality to new protein AED in this pilot does not
+guarantee equality when model CDS and exon blocks differ.

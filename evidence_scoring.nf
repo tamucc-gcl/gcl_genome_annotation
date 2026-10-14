@@ -4,8 +4,6 @@ nextflow.enable.dsl = 2
 include { ALIGN_AED_PROTEINS; ASSEMBLE_AED_RNA; MERGE_AED_RNA; NORMALIZE_AED_EVIDENCE; SCORE_EVIDENCE_AED } from './modules/evidenceAed.nf'
 
 workflow {
-    if (!(params.aed_selection in ['best_chain', 'all_union']))
-        error 'aed_selection must be best_chain or all_union'
     def root = file(params.aed_inputs_root ?: params.outdir).toString()
     def parse = { path -> new groovy.json.JsonSlurper().parse(new File(path.toString())) }
     def preflight = parse(file("${root}/preflight/resolved_inputs.json", checkIfExists: true))

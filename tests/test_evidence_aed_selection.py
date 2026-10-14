@@ -72,9 +72,17 @@ class IntactChainSelection(unittest.TestCase):
                     self.assertEqual(result['gene_aed']['g1'],expected)
                     with (root/(name+'_out')/'aed_scores.tsv').open() as handle:
                         row = next(csv.DictReader(handle,delimiter='\t'))
-                    self.assertEqual(row['aed'],row['combined_aed'])
-                    self.assertEqual(row['combined_aed'],row['all_union_combined_aed'])
+                    self.assertEqual({k for k in row if k.endswith('_aed')},{'rna_aed','protein_aed','combined_aed','legacy_protein_cds_aed'})
+                    self.assertNotIn('aed',row)
+                    self.assertTrue({'sensitivity','specificity','model_bp','evidence_bp','overlap_bp','rna_hits','protein_hits'} <= set(row))
+                    with (root/(name+'_out')/'aed_diagnostics.tsv').open() as handle:
+                        diagnostic = next(csv.DictReader(handle,delimiter='\t'))
+                    self.assertEqual(row['combined_aed'],diagnostic['all_union_combined_aed'])
                     self.assertEqual(row['protein_best_source_id'],'source_protein' if p else '.')
+                    self.assertEqual(row['model_cds_bp'],'100')
+                    self.assertEqual(row['model_exon_outside_cds_bp'],'100')
+                    self.assertEqual(json.loads(diagnostic['model_exon_blocks']),[[100,200],[300,400]])
+                    self.assertEqual(set(result['score_distributions']),{'rna_aed','protein_aed','combined_aed'})
 
     def test_comparison_preserves_original_union_and_no_schema_change_to_normalization(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -92,9 +100,10 @@ class IntactChainSelection(unittest.TestCase):
             score(gff,IDENTITY,root/'db',root/'union',selection='all_union')
             with (root/'best/aed_scores.tsv').open() as handle: a = next(csv.DictReader(handle,delimiter='\t'))
             with (root/'union/aed_scores.tsv').open() as handle: b = next(csv.DictReader(handle,delimiter='\t'))
+            with (root/'best/aed_diagnostics.tsv').open() as handle: diagnostic = next(csv.DictReader(handle,delimiter='\t'))
             self.assertEqual(a['combined_aed'],'0.00000000')
-            self.assertEqual(a['all_union_combined_aed'],'0.40000000')
-            self.assertEqual(a['all_union_combined_aed'],b['combined_aed'])
+            self.assertEqual(diagnostic['all_union_combined_aed'],'0.40000000')
+            self.assertEqual(diagnostic['all_union_combined_aed'],b['combined_aed'])
             self.assertEqual((root/'db/evidence.sqlite').read_bytes(),before)
             self.assertEqual(gff.read_text(),MODEL)
 

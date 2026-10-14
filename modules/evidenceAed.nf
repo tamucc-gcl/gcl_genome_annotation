@@ -93,9 +93,10 @@ process SCORE_EVIDENCE_AED {
     tuple val(aid), path('aed_scores.tsv'), emit: scores
     tuple val(aid), path('aed_status.json'), emit: status
     tuple val(aid), path('README.md'), emit: report
+    tuple val(aid), path('aed_diagnostics.tsv'), emit: diagnostics
     script:
     """
     python evidence_aed_selection.py --models '${models}' --identity '${identity}' \
-        --normalized '${evidence}' --validation '${validation}' --selection '${params.aed_selection}' --outdir .
+        --normalized '${evidence}' --validation '${validation}' --outdir .
     """
 }
