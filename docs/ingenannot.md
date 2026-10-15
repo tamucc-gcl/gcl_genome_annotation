@@ -7,6 +7,19 @@ method is retained as a benchmark baseline, not silently replaced.
 
 ## First stage: unchanged-model benchmark
 
+The first real run demonstrated slow full-database scaling: after about 21 hours
+with four workers, RNA had finished 216/216 batches and protein 61/216. Batch
+costs vary; these counts are not a reliable precise ETA. The original 24-hour
+task limit was insufficient. RUN_INGENANNOT_AED now defaults to 64 CPUs,
+300 GB and `ingenannot_aed_time = '96h'` (four days) for future submissions.
+The native command uses the requested CPU count as its worker count; speedup
+depends on batch costs, memory and I/O. This does not extend an
+already-running job. Extending a running Slurm time limit requires privileged
+access. Native AED does not persist completed batches as resumable task outputs;
+a failed task reruns its native assessment, while prepared indexed evidence can
+remain cached. Changing the running process's worker count requires a new task;
+resubmission restarts native assessment rather than continuing its finished batches.
+
 `ingenannot_benchmark.nf` reads completed BRAKER and current AED outputs. It
 verifies model/evidence checksums, sorts/BGZIPs/Tabix-indexes existing StringTie
 GTF and miniprot GFF, runs native InGenAnnot, checks unchanged model structures
