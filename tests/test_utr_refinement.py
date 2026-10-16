@@ -1,0 +1,128 @@
+import hashlib
+import json
+import re
+import shutil
+import subprocess
+import textwrap
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'py_scripts'))
+from utr_refinement import finalize, validate, dump, prepare
+from prepare_protein_evidence import checksum
+from gene_model_aed import gene_scores
+
+
+class UtrContracts(unittest.TestCase):
+    def test_preparation_rejects_unresolved_bam_protocol_and_reports_rna_strands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); original,raw,refined,identity,genome,inputs=self.fixture(root)
+            validation=root/'validation.json'; dump(validation,dict(status='ready',gff3_sha256=checksum(original),reference_identity='ref'))
+            metadata=root/'readsets.json';dump(metadata,[dict(layout='paired',strandedness='reverse')])
+            bam=root/'reads.bam'; bam.touch(); index=root/'reads.bam.csi';index.touch()
+            rna=root/'rna.gtf';rna.write_text(''.join(f'chr1\tStringTie\t{k}\t81\t220\t.\t{strand}\t.\tgene_id "{tid}"; transcript_id "{tid}";\n' for tid,strand in [('r1','+'),('r2','.')] for k in ('transcript','exon')))
+            prepare(original,validation,identity,rna,metadata,[bam],[index],root/'prep')
+            state=json.loads((root/'prep/inputs.json').read_text())
+            self.assertEqual(state['rna_transcripts'],1)
+            self.assertEqual(state['rna_ambiguous_strand_excluded'],1)
+            dump(metadata,[dict(layout='paired',strandedness='forward')])
+            with self.assertRaisesRegex(ValueError,'adapter'): prepare(original,validation,identity,rna,metadata,[bam],[index],root/'prep')
+
+    def fixture(self,root,strand='+'):
+        genome=root/'genome.fa'; genome.write_text('>chr1\n'+'A'*1000+'\n')
+        identity=root/'identity.json'; dump(identity,dict(reference_identity='ref',contigs=[dict(id='chr1',length=1000,uppercase_sha256=hashlib.sha256(b'A'*1000).hexdigest())]))
+        original=root/'original.gff3'
+        rows=[('gene',101,202,'.','ID=g1'),('mRNA',101,202,'.','ID=t1;Parent=g1'),
+              ('exon',101,199,'.','ID=e1;Parent=t1'),('CDS',101,199,'0','ID=c1;Parent=t1')]
+        if strand=='+': rows.append(('stop_codon',200,202,'0','ID=stop1;Parent=t1'))
+        def write(path,rows):
+            path.write_text('##gff-version 3\n'+''.join(f'chr1\tx\t{k}\t{s}\t{e}\t.\t{strand}\t{p}\t{a}\n' for k,s,e,p,a in rows))
+        write(original,rows)
+        raw=root/'native.gff3'
+        write(raw,[('gene',81,220,'.','ID=g1'),('mRNA',81,220,'.','ID=t1;Parent=g1;utr_refine_evidence=r1'),
+            ('exon',81,220,'.','ID=ne1;Parent=t1'),('CDS',101,199,'0','ID=c1;Parent=t1'),
+            ('five_prime_UTR' if strand=='+' else 'three_prime_UTR',81,100,'.','ID=u1;Parent=t1'),
+            ('three_prime_UTR' if strand=='+' else 'five_prime_UTR',200,220,'.','ID=u2;Parent=t1')])
+        inputs=root/'inputs.json'; dump(inputs,dict(model_sha256=checksum(original),reference_identity='ref',readsets=[]))
+        for name in ('old.cds','new.cds','old.proteins','new.proteins'): (root/name).write_text('>t1\nAAA\n')
+        refined=root/'refined.gff3'; finalize(original,raw,identity,refined)
+        return original,raw,refined,identity,genome,inputs
+
+    def run_validation(self,root,files,skipped=False):
+        original,raw,refined,identity,genome,inputs=files
+        return validate(original,refined,identity,genome,inputs,root/'old.cds',root/'new.cds',root/'old.proteins',root/'new.proteins',root/'out',skipped)
+
+    def test_native_extensions_preserve_cds_and_exclude_separate_stop(self):
+        for strand in ('+','-'):
+            with self.subTest(strand=strand),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp); files=self.fixture(root,strand); status=self.run_validation(root,files)
+                self.assertEqual(status['changed_transcripts'],1)
+                import csv
+                with (root/'out/utr_changes.tsv').open() as handle: row=next(csv.DictReader(handle,delimiter='\t'))
+                self.assertEqual(row['five_prime_utr_bp'],'20' if strand=='+' else '21')
+                self.assertEqual(row['three_prime_utr_bp'],'18' if strand=='+' else '20')
+                if strand=='+': self.assertIn('stop_codon',files[2].read_text())
+
+    def test_no_rna_passthrough_and_sequence_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); files=self.fixture(root); files[2].write_bytes(files[0].read_bytes())
+            status=self.run_validation(root,files,True)
+            self.assertTrue(status['skipped']); self.assertEqual(status['changed_transcripts'],0)
+            (root/'new.proteins').write_text('>t1\nAAC\n')
+            with self.assertRaisesRegex(ValueError,'sequences'): self.run_validation(root,files,True)
+
+    def test_cds_phase_and_reference_changes_block_refinement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); files=self.fixture(root)
+            files[2].write_text(files[2].read_text().replace('\t+\t0\tID=c1','\t+\t1\tID=c1'))
+            with self.assertRaisesRegex(ValueError,'phases'): self.run_validation(root,files)
+            finalize(files[0],files[1],files[3],files[2])
+            files[4].write_text('>chr1\n'+'C'*1000+'\n')
+            with self.assertRaisesRegex(ValueError,'genome'): self.run_validation(root,files)
+
+
+class OptionalAedFilterContracts(unittest.TestCase):
+    def test_existing_filter_keeps_default_models_and_uses_selected_source(self):
+        source=Path(__file__).resolve().parents[1]
+        template=(source/'modules/filterGeneModels.nf').read_text().split('    """')[1]
+        for selected,expected in [(None,{'g1','g2'}),('rna',{'g2'}),('protein',{'g1'})]:
+            with self.subTest(source=selected),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp)
+                gff=root/'models.gff3'
+                gff.write_text(''.join(f'chr1\tx\t{k}\t{s}\t{e}\t.\t+\t.\t{attrs}\n'
+                    for gid,tid,s,e in [('g1','t1',101,500),('g2','t2',701,1100)]
+                    for k,attrs in [('gene','ID='+gid),('mRNA','ID='+tid+';Parent='+gid),
+                        ('exon','ID='+tid+'.e;Parent='+tid),('CDS','ID='+tid+'.c;Parent='+tid)]))
+                proteins=root/'proteins.fa';proteins.write_text('>t1\nMAAA\n>t2\nMCCC\n')
+                scores=root/'scores.tsv';scores.write_text('gene_id\ttranscript_id\trna_aed\tprotein_aed\ng1\tt1\t0.9\t0\ng2\tt2\t0.1\t0.9\n')
+                values=dict(assembly_id='A',min_cds_length='0',min_gene_length='0',min_intron_length='0',
+                    braker_gff3=gff.as_posix(),braker_proteins=proteins.as_posix(),aed_scores=scores.as_posix())
+                values["params.filter_max_aed != null ? params.filter_max_aed : 'None'"]='0.7' if selected else 'None'
+                values['params.filter_aed_source ?: ""']=selected or ''
+                script=textwrap.dedent(re.sub(r'\$\{([^}]+)\}',lambda m:values[m[1]],template)).replace('\\\\','\\')
+                (root/'filter.py').write_text(script)
+                shutil.copy2(source/'py_scripts/gene_model_aed.py',root/'gene_model_aed.py')
+                result=subprocess.run([sys.executable,str(root/'filter.py')],cwd=root,capture_output=True,text=True)
+                self.assertEqual(result.returncode,0,result.stderr)
+                import csv
+                with (root/'A.filtered_aed.tsv').open() as handle:
+                    reader=csv.DictReader(handle,delimiter='\t');rows=list(reader)
+                    self.assertEqual(reader.fieldnames,['gene_id','transcript_id','rna_aed','protein_aed'])
+                self.assertEqual({r['gene_id'] for r in rows},expected)
+
+    def test_disabled_filter_does_not_require_evidence(self):
+        self.assertEqual(gene_scores('does-not-exist',None,None,{'g1'}),{})
+
+    def test_sources_are_separate_and_missing_source_is_an_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/'scores.tsv'; p.write_text('gene_id\ttranscript_id\trna_aed\tprotein_aed\ng1\tt1\t0.9\t0\ng1\tt2\t0.5\t0.2\n')
+            self.assertEqual(gene_scores(p,'rna',.7,{'g1'}),{'g1':.5})
+            self.assertEqual(gene_scores(p,'protein',0,{'g1'}),{'g1':0})
+            with self.assertRaisesRegex(ValueError,'filter_aed_source'): gene_scores(p,None,.7,{'g1'})
+            p.write_text(p.read_text().replace('\t0.9\t','\t.\t'))
+            with self.assertRaisesRegex(ValueError,'unavailable'): gene_scores(p,'rna',.7,{'g1'})
+
+
+if __name__=='__main__': unittest.main()

@@ -458,3 +458,23 @@ by UTR-only refinement. Native clusterize/isoform_ranking/utr_refine rank workfl
 is the next integration after the unchanged-model benchmark, rather than blind
 longest-transcript extension or a custom UTR algorithm. Portcullis is a separate
 planned assessment; no raw BRAKER model changes are made by the benchmark.
+
+
+The native AED benchmark and ten selected coordinate-level cases passed on the
+real flounder data. RNA penalties can flag incomplete coding ends despite full
+intron agreement, so AED-based removal is explicitly opt-in. Default
+filter_max_aed and filter_aed_source are null; users may select RNA or protein
+AED after inspecting distributions. The existing filter retains its gene-level
+best-transcript scope and rejects unavailable requested evidence. Other structural
+filter defaults remain unchanged; no filters run in the UTR pilot.
+
+Implemented the next isolated UTR pilot in utr_refinement.nf, reusing the pinned
+InGenAnnot clusterize/ranking/utr_refine workflow, accepted separate BAMs, retained
+RNA or existing StringTie fallback, gffread and the existing AGAT module. Native
+RNA selection is preserved. Separate BRAKER codons are retained and stop-codon
+bases excluded from UTR labels. CDS coordinates/phases, extracted coding/protein
+sequences, IDs/parents and reference bounds must be preserved. Original BRAKER
+outputs and baseline QC remain intact. Native ranking uses stable approved input
+values so report-helper edits do not force reranking. Local validation tests pass;
+native cluster UTR tests and real-extension review are pending. Final native AED
+rescoring and main.nf promotion follow those checks.

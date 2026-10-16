@@ -73,6 +73,10 @@ TE flags and optional refinement are subsequent increments.
 [InGenAnnot](docs/ingenannot.md) is the selected peer-reviewed evaluation candidate.
 The new `ingenannot_benchmark.nf` entry compares native RNA/protein AED with the
 current method using unchanged predictions and existing alignments. Combined
-AED is deferred for this method. Native cluster acceptance is pending. RNA-supported
-UTR refinement is planned after BRAKER and before final AED/QC and filtering,
-with preservation of coding sequences required.
+AED is deferred for this method. The native benchmark and selected-case review
+passed on the real flounder data. `utr_refinement.nf` now provides a native
+clusterize/rank/refine UTR pilot with CDS/protein preservation checks, transcript
+extraction and AGAT. Tiny native UTR acceptance is pending; see the linked guide
+for `tests/validate_utr_cluster.py`. AED filtering defaults to off, with optional
+RNA or protein thresholds in the downstream filter module. The UTR pilot stops
+before final AED rescoring and filtering.

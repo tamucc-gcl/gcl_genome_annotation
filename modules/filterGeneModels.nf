@@ -41,11 +41,12 @@
 
 process FILTER_GENE_MODELS {
     tag "${assembly_id}"
-    label 'mergeFiles'
+    label 'aed_python'
     publishDir "${params.outdir}/structural_annotation", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), path(braker_gff3), path(braker_proteins), path(aed_scores)
+    path aed_helper
 
     output:
     tuple val(assembly_id), path("${assembly_id}.filtered_genes.gff3"),
@@ -60,9 +61,9 @@ process FILTER_GENE_MODELS {
         emit: filtered_aed
 
     script:
-    def min_cds_length    = params.filter_min_cds_length   ?: 300
-    def min_gene_length   = params.filter_min_gene_length  ?: 200
-    def min_intron_length = params.filter_min_intron_length ?: 10
+    def min_cds_length    = params.filter_min_cds_length != null ? params.filter_min_cds_length : 300
+    def min_gene_length   = params.filter_min_gene_length != null ? params.filter_min_gene_length : 200
+    def min_intron_length = params.filter_min_intron_length != null ? params.filter_min_intron_length : 10
     """
     #!/usr/bin/env python3
     import sys
@@ -144,22 +145,11 @@ process FILTER_GENE_MODELS {
 
     # ── Read AED scores ───────────────────────────────────────────────────────
     import csv
-    gene_aed = {}   # gene_id → min AED across transcripts
-    tx_aed = {}     # transcript_id → aed
-
-    with open("${aed_scores}") as fh:
-        reader = csv.DictReader(fh, delimiter="\\t")
-        for row in reader:
-            gid = row["gene_id"]
-            tid = row["transcript_id"]
-            aed = float(row["aed"])
-            tx_aed[tid] = aed
-            if gid not in gene_aed or aed < gene_aed[gid]:
-                gene_aed[gid] = aed
-
+    from gene_model_aed import gene_scores
     MAX_AED = ${params.filter_max_aed != null ? params.filter_max_aed : 'None'}
+    AED_SOURCE = '${params.filter_aed_source ?: ""}'
+    gene_aed = gene_scores("${aed_scores}", AED_SOURCE, MAX_AED, genes)
 
-    # ── Apply filters ─────────────────────────────────────────────────────────
     removed_genes = {}
 
     for gene_id, gene_info in genes.items():
@@ -203,9 +193,9 @@ process FILTER_GENE_MODELS {
         
         # Filter 4: AED threshold (if configured)
         if MAX_AED is not None:
-            best = gene_aed.get(gene_id, 1.0)
+            best = gene_aed[gene_id]
             if best > MAX_AED:
-                removed_genes[gene_id] = f"high_AED({best:.3f}>{MAX_AED})"
+                removed_genes[gene_id] = f"high_{AED_SOURCE}_AED({best:.3f}>{MAX_AED})"
                 continue
 
     # ── Collect kept mRNA/transcript IDs for protein filtering ────────────────
@@ -290,15 +280,14 @@ process FILTER_GENE_MODELS {
 
     # ── Write filtered AED scores ────────────────────────────────────────────
     with open(f"{ASM}.filtered_aed.tsv", "w") as out:
-        out.write("gene_id\\ttranscript_id\\taed\\tbest_protein_hit\\t"
-                "protein_identity\\tn_evidence_hits\\n")
         with open("${aed_scores}") as fh:
             reader = csv.DictReader(fh, delimiter="\\t")
+            writer = csv.DictWriter(out, fieldnames=reader.fieldnames, delimiter="\\t")
+            writer.writeheader()
             for row in reader:
                 if row["gene_id"] not in removed_genes:
-                    out.write("\\t".join(row[c] for c in reader.fieldnames) + "\\n")
+                    writer.writerow(row)
 
-    # ── Summary ───────────────────────────────────────────────────────────────
     n_total = len(genes)
     n_removed = len(removed_genes)
     n_kept = n_total - n_removed
@@ -321,7 +310,7 @@ process FILTER_GENE_MODELS {
     touch ${assembly_id}.filtered_proteins.fa
     touch ${assembly_id}.removed_genes.gff3
     touch ${assembly_id}.gene_filter_report.tsv
-    printf "gene_id\\ttranscript_id\\taed\\tbest_protein_hit\\tprotein_identity\\tn_evidence_hits\\n" \\
+    printf "gene_id\\ttranscript_id\\trna_aed\\tprotein_aed\\n" \\
         > ${assembly_id}.filtered_aed.tsv
     """
 }

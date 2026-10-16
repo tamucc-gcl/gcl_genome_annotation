@@ -9,7 +9,7 @@
 process AGAT {
     tag "${assembly_id}"
     label 'agat'
-    publishDir "${params.outdir}/qc/baseline/${assembly_id}/agat", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/qc/${task.ext.qc_stage ?: 'baseline'}/${assembly_id}/agat", mode: params.publish_dir_mode
     
     input:
     tuple val(assembly_id), path(assembly_path), path(gff)
@@ -22,7 +22,7 @@ process AGAT {
     script:
     """
     set -euo pipefail
-    grep -P "\\t(gene|mRNA|exon|CDS|intron|start_codon|stop_codon|tRNA|rRNA)\\t" ${gff} \
+    grep -P "\\t(gene|mRNA|exon|CDS|five_prime_UTR|three_prime_UTR|intron|start_codon|stop_codon|tRNA|rRNA)\\t" ${gff} \
     > genes_only.gff3
 
     agat_sp_statistics.pl \

@@ -105,8 +105,8 @@ python gcl_genome_annotation/tests/validate_ingenannot_cluster.py \
 The test uses tiny prealigned evidence, all four source combinations, current
 baseline scores, resume, profile changes and changed-evidence blocking. It stops
 after native assessment; no UTR work or prediction is run. Recover failures using
-the same directory and `--resume`. Native InGenAnnot and Nextflow execution are
-pending; local tests verify the validation/report adapter, not the external tool.
+the same directory and `--resume`. The original tiny native acceptance and the real benchmark passed on Crest.
+The additional report-edit cache regression awaits cluster verification.
 
 ### Real unchanged-model benchmark
 
@@ -142,7 +142,76 @@ identities are preserved, their scientific input is unchanged and those outputs
 can be reused after verifying that invariant. Filtering can change the protein
 set, requiring an appropriate post-filter comparison.
 
-## UTR pilot requirements (next increment)
+## UTR pilot
+
+`utr_refinement.nf` now implements the next isolated development stage. Run tiny
+native acceptance first:
+
+```bash
+python gcl_genome_annotation/tests/validate_utr_cluster.py \
+  --outdir testing/utr_contracts_01
+```
+
+It creates small synthetic paired BAMs with samtools, uses native InGenAnnot
+0.0.20 clusterize/ranking/refinement on both strands, checks no-RNA and disabled
+pass-through, extracts sequences with gffread, runs the existing AGAT module,
+and verifies ranking cache reuse after a reporting-helper edit. It does not run
+HISAT2, repeat discovery, BRAKER, database alignment or full-genome AED. Recover
+using the same directory and `--resume`. Native cluster acceptance is pending.
+
+After acceptance, change only the existing sbatch Nextflow target to
+`gcl_genome_annotation/utr_refinement.nf`, keeping its current config, output/work
+directories, resources and `-resume`. `--utr_inputs_root` defaults to `--outdir`.
+The pilot reuses retained ETP StringTie transcripts or the existing standalone
+RNA assembly. If neither exists for an RNA-supported assembly, it reuses the
+existing StringTie assembly/merge modules on its separate accepted BAMs.
+
+Outputs are `structural_annotation/utr/<assembly>/`: the separately validated
+`<assembly>.utr.gff3`, transcript FASTA, `utr_changes.tsv`, `utr_status.json` and
+README. Native ranking/refinement outputs are retained in `native/`. The existing
+AGAT module also runs on the refined annotation under `qc/utr/<assembly>/agat/`,
+including UTR feature types. It does not overwrite the coding baseline.
+
+All resources and thresholds are in root nextflow.config. Ranking defaults to
+16 CPUs, 64 GB and 96 hours; sequence extraction uses gffread 0.12.7. Pinned
+InGenAnnot uses `clusterize -g` (not `-f`) and FOF booleans for paired and reverse
+stranded BAMs. Current reverse-stranded libraries and unstranded BAMs are
+supported; forward/auto strand metadata explicitly blocks the pilot until a
+validated adapter is available. No BAMs are manually linked or merged.
+
+The native tools choose RNA structures. The output adapter preserves BRAKER's
+separately annotated start/stop codons and removes stop-codon bases from native
+UTR features, without changing CDSs or choosing UTR boundaries itself. It records
+supporting RNA IDs and strand-correct UTR lengths. The validator requires additive
+exon changes only, preserved existing UTRs, gene/transcript identity, CDS/phases,
+feature relationships/reference bounds and identical baseline/refined gffread
+CDS/protein sequences. Original predictions remain unchanged.
+
+Input approval is passed to ranking as a stable content value, so editing the
+validation/report helper does not invalidate the expensive native ranking when
+approved scientific inputs are unchanged. This uses Nextflow's normal cache.
+
+This pilot stops after UTR validation and AGAT. Promotion into main.nf and final
+native AED rescoring are subsequent steps after cluster acceptance and review of
+real extensions. BUSCO/OMArk need not be repeated for an unchanged protein set.
+
+### AED filtering policy
+
+AED filtering is disabled by default: `filter_max_aed = null` and
+`filter_aed_source = null`. The existing downstream gene-filter module accepts
+either `--filter_aed_source rna --filter_max_aed 0.7` or the corresponding
+`protein` source. The threshold is a user decision; 0.7 is an example, not a
+recommended calibrated cutoff. A gene is removed for AED only when every
+transcript exceeds the chosen threshold; equality passes. All its isoforms are
+retained when its best transcript passes, preserving the existing gene-level
+filter scope. Missing evidence is an error when explicitly requested, never
+silently interpreted as AED 1. Score tables retain their original columns.
+
+The filter consumes canonical `rna_aed` / `protein_aed` columns, not benchmark
+delta columns or legacy `aed`. Its caller supplies `gene_model_aed.py` as the
+additional staged helper input. Other existing structural filter defaults are
+unchanged. The UTR pilot does not invoke gene filtering; these choices take
+effect when that downstream stage is connected after final AED assessment.
 
 Use InGenAnnot's native short-read UTR workflow, not a custom exon-extension
 algorithm: compatible merged RNA transcripts, `clusterize` against coding
@@ -172,9 +241,10 @@ Requirements before promotion:
 8. Keep final filtering disabled until benchmark and UTR contracts pass and real
    representative extensions are reviewed. Do not change BRAKER training inputs.
 
-The benchmark is implemented; the native UTR ranking/refinement integration is
-the following increment after benchmark acceptance. The order and validation
-requirements above do not claim UTR refinement is already implemented.
+The unchanged-model benchmark and selected-case review passed on the real
+flounder data. The UTR pilot is implemented; actual native cluster acceptance
+and real UTR-extension review remain pending. Final AED rescoring/promotion
+follow those checks.
 
 ## References
 
