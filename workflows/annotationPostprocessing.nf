@@ -15,7 +15,6 @@ workflow ANNOTATION_POSTPROCESSING {
     main:
     if (params.ingenannot_rna_penalty < 0 || params.ingenannot_rna_penalty > 1)
         error 'ingenannot_rna_penalty must be between 0 and 1'
-    parse = { path -> new groovy.json.JsonSlurperClassic().parse(new File(path.toString())) }
     utrHelpers = ['utr_refinement.py','evidence_aed.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
         file("${projectDir}/py_scripts/${it}", checkIfExists: true)
     }
@@ -42,7 +41,11 @@ workflow ANNOTATION_POSTPROCESSING {
             validation,identity,enabled ? rna : [],enabled ? bams : [],enabled ? indices : [])
     }
     PREPARE_UTR_INPUTS(utrRequests,utrHelpers)
-    RUN_UTR_REFINEMENT(utrRequests.join(PREPARE_UTR_INPUTS.out.status.map { aid,path -> tuple(aid,parse(path)) }))
+    RUN_UTR_REFINEMENT(utrRequests.join(PREPARE_UTR_INPUTS.out.status.map { aid,path ->
+        // Invoke the parser directly: workflow-bound closures are not script
+        // methods inside operator callbacks on Nextflow 23.10.1.
+        tuple(aid,new groovy.json.JsonSlurperClassic().parse(new File(path.toString())))
+    }))
     FINALIZE_UTR_ANNOTATION(utrRequests.map { aid,enabled,readsets,gff,validation,identity,rna,bams,indices ->
         tuple(aid,!enabled,gff,identity)
     }.join(RUN_UTR_REFINEMENT.out.annotation).map { aid,skipped,original,identity,raw ->
