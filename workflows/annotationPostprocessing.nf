@@ -15,7 +15,7 @@ workflow ANNOTATION_POSTPROCESSING {
     main:
     if (params.ingenannot_rna_penalty < 0 || params.ingenannot_rna_penalty > 1)
         error 'ingenannot_rna_penalty must be between 0 and 1'
-    parse = { path -> new groovy.json.JsonSlurper().parse(new File(path.toString())) }
+    parse = { path -> new groovy.json.JsonSlurperClassic().parse(new File(path.toString())) }
     utrHelpers = ['utr_refinement.py','evidence_aed.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
         file("${projectDir}/py_scripts/${it}", checkIfExists: true)
     }
@@ -23,6 +23,8 @@ workflow ANNOTATION_POSTPROCESSING {
         file("${projectDir}/py_scripts/${it}", checkIfExists: true)
     }
     rnaJobs = jobs.map { aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices ->
+        if (!aid || !prediction || !(mode in ['rna_protein','rna','protein','ab_initio']))
+            error "Invalid postprocessing job: assembly=${aid}, mode=${mode}, prediction=${prediction}"
         if (mode in ['rna','rna_protein'] && !readsets) error "Missing RNA readsets for ${aid}"
         def retained = file("${prediction}/braker_run/GeneMark-ETP/rnaseq/stringtie/transcripts_merged.gff")
         tuple(aid, mode in ['rna','rna_protein'] ? readsets : [], bams, indices,

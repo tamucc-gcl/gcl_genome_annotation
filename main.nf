@@ -359,7 +359,7 @@ workflow {
              busco_lineage: row.settings.busco_lineage, taxid: row.settings.taxid]) }
         def postprocessing = predictionInputs.join(BRAKER.out.prediction).join(VALIDATE_BRAKER_OUTPUTS.out.status)
             .join(finalSettings).map { aid,spec,genome,proteins,bams,indices,identity,prediction,validation,settings ->
-                def metadata = new groovy.json.JsonSlurper().parseText(new String(spec.decodeBase64(),'UTF-8'))
+                def metadata = new groovy.json.JsonSlurperClassic().parseText(new String(spec.decodeBase64(),'UTF-8'))
                 tuple(aid,settings,metadata.mode,metadata.readsets,genome,prediction,validation,identity,bams,indices)
             }
         def proteinAlignmentInputs = REPEAT_MASK_PARALLEL.out.masked_fasta.join(COMBINE_PROTEIN_EVIDENCE.out.evidence)
