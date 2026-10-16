@@ -1,4 +1,5 @@
 import hashlib
+import base64
 import json
 import re
 import shutil
@@ -16,6 +17,18 @@ from gene_model_aed import gene_scores
 
 
 class UtrContracts(unittest.TestCase):
+    def test_native_bam_list_command_preserves_multiple_rows_without_heredoc(self):
+        module=(Path(__file__).resolve().parents[1]/'modules/utrRefinement.nf').read_text()
+        body=module.split('process RUN_UTR_REFINEMENT {',1)[1].split('process FINALIZE_UTR_ANNOTATION',1)[0]
+        command=re.search(r'python -c "(import base64;[^\n]+)"',body).group(1)
+        for count in (0,1,2,10):
+            with self.subTest(readsets=count),tempfile.TemporaryDirectory() as tmp:
+                expected=''.join(f'bams/readset{i:02}.bam\ttrue\ttrue\n' for i in range(1,count+1))
+                encoded=base64.b64encode(expected.encode()).decode()
+                result=subprocess.run([sys.executable,'-c',command.replace('${fofEncoded}',encoded)],cwd=tmp,capture_output=True,text=True)
+                self.assertEqual(result.returncode,0,result.stderr)
+                self.assertEqual((Path(tmp)/'bam.fof').read_bytes(),expected.encode())
+
     def test_preparation_rejects_unresolved_bam_protocol_and_reports_rna_strands(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); original,raw,refined,identity,genome,inputs=self.fixture(root)

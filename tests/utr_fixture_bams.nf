@@ -7,13 +7,15 @@ process CREATE_UTR_FIXTURE_BAMS {
     input:
     tuple val(aid), path(sam)
     output:
-    path "readsets/${aid}/R1"
+    path "readsets/${aid}"
     script:
     """
     set -euo pipefail
-    mkdir -p readsets/${aid}/R1
-    samtools sort -o readsets/${aid}/R1/aligned.bam '${sam}'
-    samtools index -c readsets/${aid}/R1/aligned.bam
+    for rid in R1 R2; do
+      mkdir -p readsets/${aid}/\$rid
+      samtools sort -o readsets/${aid}/\$rid/aligned.bam '${sam}'
+      samtools index -c readsets/${aid}/\$rid/aligned.bam
+    done
     """
 }
 

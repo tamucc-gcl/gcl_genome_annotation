@@ -34,7 +34,7 @@ def fixtures(root):
         dump(accepted/f'filtered_assemblies/{aid}/{aid}.contigs.json',identity)
         readsets=[]
         if mode!='protein':
-            readsets=[dict(readset_id='R1',layout='paired',strandedness='reverse',bam=f'readsets/{aid}/R1/aligned.bam',bam_index=f'readsets/{aid}/R1/aligned.bam.csi')]
+            readsets=[dict(readset_id=rid,layout='paired',strandedness='reverse',bam=f'readsets/{aid}/{rid}/aligned.bam',bam_index=f'readsets/{aid}/{rid}/aligned.bam.csi') for rid in ('R1','R2')]
             rna=gff.parent/'braker_run/GeneMark-ETP/rnaseq/stringtie/transcripts_merged.gff';rna.parent.mkdir(parents=True)
             rna.write_text(''.join(f'chr1\tStringTie\t{k}\t{s}\t{e}\t.\t{strand}\t.\tgene_id "r1"; transcript_id "rna1";\n'
                 for k,s,e in [('transcript',451,950),('exon',451,650),('exon',751,950)]))
@@ -73,6 +73,7 @@ def run_case(root,name,resume=False,enabled=True):
         assert status['status']=='ready' and status['protein_sequences_unchanged'] and status['cds_coordinates_and_phases_unchanged']
         assert status['changed_transcripts']==(1 if enabled and aid!='B' else 0)
         assert status['skipped']==(not enabled or aid=='B')
+        if enabled and aid!='B': assert len(status['readsets'])==2
         with (folder/'utr_changes.tsv').open() as h: row=next(csv.DictReader(h,delimiter='\t'))
         if enabled and aid!='B': assert row['five_prime_utr_bp']=='50' and row['three_prime_utr_bp']=='50'
         assert (case/f'results/qc/utr/{aid}/agat/{aid}_annotation_stats').is_file()

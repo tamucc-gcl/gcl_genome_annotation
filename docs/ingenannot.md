@@ -152,7 +152,8 @@ python gcl_genome_annotation/tests/validate_utr_cluster.py \
   --outdir testing/utr_contracts_01
 ```
 
-It creates small synthetic paired BAMs with samtools, uses native InGenAnnot
+It creates two small synthetic paired BAM readsets per RNA-supported assembly
+with samtools (including the multi-line native BAM-list regression), uses native InGenAnnot
 0.0.20 clusterize/ranking/refinement on both strands, checks no-RNA and disabled
 pass-through, extracts sequences with gffread, runs the existing AGAT module,
 and verifies ranking cache reuse after a reporting-helper edit. It does not run
