@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Adapt and validate native InGenAnnot UTR-only refinement; no UTR prediction."""
 import argparse
+from bisect import bisect_left, bisect_right
 import csv
 import hashlib
 import json
@@ -46,6 +47,42 @@ def boundary_label_completions(exons,cds,observed,stops,strand):
         if missing and not extra and not subtract(missing,subtract(edges,stops)):
             completed[kind]=missing
     return completed
+
+
+def coding_overlap_warnings(before,after,stops=None):
+    """Flag UTR additions overlapping another gene's CDS; never filter them.
+
+    Index merged coding blocks per gene so shared isoforms do not inflate bases.
+    Same-strand transcription alone cannot resolve coding assignment/readthrough.
+    """
+    genes={}
+    for model in before.values():
+        key=(model['seq'],model['gene_id'],model['strand'])
+        genes.setdefault(key,[]).extend(model['cds'])
+    indexed={}
+    for (seq,gid,strand),blocks in genes.items():
+        indexed.setdefault(seq,[]).extend((s,e,gid,strand) for s,e in merged(blocks))
+    for seq,blocks in indexed.items():
+        blocks.sort();starts=[];ends=[];maximum=-1
+        for s,e,gid,strand in blocks:
+            starts.append(s);maximum=max(maximum,e);ends.append(maximum)
+        indexed[seq]=(blocks,starts,ends)
+    warnings=[]
+    for tid,old in before.items():
+        model=after[tid];added=subtract(subtract(model['exons'],old['exons']),(stops or {}).get(tid,[]))
+        if not added:continue
+        blocks,starts,ends=indexed.get(model['seq'],([],[],[]))
+        overlaps={}
+        for s,e in added:
+            for a,b,gid,strand in blocks[bisect_right(ends,s):bisect_left(starts,e)]:
+                if gid!=model['gene_id'] and b>s:
+                    overlaps.setdefault((gid,strand),[]).append((max(s,a),min(e,b)))
+        for (gid,strand),parts in sorted(overlaps.items()):
+            warnings.append(dict(transcript_id=tid,gene_id=model['gene_id'],other_gene_id=gid,
+                contig=model['seq'],strand=model['strand'],other_gene_strand=strand,
+                same_strand=model['strand']==strand,overlap_bp=sum(e-s for s,e in merged(parts)),
+                warning='UTR addition overlaps another gene CDS; retained for review'))
+    return warnings
 
 
 def prepare(gff,validation,identity,rna,metadata,bams,indices,output):
@@ -100,6 +137,7 @@ def finalize(original,native,identity,output):
             if (row['seq'],row['strand'])!=(parent['seq'],parent['strand']) or (parent['seq'],parent['strand'])!=(original_model['seq'],original_model['strand']):
                 rejected[tid]='Native UTR candidate has incompatible feature/transcript contig or strand; retained original BRAKER transcript'
             if row['kind']=='exon': native_exons[tid].append((row['start'],row['end']))
+    normalized={}
     for tid,old in original_models.items():
         exons=native_exons[tid]
         parent=native_transcripts[tid]
@@ -107,7 +145,10 @@ def finalize(original,native,identity,output):
             raise ValueError('Native UTR refinement changed gene/transcript relationships')
         reason=None
         if sorted(exons)!=sorted(old['exons']):
-            if not parent['attrs'].get('utr_refine_evidence'):
+            if set(exons)==set(old['exons']):
+                if tid not in rejected:
+                    normalized[tid]='Duplicate exon records only; retained original BRAKER transcript'
+            elif not parent['attrs'].get('utr_refine_evidence'):
                 reason='Native exon change lacks UTR evidence provenance'
             elif overlap_length(exons,old['exons'])!=sum(e-s for s,e in merged(old['exons'])):
                 reason='Native UTR candidate shortens existing exons'
@@ -117,20 +158,21 @@ def finalize(original,native,identity,output):
                 reason='Native UTR candidate adds exonic bases inside the CDS span'
         if reason and tid not in rejected:
             rejected[tid]=reason+'; retained original BRAKER transcript'
-    if rejected:
+    restore=set(rejected)|set(normalized)
+    if restore:
         restored=[]
         for row in raw:
             if row['kind']=='gene': restored.append(row); continue
             if row['kind'] in ('mRNA','transcript'):
-                if row['attrs']['ID'] not in rejected: restored.append(row)
+                if row['attrs']['ID'] not in restore: restored.append(row)
                 continue
-            parents=[p for p in row['attrs']['Parent'].split(',') if p not in rejected]
+            parents=[p for p in row['attrs']['Parent'].split(',') if p not in restore]
             if parents: restored.append(dict(row,attrs=dict(row['attrs'],Parent=','.join(parents))))
         for row in before:
-            if row['kind'] in ('mRNA','transcript') and row['attrs']['ID'] in rejected:
+            if row['kind'] in ('mRNA','transcript') and row['attrs']['ID'] in restore:
                 restored.append(row)
             elif row['kind'] in ('exon','CDS','five_prime_UTR','three_prime_UTR'):
-                parents=[p for p in row['attrs']['Parent'].split(',') if p in rejected]
+                parents=[p for p in row['attrs']['Parent'].split(',') if p in restore]
                 if parents: restored.append(dict(row,attrs=dict(row['attrs'],Parent=','.join(parents))))
         raw=restored
     codons=[r for r in before if r['kind'] in ('start_codon','stop_codon')]
@@ -157,7 +199,7 @@ def finalize(original,native,identity,output):
             else:observed[tid][row['kind']].append((row['start'],row['end']))
     completed={}
     for tid,model in original_models.items():
-        if tid in rejected or not native_transcripts[tid]['attrs'].get('utr_refine_evidence'):continue
+        if tid in restore or not native_transcripts[tid]['attrs'].get('utr_refine_evidence'):continue
         corrections=boundary_label_completions(exon_blocks[tid],model['cds'],observed[tid],stops.get(tid,[]),model['strand'])
         if corrections:
             completed[tid]=corrections
@@ -189,7 +231,8 @@ def finalize(original,native,identity,output):
         for r in adjusted:
             attrs=';'.join(k+'='+v for k,v in r['attrs'].items())
             handle.write(f"{r['seq']}\tingenannot\t{r['kind']}\t{r['start']+1}\t{r['end']}\t.\t{r['strand']}\t{r['phase']}\t{attrs}\n")
-    dump(Path(output).with_suffix('.rejections.json'),dict(schema_version=1,rejected_candidates=rejected,completed_boundary_utr_labels=completed))
+    dump(Path(output).with_suffix('.rejections.json'),dict(schema_version=1,rejected_candidates=rejected,
+        normalized_duplicate_exon_records=normalized,completed_boundary_utr_labels=completed))
 
 
 def sequences(path):
@@ -213,8 +256,12 @@ def validate(original,refined,identity,genome,inputs,old_cds,new_cds,old_protein
     audit=read(rejections) if rejections else {}
     rejected=audit['rejected_candidates'] if audit.get('schema_version')==1 else audit
     completed=audit.get('completed_boundary_utr_labels',{}) if audit.get('schema_version')==1 else {}
+    normalized=audit.get('normalized_duplicate_exon_records',{}) if audit.get('schema_version')==1 else {}
+    restored=set(rejected)|set(normalized)
     if not set(rejected)<=set(before): raise ValueError('UTR rejection refers to unknown transcript')
     if not set(completed)<=set(before): raise ValueError('UTR label completion refers to unknown transcript')
+    if not set(normalized)<=set(before) or set(normalized)&set(rejected):
+        raise ValueError('Invalid duplicate exon normalization audit')
     if set(before)!=set(after): raise ValueError('UTR refinement changed transcript IDs')
     def coding(path):
         result={tid:[] for tid in before}
@@ -249,7 +296,7 @@ def validate(original,refined,identity,genome,inputs,old_cds,new_cds,old_protein
     summary=[]
     for tid,a in before.items():
         b=after[tid]
-        if tid in rejected and (sorted(a['exons'])!=sorted(b['exons']) or a['attrs']!=b['attrs']):
+        if tid in restored and (sorted(a['exons'])!=sorted(b['exons']) or a['attrs']!=b['attrs']):
             raise ValueError('Rejected UTR candidate did not retain original transcript')
         if any(a[k]!=b[k] for k in ('gene_id','seq','strand')): raise ValueError('UTR refinement changed gene/reference/strand')
         if overlap_length(b['exons'],a['exons'])!=sum(e-s for s,e in merged(a['exons'])): raise ValueError('UTR refinement shortened existing exons')
@@ -264,9 +311,10 @@ def validate(original,refined,identity,genome,inputs,old_cds,new_cds,old_protein
         high=[(max(s,upper),e) for s,e in b['exons'] if e>upper]
         expected={'five_prime_UTR':low if a['strand']=='+' else high,'three_prime_UTR':high if a['strand']=='+' else low}
         for kind,blocks in expected.items():
-            if not skipped and tid not in rejected and merged(utrs[tid][kind])!=subtract(blocks,stops.get(tid,[])): raise ValueError('UTR orientation/coordinates differ from exons or include stop codon')
+            if not skipped and tid not in restored and merged(utrs[tid][kind])!=subtract(blocks,stops.get(tid,[])): raise ValueError('UTR orientation/coordinates differ from exons or include stop codon')
         summary.append(dict(transcript_id=tid,gene_id=a['gene_id'],changed=sorted(a['exons'])!=sorted(b['exons']),
             rejected_candidate_reason=rejected.get(tid,'.'),
+            duplicate_exon_records_normalized=tid in normalized,
             boundary_utr_labels_completed=sum(len(v) for v in completed.get(tid,{}).values()),
             evidence_id=b['attrs'].get('utr_refine_evidence','.'),
             five_prime_utr_bp=sum(e-s for s,e in subtract(expected['five_prime_UTR'],stops.get(tid,[]))),
@@ -284,15 +332,28 @@ def validate(original,refined,identity,genome,inputs,old_cds,new_cds,old_protein
     status['rna_transcripts']=accepted.get('rna_transcripts',0)
     status['rejected_utr_candidates']=rejected
     status['completed_boundary_utr_labels']=completed
+    status['normalized_duplicate_exon_records']=normalized
+    warnings=coding_overlap_warnings(before,after,stops)
+    with (output/'utr_warnings.tsv').open('w',newline='') as h:
+        w=csv.DictWriter(h,fieldnames=['transcript_id','gene_id','other_gene_id','contig','strand',
+            'other_gene_strand','same_strand','overlap_bp','warning'],delimiter='\t')
+        w.writeheader();w.writerows(warnings)
+    status['coding_overlap_warning_pairs']=len(warnings)
+    status['transcripts_with_coding_overlap_warnings']=len({r['transcript_id'] for r in warnings})
+    status['same_strand_coding_overlap_warning_pairs']=sum(r['same_strand'] for r in warnings)
     status['rna_ambiguous_strand_excluded']=accepted.get('rna_ambiguous_strand_excluded',0)
     dump(output/'utr_status.json',status)
     (output/'README.md').write_text('# UTR refinement\n\nStatus: **ready**\n\n'+
         ('Refinement skipped: disabled or no RNA evidence.\n\n' if skipped else 'Native clusterize, BAM-based isoform ranking and utr_refine --utr_mode rank --onlynew.\n\n')+
         f"Changed transcripts: {status['changed_transcripts']}. CDS coordinates, phases and extracted CDS/protein sequences are unchanged. "
         f"Rejected UTR candidates: {len(rejected)}; original BRAKER transcripts retained. "
+        f"Transcripts with duplicate exon records normalized: {len(normalized)} (not rejected extensions). "
         f"Transcripts with missing boundary UTR labels completed: {len(completed)}. "
         'Original BRAKER models remain preserved. Separately annotated stop codons are retained and excluded from UTR lengths.\n\n'
-        '[Changes](utr_changes.tsv) | [Validation](utr_status.json)\n\n'
+        '[Changes](utr_changes.tsv) | [Validation](utr_status.json) | [Coding overlap warnings](utr_warnings.tsv)\n\n'
+        f"UTR additions overlap another gene CDS in {len(warnings)} transcript/gene pairs, "
+        f"including {status['same_strand_coding_overlap_warning_pairs']} on the same strand. "
+        'These are review warnings, not automatic rejection criteria; RNA support does not establish coding assignment.\n\n'
         'Review extensions before promotion. Protein BUSCO/OMArk inputs are unchanged; final AGAT/AED assessment follows. No models were filtered.\n')
     return status
 

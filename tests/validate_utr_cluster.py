@@ -73,6 +73,8 @@ def run_case(root,name,resume=False,enabled=True):
         assert status['status']=='ready' and status['protein_sequences_unchanged'] and status['cds_coordinates_and_phases_unchanged']
         assert status['changed_transcripts']==(1 if enabled and aid!='B' else 0)
         assert status['skipped']==(not enabled or aid=='B')
+        assert (folder/'utr_warnings.tsv').is_file()
+        assert status['coding_overlap_warning_pairs']==0
         if enabled and aid!='B': assert len(status['readsets'])==2
         with (folder/'utr_changes.tsv').open() as h: row=next(csv.DictReader(h,delimiter='\t'))
         if enabled and aid!='B': assert row['five_prime_utr_bp']=='50' and row['three_prime_utr_bp']=='50'

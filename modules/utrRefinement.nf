@@ -100,6 +100,7 @@ process VALIDATE_UTR_REFINEMENT {
     tuple val(aid), path("${aid}.utr.gff3"), emit: annotation
     tuple val(aid), path('utr_status.json'), emit: status
     tuple val(aid), path('utr_changes.tsv'), emit: changes
+    tuple val(aid), path('utr_warnings.tsv'), emit: warnings
     tuple val(aid), path('README.md'), emit: report
     tuple val(aid), path('transcripts.fa'), emit: transcripts
     script:

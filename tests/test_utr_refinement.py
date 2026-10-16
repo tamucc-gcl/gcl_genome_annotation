@@ -11,7 +11,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'py_scripts'))
-from utr_refinement import finalize, validate, dump, prepare, boundary_label_completions
+from utr_refinement import finalize, validate, dump, prepare, boundary_label_completions, coding_overlap_warnings
 from prepare_protein_evidence import checksum
 from gene_model_aed import gene_scores
 from evidence_aed import models
@@ -170,7 +170,23 @@ class UtrContracts(unittest.TestCase):
             finalize(original,raw,identity,refined)
             status=self.run_validation(root,files)
             self.assertEqual(status['changed_transcripts'],0)
-            self.assertEqual(set(status['rejected_utr_candidates']),{'t1'})
+            self.assertEqual(status['rejected_utr_candidates'],{})
+            self.assertEqual(set(status['normalized_duplicate_exon_records']),{'t1'})
+            self.assertEqual(models(original,{'chr1':1000})['t1']['exons'],models(refined,{'chr1':1000})['t1']['exons'])
+
+    def test_coding_overlap_warnings_are_gene_level_strand_aware_and_do_not_filter(self):
+        before={
+            't1':dict(gene_id='g1',seq='chr1',strand='+',exons=[(10,20)],cds=[(10,20)]),
+            't2':dict(gene_id='g2',seq='chr1',strand='+',exons=[(30,40)],cds=[(30,40)]),
+            't3':dict(gene_id='g2',seq='chr1',strand='+',exons=[(30,40)],cds=[(30,40)]),
+            't4':dict(gene_id='g3',seq='chr1',strand='-',exons=[(45,60)],cds=[(45,60)])}
+        after={tid:dict(model) for tid,model in before.items()}
+        after['t1']['exons']=[(10,50)]
+        warnings=coding_overlap_warnings(before,after)
+        self.assertEqual([(w['other_gene_id'],w['overlap_bp'],w['same_strand']) for w in warnings],
+                         [('g2',10,True),('g3',5,False)])
+        self.assertEqual(after['t1']['exons'],[(10,50)])
+        self.assertEqual(coding_overlap_warnings(before,before),[])
 
     def test_restoring_unmarked_candidate_cannot_hide_native_cds_change(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -267,8 +267,10 @@ can be prioritized later if supplied; current data are short-read RNA-seq.
 Requirements before promotion:
 
 1. Preserve raw BRAKER outputs and write a separate UTR-refined model set.
-2. Require compatible coding structures; ambiguous, multi-gene/fusion candidates
-   must be reviewed/rejected using the native preparation and ranking workflow.
+2. Require compatible coding structures and use native preparation and ranking.
+   RNA-supported UTR/CDS overlaps can still remain after native ranking; report
+   those conflicts for review rather than equating transcription with coding
+   assignment or automatically deleting models.
 3. Do not infer UTRs from protein-only evidence. With no RNA, skip refinement and
    retain coding models with an explicit not-applicable status.
 4. Initially add UTRs to models without them, preserving existing annotated UTRs.
@@ -286,10 +288,43 @@ Requirements before promotion:
 8. Keep final filtering disabled until benchmark and UTR contracts pass and real
    representative extensions are reviewed. Do not change BRAKER training inputs.
 
-The unchanged-model benchmark and selected-case review passed on the real
-flounder data. The UTR pilot is implemented; actual native cluster acceptance
-and real UTR-extension review remain pending. Final AED rescoring/promotion
-follow those checks.
+The unchanged-model benchmark, native UTR cluster contracts and real-data UTR
+validation passed. Targeted BAM inspection found support for all 48 new
+junctions among ten long-extension cases in at least one library (46 in both).
+This supports use of the native workflow; it does not prove every assembled
+transcript or its coding assignment. Final AED assessment/promotion remains
+pending.
+
+### General UTR safeguards
+
+The wrapper preserves CDS coordinates/phases and extracted CDS/protein
+sequences, IDs/parents and reference/strand consistency. Invalid optional UTR
+proposals revert to the original transcript, with an explicit reason. A coding
+change is a validation failure and cannot be hidden by that fallback. No-RNA
+and disabled runs retain the original models.
+
+Duplicate exon records with exactly the same coordinate set as the original
+are restored to the original representation and audited separately under
+`normalized_duplicate_exon_records`. They are not rejected biological
+extensions. Different exon boundaries or different covered bases still require
+native evidence provenance; the duplicate rule cannot accept those changes.
+
+`utr_warnings.tsv` reports every accepted UTR addition overlapping another
+gene's CDS, with strand relationship and overlapping exonic bases. Coding blocks
+are merged per gene to avoid inflating counts across isoforms. Separately
+annotated stop codons are excluded. Warnings never filter models or change
+ranking, and the report links to them. No species-specific UTR length cutoff
+is imposed. Long extensions, readthrough and overlapping coding models are
+evidence conflicts to inspect, not automatic errors based on length alone.
+
+The development utilities `review_utr_candidates.py`, `review_utr_bams.py` and
+`review_utr_coding_evidence.py` inspect completed outputs without rerunning
+annotation. The last selects overlapping gene pairs from the candidate report,
+compares all their coding isoforms with their existing native protein AED and
+selected miniprot chains, and retains protein target identifiers. The BAM
+utility reports individual libraries and respects resolved strandedness. These
+are targeted diagnostics, not replacements for native InGenAnnot ranking or
+the planned Portcullis assessment.
 
 ## References
 

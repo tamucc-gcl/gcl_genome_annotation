@@ -67,7 +67,7 @@ def compare_rna(model,hit,penalty):
         matching_intron_boundaries=len(model_introns & rna_introns))
 
 
-def selected_proteins(path,wanted):
+def selected_proteins(path,wanted,include_attributes=False):
     """Read grouped miniprot output once; keep only the requested chains."""
     hits={}; current=None
     if not wanted: return hits
@@ -83,6 +83,8 @@ def selected_proteins(path,wanted):
                 current=identifier if identifier in wanted else None
                 if current:
                     hits[current]=dict(evidence_id=current,seq=fields[0],strand=fields[6],blocks=[])
+                    if include_attributes:
+                        hits[current]['attributes']=dict(x.split('=',1) for x in fields[8].split(';') if '=' in x)
             elif fields[2]=='CDS' and current:
                 if 'Parent='+current not in fields[8].split(';'):
                     raise ValueError('Unexpected miniprot CDS parent')
