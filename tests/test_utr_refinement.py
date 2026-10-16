@@ -11,7 +11,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'py_scripts'))
-from utr_refinement import finalize, validate, dump, prepare
+from utr_refinement import finalize, validate, dump, prepare, boundary_label_completions
 from prepare_protein_evidence import checksum
 from gene_model_aed import gene_scores
 from evidence_aed import models
@@ -34,6 +34,28 @@ class UtrContracts(unittest.TestCase):
             self.assertEqual(result['mismatched_labels_on_eligible_candidates'],1)
             self.assertEqual(result['issues'][0]['missing_label_blocks'],[(80,100)])
             self.assertTrue(result['issues'][0]['boundary_equalities']['cds_start_is_exon_last_base'])
+            state=json.loads(inputs.read_text());state['model_sha256']=checksum(original);dump(inputs,state)
+            finalize(original,raw,identity,refined)
+            status=self.run_validation(root,(original,raw,refined,identity,genome,inputs))
+            self.assertEqual(status['completed_boundary_utr_labels'],{'t1':{'five_prime_UTR':[[80,100]]}})
+            self.assertEqual(models(refined,{'chr1':1000})['t1']['exons'],[(80,101),(200,320)])
+
+    def test_boundary_label_completion_is_strand_correct_and_narrow(self):
+        for strand in ('+','-'):
+            low_kind='five_prime_UTR' if strand=='+' else 'three_prime_UTR'
+            high_kind='three_prime_UTR' if strand=='+' else 'five_prime_UTR'
+            observed={low_kind:[],high_kind:[(250,270)]}
+            result=boundary_label_completions([(80,101),(200,270)],[(100,101),(200,250)],observed,[],strand)
+            self.assertEqual(result,{low_kind:[(80,100)]})
+            observed={low_kind:[(80,100)],high_kind:[]}
+            result=boundary_label_completions([(80,150),(200,230)],[(100,150),(200,201)],observed,[(201,204)],strand)
+            self.assertEqual(result,{high_kind:[(204,230)]})
+            # A missing ordinary UTR label is not this known boundary bug.
+            self.assertEqual(boundary_label_completions([(80,150),(200,270)],[(100,150),(200,250)],
+                {low_kind:[],high_kind:[]},[],strand),{})
+            # Extra unexpected UTR labels remain a validation failure.
+            self.assertEqual(boundary_label_completions([(80,101),(200,270)],[(100,101),(200,250)],
+                {low_kind:[(70,75)],high_kind:[(250,270)]},[],strand),{})
 
     def test_label_diagnostic_excludes_separate_stop_codons(self):
         with tempfile.TemporaryDirectory() as tmp:

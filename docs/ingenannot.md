@@ -222,6 +222,16 @@ already be rejected by the adapter. It does not run ranking/refinement, read
 BAMs, extract sequences or modify annotations. Inspect the otherwise-eligible
 cases to determine whether the problem is label serialization or RNA structure.
 
+The real diagnostic identified 19 missing UTR labels on 19 otherwise-eligible
+transcripts. All occur where the coding boundary is a single base at the end of
+an exon: InGenAnnot 0.0.20's strict inequalities omit the adjacent UTR segment.
+The adapter completes only missing labels within those exact equality cases,
+using native-selected exon boundaries and unchanged CDSs, excluding stop codons.
+It does not extend exons, select different evidence or modify coding sequence.
+Unexpected extra labels or omissions elsewhere still fail validation. Corrections
+are recorded as `completed_boundary_utr_labels` in status and counted per
+transcript in `utr_changes.tsv`; the unchanged native GFF remains available.
+
 Input approval is passed to ranking as a stable content value, so editing the
 validation/report helper does not invalidate the expensive native ranking when
 approved scientific inputs are unchanged. This uses Nextflow's normal cache.

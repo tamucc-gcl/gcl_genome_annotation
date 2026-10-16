@@ -25,6 +25,29 @@ def subtract(blocks,excluded):
     return merged(result)
 
 
+def boundary_label_completions(exons,cds,observed,stops,strand):
+    """Only complete omitted labels at InGenAnnot 0.0.20's strict-equality edges.
+
+    Coordinates and evidence selection are untouched. Unexpected labels, or
+    omissions anywhere else, remain validation failures.
+    """
+    lower=min(s for s,e in cds);upper=max(e for s,e in cds)
+    low=[(s,min(e,lower)) for s,e in exons if s<lower]
+    high=[(max(s,upper),e) for s,e in exons if e>upper]
+    low_edge=[(s,lower) for s,e in exons if s<lower and e==lower+1]
+    high_edge=[(upper,e) for s,e in exons if e>upper and s==upper-1]
+    candidates={
+        'five_prime_UTR':(low,low_edge) if strand=='+' else (high,high_edge),
+        'three_prime_UTR':(high,high_edge) if strand=='+' else (low,low_edge)}
+    completed={}
+    for kind,(expected,edges) in candidates.items():
+        want=subtract(expected,stops);actual=merged(observed[kind])
+        missing=subtract(want,actual);extra=subtract(actual,want)
+        if missing and not extra and not subtract(missing,subtract(edges,stops)):
+            completed[kind]=missing
+    return completed
+
+
 def prepare(gff,validation,identity,rna,metadata,bams,indices,output):
     state=read(validation); reference=read(identity)
     if state['status']!='ready' or checksum(gff)!=state['gff3_sha256'] or state['reference_identity']!=reference['reference_identity']:
@@ -125,6 +148,23 @@ def finalize(original,native,identity,output):
                     attrs=dict(row['attrs'],Parent=tid,ID=row['attrs']['ID']+f'.{i+1}')
                     adjusted.append(dict(row,start=s,end=e,attrs=attrs))
         else: adjusted.append(row)
+    exon_blocks={tid:[] for tid in original_models}
+    observed={tid:{'five_prime_UTR':[],'three_prime_UTR':[]} for tid in original_models}
+    for row in adjusted:
+        if row['kind'] not in ('exon','five_prime_UTR','three_prime_UTR'):continue
+        for tid in row['attrs']['Parent'].split(','):
+            if row['kind']=='exon':exon_blocks[tid].append((row['start'],row['end']))
+            else:observed[tid][row['kind']].append((row['start'],row['end']))
+    completed={}
+    for tid,model in original_models.items():
+        if tid in rejected or not native_transcripts[tid]['attrs'].get('utr_refine_evidence'):continue
+        corrections=boundary_label_completions(exon_blocks[tid],model['cds'],observed[tid],stops.get(tid,[]),model['strand'])
+        if corrections:
+            completed[tid]=corrections
+            for kind,blocks in corrections.items():
+                for i,(s,e) in enumerate(blocks,1):
+                    adjusted.append(dict(seq=model['seq'],kind=kind,start=s,end=e,strand=model['strand'],phase='.',
+                        attrs=dict(ID=f'utr_boundary_label.{tid}.{kind}.{i}',Parent=tid)))
     adjusted.extend(codons)
     transcripts={r['attrs']['ID']:r for r in adjusted if r['kind'] in ('mRNA','transcript')}
     genes={r['attrs']['ID']:r for r in adjusted if r['kind']=='gene'}
@@ -149,7 +189,7 @@ def finalize(original,native,identity,output):
         for r in adjusted:
             attrs=';'.join(k+'='+v for k,v in r['attrs'].items())
             handle.write(f"{r['seq']}\tingenannot\t{r['kind']}\t{r['start']+1}\t{r['end']}\t.\t{r['strand']}\t{r['phase']}\t{attrs}\n")
-    dump(Path(output).with_suffix('.rejections.json'),rejected)
+    dump(Path(output).with_suffix('.rejections.json'),dict(schema_version=1,rejected_candidates=rejected,completed_boundary_utr_labels=completed))
 
 
 def sequences(path):
@@ -170,8 +210,11 @@ def validate(original,refined,identity,genome,inputs,old_cds,new_cds,old_protein
     if contigs!=reference['contigs']: raise ValueError('UTR genome differs from accepted reference')
     lengths={c['id']:c['length'] for c in reference['contigs']}
     before,after=models(original,lengths),models(refined,lengths)
-    rejected=read(rejections) if rejections else {}
+    audit=read(rejections) if rejections else {}
+    rejected=audit['rejected_candidates'] if audit.get('schema_version')==1 else audit
+    completed=audit.get('completed_boundary_utr_labels',{}) if audit.get('schema_version')==1 else {}
     if not set(rejected)<=set(before): raise ValueError('UTR rejection refers to unknown transcript')
+    if not set(completed)<=set(before): raise ValueError('UTR label completion refers to unknown transcript')
     if set(before)!=set(after): raise ValueError('UTR refinement changed transcript IDs')
     def coding(path):
         result={tid:[] for tid in before}
@@ -224,6 +267,7 @@ def validate(original,refined,identity,genome,inputs,old_cds,new_cds,old_protein
             if not skipped and tid not in rejected and merged(utrs[tid][kind])!=subtract(blocks,stops.get(tid,[])): raise ValueError('UTR orientation/coordinates differ from exons or include stop codon')
         summary.append(dict(transcript_id=tid,gene_id=a['gene_id'],changed=sorted(a['exons'])!=sorted(b['exons']),
             rejected_candidate_reason=rejected.get(tid,'.'),
+            boundary_utr_labels_completed=sum(len(v) for v in completed.get(tid,{}).values()),
             evidence_id=b['attrs'].get('utr_refine_evidence','.'),
             five_prime_utr_bp=sum(e-s for s,e in subtract(expected['five_prime_UTR'],stops.get(tid,[]))),
             three_prime_utr_bp=sum(e-s for s,e in subtract(expected['three_prime_UTR'],stops.get(tid,[])))))
@@ -239,12 +283,14 @@ def validate(original,refined,identity,genome,inputs,old_cds,new_cds,old_protein
         reference_identity=reference['reference_identity'],readsets=accepted['readsets'])
     status['rna_transcripts']=accepted.get('rna_transcripts',0)
     status['rejected_utr_candidates']=rejected
+    status['completed_boundary_utr_labels']=completed
     status['rna_ambiguous_strand_excluded']=accepted.get('rna_ambiguous_strand_excluded',0)
     dump(output/'utr_status.json',status)
     (output/'README.md').write_text('# UTR refinement\n\nStatus: **ready**\n\n'+
         ('Refinement skipped: disabled or no RNA evidence.\n\n' if skipped else 'Native clusterize, BAM-based isoform ranking and utr_refine --utr_mode rank --onlynew.\n\n')+
         f"Changed transcripts: {status['changed_transcripts']}. CDS coordinates, phases and extracted CDS/protein sequences are unchanged. "
         f"Rejected UTR candidates: {len(rejected)}; original BRAKER transcripts retained. "
+        f"Transcripts with missing boundary UTR labels completed: {len(completed)}. "
         'Original BRAKER models remain preserved. Separately annotated stop codons are retained and excluded from UTR lengths.\n\n'
         '[Changes](utr_changes.tsv) | [Validation](utr_status.json)\n\n'
         'Review extensions before promotion. Protein BUSCO/OMArk inputs are unchanged; final AGAT/AED assessment follows. No models were filtered.\n')
