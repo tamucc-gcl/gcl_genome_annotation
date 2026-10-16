@@ -55,8 +55,8 @@ workflow {
     def modelFiles = requests.map { aid,enabled,readsets,gff,validation,identity,rna,bams,indices -> tuple(aid,!enabled,gff,identity) }
         .join(genomes).join(FINALIZE_UTR_ANNOTATION.out.annotation)
     EXTRACT_UTR_SEQUENCES(modelFiles.map { aid,skipped,original,identity,genome,refined -> tuple(aid,genome,original,refined) })
-    VALIDATE_UTR_REFINEMENT(modelFiles.join(PREPARE_UTR_INPUTS.out.status).join(EXTRACT_UTR_SEQUENCES.out.sequences).map {
-        aid,skipped,original,identity,genome,refined,inputs,sequences -> tuple(aid,skipped,original,refined,identity,genome,inputs,sequences)
+    VALIDATE_UTR_REFINEMENT(modelFiles.join(PREPARE_UTR_INPUTS.out.status).join(EXTRACT_UTR_SEQUENCES.out.sequences).join(FINALIZE_UTR_ANNOTATION.out.rejections).map {
+        aid,skipped,original,identity,genome,refined,inputs,sequences,rejections -> tuple(aid,skipped,original,refined,identity,genome,inputs,sequences,rejections)
     },helpers)
     UTR_AGAT(VALIDATE_UTR_REFINEMENT.out.annotation.join(genomes).map { aid,gff,genome -> tuple(aid,genome,gff) })
 }

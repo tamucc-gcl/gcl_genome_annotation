@@ -14,6 +14,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'py_scripts'))
 from utr_refinement import finalize, validate, dump, prepare
 from prepare_protein_evidence import checksum
 from gene_model_aed import gene_scores
+from evidence_aed import models
 
 
 class UtrContracts(unittest.TestCase):
@@ -65,7 +66,34 @@ class UtrContracts(unittest.TestCase):
 
     def run_validation(self,root,files,skipped=False):
         original,raw,refined,identity,genome,inputs=files
-        return validate(original,refined,identity,genome,inputs,root/'old.cds',root/'new.cds',root/'old.proteins',root/'new.proteins',root/'out',skipped)
+        return validate(original,refined,identity,genome,inputs,root/'old.cds',root/'new.cds',root/'old.proteins',root/'new.proteins',root/'out',skipped,refined.with_suffix('.rejections.json'))
+
+    def test_wrong_strand_native_proposal_restores_only_affected_isoform(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); files=self.fixture(root)
+            original,raw,refined,identity,genome,inputs=files
+            def second_isoform(text,wrong_strand=False):
+                result=[]
+                for line in text.splitlines():
+                    f=line.split('\t')
+                    if len(f)!=9 or f[2]=='gene': continue
+                    f[8]=f[8].replace('t1','t2').replace('ne1','ne2').replace('ID=e1','ID=e2').replace('ID=c1','ID=c2').replace('ID=u1','ID=u3').replace('ID=u2','ID=u4').replace('stop1','stop2')
+                    if wrong_strand and f[2]=='exon': f[6]='-'
+                    result.append('\t'.join(f))
+                return '\n'.join(result)+'\n'
+            original.write_text(original.read_text()+second_isoform(original.read_text()))
+            raw.write_text(raw.read_text()+second_isoform(raw.read_text(),True))
+            state=json.loads(inputs.read_text());state['model_sha256']=checksum(original);dump(inputs,state)
+            for name in ('old.cds','new.cds','old.proteins','new.proteins'):
+                with (root/name).open('a') as h:h.write('>t2\nAAA\n')
+            finalize(original,raw,identity,refined)
+            before=models(original,{'chr1':1000});after=models(refined,{'chr1':1000})
+            self.assertEqual(after['t2']['exons'],before['t2']['exons'])
+            self.assertNotEqual(after['t1']['exons'],before['t1']['exons'])
+            status=self.run_validation(root,files)
+            self.assertEqual(set(status['rejected_utr_candidates']),{'t2'})
+            self.assertEqual(status['changed_transcripts'],1)
+            self.assertEqual(after['t2']['strand'],'+')
 
     def test_native_extensions_preserve_cds_and_exclude_separate_stop(self):
         for strand in ('+','-'):

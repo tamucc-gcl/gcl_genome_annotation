@@ -104,7 +104,9 @@ def models(path, lengths):
                 raise ValueError('Unresolved model block Parent')
             model = transcripts[parent]
             if (row['seq'], row['strand']) != (model['seq'], model['strand']) or not model['start'] <= row['start'] < row['end'] <= model['end']:
-                raise ValueError('Model block differs from transcript coordinates/strand')
+                raise ValueError(f"Model block differs from transcript coordinates/strand: {parent}; "
+                    f"{row['kind']} {row['seq']}:{row['start']+1}-{row['end']} ({row['strand']}); "
+                    f"transcript {model['seq']}:{model['start']+1}-{model['end']} ({model['strand']})")
             model['exons' if row['kind'] == 'exon' else 'cds'].append((row['start'], row['end']))
     for tid, row in transcripts.items():
         if row['gene_id'] not in genes or not row['exons']:

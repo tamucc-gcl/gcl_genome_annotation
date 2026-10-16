@@ -188,6 +188,16 @@ exon changes only, preserved existing UTRs, gene/transcript identity, CDS/phases
 feature relationships/reference bounds and identical baseline/refined gffread
 CDS/protein sequences. Original predictions remain unchanged.
 
+The real native output contained one incompatible proposal: a minus-strand exon
+under the plus-strand transcript `g10479.t2`. The adapter rejects proposals with
+incompatible feature/transcript contigs or strands and restores that transcript's
+original BRAKER features, including in a multi-isoform gene. Other valid proposals
+remain eligible. It never flips an evidence strand to force compatibility.
+`utr_status.json` records `rejected_utr_candidates`, and `utr_changes.tsv` includes
+`rejected_candidate_reason`. Native outputs remain available for inspection.
+Unexpected coding, identity, parent, coordinate or sequence changes still fail
+validation. Restored transcripts are validated as unchanged pass-through models.
+
 Input approval is passed to ranking as a stable content value, so editing the
 validation/report helper does not invalidate the expensive native ranking when
 approved scientific inputs are unchanged. This uses Nextflow's normal cache.

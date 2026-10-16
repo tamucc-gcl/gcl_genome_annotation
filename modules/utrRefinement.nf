@@ -63,8 +63,9 @@ process FINALIZE_UTR_ANNOTATION {
     path helpers
     output:
     tuple val(aid), path("${aid}.utr.gff3"), emit: annotation
+    tuple val(aid), path("${aid}.utr.rejections.json"), emit: rejections
     script:
-    def command = skipped ? "cp '${original}' '${aid}.utr.gff3'" :
+    def command = skipped ? "cp '${original}' '${aid}.utr.gff3'\nprintf '{}\\n' > '${aid}.utr.rejections.json'" :
         "python utr_refinement.py finalize --original '${original}' --native '${raw_gff}' --identity '${identity}' --output '${aid}.utr.gff3'"
     """
     set -euo pipefail
@@ -93,7 +94,7 @@ process VALIDATE_UTR_REFINEMENT {
     label 'aed_python'
     publishDir "${params.outdir}/structural_annotation/utr/${aid}", mode: 'copy', overwrite: true
     input:
-    tuple val(aid), val(skipped), path(original), path(refined, stageAs: 'candidate.gff3'), path(identity), path(genome), path(inputs), path(sequences)
+    tuple val(aid), val(skipped), path(original), path(refined, stageAs: 'candidate.gff3'), path(identity), path(genome), path(inputs), path(sequences), path(rejections)
     path helpers
     output:
     tuple val(aid), path("${aid}.utr.gff3"), emit: annotation
@@ -108,7 +109,7 @@ process VALIDATE_UTR_REFINEMENT {
     python utr_refinement.py validate --original '${original}' --refined '${refined}' \
       --identity '${identity}' --genome '${genome}' --inputs '${inputs}' \
       --old-cds '${sequences}/baseline.cds.fa' --new-cds '${sequences}/cds.fa' \
-      --old-proteins '${sequences}/baseline.proteins.fa' --new-proteins '${sequences}/proteins.fa' --outdir . ${skip}
+      --old-proteins '${sequences}/baseline.proteins.fa' --new-proteins '${sequences}/proteins.fa' --outdir . ${skip} --rejections '${rejections}'
     cp '${refined}' '${aid}.utr.gff3'
     cp '${sequences}/transcripts.fa' transcripts.fa
     """
