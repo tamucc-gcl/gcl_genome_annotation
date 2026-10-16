@@ -10,7 +10,7 @@
 process BUSCO {
     tag "${assembly_id}"
     label 'busco'
-    publishDir "${params.outdir}/qc/baseline/${assembly_id}/busco", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/qc/${task.ext.qc_stage ?: 'baseline'}/${assembly_id}/busco", mode: params.publish_dir_mode
     
     input:
     tuple val(assembly_id), val(lineage), path(protein_fasta), path(busco_db)

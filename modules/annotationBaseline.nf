@@ -1,7 +1,7 @@
 process PREPARE_ANNOTATION_BASELINE {
     tag "${aid}"
     label 'baseline_python'
-    publishDir "${params.outdir}/qc/baseline/${aid}", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/qc/${task.ext.qc_stage ?: 'baseline'}/${aid}", mode: 'copy', overwrite: true
     input:
     tuple val(aid), val(settings), path(genome), path(gff), path(proteins), path(validation)
     path helpers
@@ -18,7 +18,7 @@ process PREPARE_ANNOTATION_BASELINE {
 
 process REPORT_ANNOTATION_BASELINE {
     label 'baseline_python'
-    publishDir "${params.outdir}/qc/baseline", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/qc/${task.ext.qc_stage ?: 'baseline'}", mode: 'copy', overwrite: true
     input:
     val ids
     path selections, stageAs: 'selection/*/selection.json'

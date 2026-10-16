@@ -11,7 +11,7 @@ from prepare_protein_evidence import checksum
 from ingenannot_inputs import check
 
 
-def report(original, annotated, identity, inputs, current_scores, cds_only, penalty, output):
+def assess(original, annotated, identity, inputs):
     identity = json.loads(Path(identity).read_text())
     accepted = json.loads(Path(inputs).read_text())
     if accepted.get('status') != 'ready' or identity['reference_identity'] != accepted['reference_identity'] or checksum(original) != accepted['model_sha256']:
@@ -57,6 +57,12 @@ def report(original, annotated, identity, inputs, current_scores, cds_only, pena
             entry[kind+'_evidence_id'] = attrs.get(evidence)
         entry['rna_penalty'] = attrs.get('ev_tr_penalty')
         scores[tid] = entry
+    return before,scores,normalized_bounds,accepted
+
+
+def report(original, annotated, identity, inputs, current_scores, cds_only, penalty, output):
+    before,scores,normalized_bounds,accepted=assess(original,annotated,identity,inputs)
+    identity=json.loads(Path(identity).read_text())
     with Path(current_scores).open() as handle:
         baseline = {r['transcript_id']:r for r in csv.DictReader(handle,delimiter='\t')}
     if set(baseline) != set(before) or set(scores) != set(before):

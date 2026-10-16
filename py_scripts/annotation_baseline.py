@@ -85,6 +85,7 @@ def prepare(aid, settings, prediction, gff, proteins, output, genome=None):
                 fasta.write(sequence[start:start + 60] + '\n')
             table.write(f'{gid}\t{tid}\t{len(sequence.rstrip("*"))}\t{len(tids)}\n')
     data = dict(assembly_id=aid, status='ready', model_set='unfiltered',
+                model_source=prediction.get('stage','braker_prediction'),
                 genes=len(genes), coding_genes=len(groups), coding_transcripts=len(coding),
                 representative_proteins=len(selected),
                 selection='Longest protein per coding gene; ties by transcript ID; terminal stop excluded from ranking',
@@ -133,7 +134,7 @@ def report(selections, agat, busco, omark, output):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     (output / 'baseline_status.json').write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
-    lines = ['# Unfiltered annotation baseline', '', 'Status: **ready**', '', data['scope'], '',
+    lines = ['# Unfiltered annotation QC', '', 'Status: **ready**', '', data['scope'], '',
              '| Assembly | Genes | Coding transcripts | Representative proteins | BUSCO | OMArk |',
              '|---|---:|---:|---:|---|---|']
     for row in data['assemblies']:
@@ -149,7 +150,7 @@ def report(selections, agat, busco, omark, output):
     lines += ['Representative selection does not remove or alter the original BRAKER models.',
               'Counts and isoform-sensitive completeness results must be interpreted with the stated protein set.',
               'BUSCO/OMArk metrics assess biological quality; ready means requested tools completed, not a quality cutoff.',
-              'Protein-based AED and model filters are subsequent work; missing protein evidence is not evidence of an unsupported model.', '',
+              'Native AED is reported separately when enabled. Missing evidence is not evidence of an unsupported model.', '',
               '[Machine-readable status](baseline_status.json)']
     for label in ('busco', 'omark'):
         for aid, path in sorted(indexed[label].items()):

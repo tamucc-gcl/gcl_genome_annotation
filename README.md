@@ -12,7 +12,7 @@ the synthetic acceptance summary has not been supplied.
 ![](assets/genome_annotation_pipeline.png)
 ## Pipeline rework
 
-The new [input and taxonomy preflight](docs/foundation-preflight.md) supports two-sheet validation, global defaults, per-assembly overrides and taxonomy-derived settings. The integrated `main.nf` now connects preparation, repeats, alignment, BRAKER3 prediction and unfiltered baseline QC. Functional annotation and model filtering have not yet been connected. Standalone entries remain available for development and testing.
+The new [input and taxonomy preflight](docs/foundation-preflight.md) supports two-sheet validation, global defaults, per-assembly overrides and taxonomy-derived settings. The integrated `main.nf` connects preparation, repeats, alignment, BRAKER3 prediction, optional native UTR refinement, final unfiltered QC and native RNA/protein AED. Functional annotation and model filtering have not yet been connected. Standalone entries remain available for development and testing.
 Input-contract acceptance passed on Nextflow 23.10.1.
 
 [Protein evidence preparation](docs/protein-evidence.md) adds validated,
@@ -76,7 +76,27 @@ current method using unchanged predictions and existing alignments. Combined
 AED is deferred for this method. The native benchmark and selected-case review
 passed on the real flounder data. `utr_refinement.nf` now provides a native
 clusterize/rank/refine UTR pilot with CDS/protein preservation checks, transcript
-extraction and AGAT. Tiny native UTR acceptance is pending; see the linked guide
-for `tests/validate_utr_cluster.py`. AED filtering defaults to off, with optional
-RNA or protein thresholds in the downstream filter module. The UTR pilot stops
-before final AED rescoring and filtering.
+extraction and AGAT. Tiny native UTR acceptance and the real-data UTR pilot
+passed. `main.nf` now routes accepted UTR-refined models into the existing QC
+modules and native InGenAnnot AED. RNA-free or refinement-disabled assemblies
+retain their original models. AED filtering defaults to off; the downstream
+filter module is not yet connected.
+
+The accepted model set is published under `structural_annotation/final/<assembly>/`,
+with `annotation_status.json`, GFF3 and unchanged coding FASTAs. Original BRAKER
+outputs remain under `structural_annotation/braker/`. Final unfiltered QC is
+under `qc/final/` and native RNA/protein AED under
+`structural_annotation/aed/<assembly>/`. RNA assemblies are reused from BRAKER
+when available, otherwise existing StringTie assembly/merge modules supply both
+UTR refinement and AED. Protein alignments are independent of UTR changes.
+All downstream handoffs use native Nextflow task paths.
+
+Before the first integrated real-data run, execute
+`python tests/validate_postprocessing_cluster.py --outdir testing/postprocessing_contracts_01`
+on Crest. This checks all four evidence modes with actual small UTR/AGAT/miniprot/
+InGenAnnot tasks, unchanged resume, report-only cache reuse and disabled UTRs;
+it performs no BRAKER training or repeat discovery. Local Python tests pass;
+connected cluster acceptance remains pending. `--utr_refine false`,
+`--run_baseline_qc false` and `--run_aed false` disable the respective optional
+work. The default RNA AED profile assesses coding support, not UTR boundary
+quality. See [the InGenAnnot guide](docs/ingenannot.md) for safeguards and scope.

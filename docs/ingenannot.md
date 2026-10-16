@@ -292,8 +292,56 @@ The unchanged-model benchmark, native UTR cluster contracts and real-data UTR
 validation passed. Targeted BAM inspection found support for all 48 new
 junctions among ten long-extension cases in at least one library (46 in both).
 This supports use of the native workflow; it does not prove every assembled
-transcript or its coding assignment. Final AED assessment/promotion remains
-pending.
+transcript or its coding assignment.
+
+## Connected pipeline
+
+`main.nf` calls `ANNOTATION_POSTPROCESSING` using native BRAKER, reference,
+protein evidence and BAM channels. It resolves one RNA assembly per assembly,
+reusing retained ETP StringTie output or the existing standalone StringTie
+assembly/merge modules. The resulting RNA evidence is shared by UTR refinement
+and AED, including when refinement is disabled. Protein alignment depends on
+the reference and supplied proteins, so it can overlap BRAKER and is independent
+of UTR/refinement settings.
+
+Accepted models are published to `structural_annotation/final/<assembly>/`.
+This handoff validates UTR provenance and coding invariance and retains the
+original BRAKER protein/CDS FASTAs. The original BRAKER directory is preserved.
+Existing AGAT/BUSCO/OMArk modules assess the final unfiltered set in `qc/final/`;
+standalone raw baseline reports remain in `qc/baseline/`. Protein selection is
+still one longest protein per coding gene. QC and native AED can run concurrently
+after final model validation; neither edits the accepted models.
+
+Production AED uses the accepted InGenAnnot preparation/run modules and the
+same structural assessment checks as the benchmark, without running custom
+scoring for every annotation. Results are in `structural_annotation/aed/<assembly>/`
+with only `rna_aed` and `protein_aed`, selected evidence IDs and the RNA penalty
+indicator. Missing evidence is `.`, never a fabricated AED 1. No combined score,
+alias columns or benchmark deltas are added. The benchmark remains a development
+entry. The default CDS-only RNA profile assesses coding support and does not
+measure UTR boundary quality. RNA overflow penalty is recorded explicitly.
+
+`utr_refine`, `run_baseline_qc` and `run_aed` default to true. Missing RNA or
+disabled refinement retains original models with a skipped status; all four
+evidence modes reach final publication and optional assessment. The existing
+forward-stranded UTR guard remains explicit for the pinned ranking tool; use
+`--utr_refine false` for such libraries until an adapter is validated. This does
+not prevent standalone RNA assembly or RNA AED.
+
+Input validation and final publication helpers are separate from AED reporting,
+so report-only edits do not invalidate native assessment. Resume and changed
+evidence behavior follow Nextflow file inputs and process scopes. Existing
+standalone stage caches are not promised to transfer to newly scoped processes
+in the first integrated run. Use the desired prior `main.nf` run with `-resume`
+when resuming earlier preparation/prediction work.
+
+Run `tests/validate_postprocessing_cluster.py --outdir testing/postprocessing_contracts_01`
+on Crest before a full integrated run. It uses the same postprocessing workflow
+with tiny accepted-model fixtures, actual tools, all evidence modes, final-model
+QC/AED identity checks, unchanged resume, report-only changes and disabled UTRs.
+It also checks that `main.nf` compiles and reaches its missing-input guard.
+This is not a BRAKER training or repeat test. Local unit checks pass; connected
+cluster acceptance and the integrated full-genome assessment remain pending.
 
 ### General UTR safeguards
 

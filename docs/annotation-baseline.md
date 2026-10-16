@@ -2,8 +2,11 @@
 
 The first downstream increment reuses AGAT, BUSCO and OMArk from the original
 pipeline. It assesses accepted BRAKER outputs without filtering or renaming them.
-The integrated `main.nf` runs it after prediction validation when
-`run_baseline_qc = true` (default). It is skipped in BRAKER software-check mode.
+The integrated `main.nf` now runs these same modules after optional UTR
+refinement and final model validation when `run_baseline_qc = true` (default),
+publishing under `qc/final/`. The standalone `annotation_qc.nf` entry retains
+raw BRAKER assessment under `qc/baseline/`. Original BRAKER predictions remain
+preserved. QC is skipped in BRAKER software-check mode.
 No manual checkpoint is required in a normal pipeline run.
 
 AGAT assesses the complete GFF3, including alternative isoforms. BUSCO and OMArk

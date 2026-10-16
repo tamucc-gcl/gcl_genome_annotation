@@ -12,11 +12,13 @@ process PREPARE_INGENANNOT_EVIDENCE {
     def options = (r ? "--rna '${r[0]}'" : '') + ' ' + (p ? "--protein '${p[0]}'" : '')
     def rpath = r ? "'${r[0]}'" : '/dev/null'
     def ppath = p ? "'${p[0]}'" : '/dev/null'
+    def prior = current_status instanceof Collection ? current_status : [current_status]
+    def priorOption = prior ? "--current-status '${prior[0]}'" : ''
     """
     set -euo pipefail
     mkdir indexed
     python ingenannot_inputs.py --gff '${gff}' --validation '${validation}' \
-      --current-status '${current_status}' ${options} --out indexed/inputs.json
+      ${priorOption} ${options} --out indexed/inputs.json
     LC_ALL=C sort -k1,1 -k4,4n -k5,5n ${rpath} | bgzip -c > indexed/rna.gtf.gz
     tabix -p gff indexed/rna.gtf.gz
     LC_ALL=C sort -k1,1 -k4,4n -k5,5n ${ppath} | bgzip -c > indexed/protein.gff.gz
@@ -27,7 +29,7 @@ process PREPARE_INGENANNOT_EVIDENCE {
 process RUN_INGENANNOT_AED {
     tag "${aid}"
     label 'ingenannot'
-    publishDir "${params.outdir}/structural_annotation/ingenannot_benchmark/${aid}/native", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/structural_annotation/${task.ext.aed_stage ?: 'ingenannot_benchmark'}/${aid}/native", mode: 'copy', overwrite: true
     input:
     tuple val(aid), path(gff), path(indexed)
     output:

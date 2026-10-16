@@ -9,7 +9,7 @@
 process OMARK {
     tag "${assembly_id}"
     label 'omark'
-    publishDir "${params.outdir}/qc/baseline/${assembly_id}/omark", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/qc/${task.ext.qc_stage ?: 'baseline'}/${assembly_id}/omark", mode: params.publish_dir_mode
     
     input:
     tuple val(assembly_id), val(taxid), path(protein_fasta), path(omamer_db), path(taxa_db)
