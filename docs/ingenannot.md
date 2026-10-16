@@ -204,6 +204,24 @@ new exonic bases inside the coding span. Native CDS coordinates, strands and
 phases are checked before any restoration, so a fallback cannot conceal a coding
 change. Structural and sequence validation still runs on the complete final set.
 
+If UTR-label validation fails, inspect all disagreements before changing the
+adapter or rerunning the pipeline:
+
+```bash
+python gcl_genome_annotation/tests/inspect_utr_labels.py \
+  --inputs-root testing/genome_annotation \
+  --assembly-id Sfl-n_primary \
+  --output testing/utr_labels.json
+```
+
+This streams the original and already completed native GFFs, retains compact
+coordinate structures, and reports missing/extra UTR labels after excluding
+separate stop codons. Each mismatch includes transcript/evidence IDs, strand,
+exon/CDS coordinates, coding-boundary equalities, and whether the candidate would
+already be rejected by the adapter. It does not run ranking/refinement, read
+BAMs, extract sequences or modify annotations. Inspect the otherwise-eligible
+cases to determine whether the problem is label serialization or RNA structure.
+
 Input approval is passed to ranking as a stable content value, so editing the
 validation/report helper does not invalidate the expensive native ranking when
 approved scientific inputs are unchanged. This uses Nextflow's normal cache.

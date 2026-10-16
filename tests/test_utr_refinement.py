@@ -15,9 +15,31 @@ from utr_refinement import finalize, validate, dump, prepare
 from prepare_protein_evidence import checksum
 from gene_model_aed import gene_scores
 from evidence_aed import models
+from inspect_utr_labels import inspect as inspect_labels
 
 
 class UtrContracts(unittest.TestCase):
+    def test_label_diagnostic_identifies_cds_at_terminal_exon_base(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);original,raw,refined,identity,genome,inputs=self.fixture(root)
+            def write(path,rows):
+                path.write_text(''.join(f'chr1\tx\t{k}\t{s}\t{e}\t.\t+\t{phase}\t{attrs}\n' for k,s,e,phase,attrs in rows))
+            coding=[('CDS',101,101,'0','ID=c1;Parent=t1'),('CDS',201,299,'2','ID=c2;Parent=t1')]
+            write(original,[('gene',101,299,'.','ID=g1'),('mRNA',101,299,'.','ID=t1;Parent=g1'),
+                ('exon',101,101,'.','ID=e1;Parent=t1'),('exon',201,299,'.','ID=e2;Parent=t1')]+coding)
+            write(raw,[('gene',81,320,'.','ID=g1'),('mRNA',81,320,'.','ID=t1;Parent=g1;utr_refine_evidence=r1'),
+                ('exon',81,101,'.','ID=e1;Parent=t1'),('exon',201,320,'.','ID=e2;Parent=t1'),
+                ('three_prime_UTR',300,320,'.','ID=u3;Parent=t1')]+coding)
+            result=inspect_labels(original,raw,identity,root/'labels.json')
+            self.assertEqual(result['mismatched_labels_on_eligible_candidates'],1)
+            self.assertEqual(result['issues'][0]['missing_label_blocks'],[(80,100)])
+            self.assertTrue(result['issues'][0]['boundary_equalities']['cds_start_is_exon_last_base'])
+
+    def test_label_diagnostic_excludes_separate_stop_codons(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);original,raw,refined,identity,genome,inputs=self.fixture(root)
+            self.assertEqual(inspect_labels(original,raw,identity,root/'labels.json')['mismatched_labels'],0)
+
     def test_native_bam_list_command_preserves_multiple_rows_without_heredoc(self):
         module=(Path(__file__).resolve().parents[1]/'modules/utrRefinement.nf').read_text()
         body=module.split('process RUN_UTR_REFINEMENT {',1)[1].split('process FINALIZE_UTR_ANNOTATION',1)[0]
