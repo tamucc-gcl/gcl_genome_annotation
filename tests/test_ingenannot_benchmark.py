@@ -50,5 +50,45 @@ class NativeBenchmarkContracts(unittest.TestCase):
             a.write_text(a.read_text().replace('aed_ev_tr=0.3000','aed_ev_tr=1.3000'))
             with self.assertRaisesRegex(ValueError,'Invalid native AED'): report(gff,a,i,root/'inputs.json',b,True,.25,root/'out')
 
+    def test_exon_envelope_normalization_preserves_blocks_on_both_strands(self):
+        for strand in ('+','-'):
+            with self.subTest(strand=strand),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp); gff,v,c,i,b,a=self.fixtures(root)
+                # Mirror BRAKER's separate terminal stop codon: mRNA extends
+                # beyond exons/CDS, native export recomputes the exon envelope.
+                def rewrite(path,native):
+                    lines=[]
+                    for line in path.read_text().splitlines():
+                        fields=line.split('\t')
+                        if len(fields)==9:
+                            fields[6]=strand
+                            if fields[2] in ('gene','mRNA','transcript'):
+                                fields[3]='101' if native and fields[2]!='gene' else '98'
+                            line='\t'.join(fields)
+                        lines.append(line)
+                    path.write_text('\n'.join(lines)+'\n')
+                rewrite(gff,False); rewrite(a,True)
+                accepted=json.loads((root/'inputs.json').read_text()); accepted['model_sha256']=checksum(gff)
+                (root/'inputs.json').write_text(json.dumps(accepted))
+                data=report(gff,a,i,root/'inputs.json',b,True,.25,root/'out')
+                self.assertEqual(data['transcript_bounds_normalized_to_exons'],['t1'])
+                a.write_text(a.read_text().replace('mRNA\t101','mRNA\t99'))
+                with self.assertRaisesRegex(ValueError,'unexpected transcript bounds'):
+                    report(gff,a,i,root/'inputs.json',b,True,.25,root/'out')
+
+    def test_cds_phase_changes_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); gff,v,c,i,b,a=self.fixtures(root)
+            lines=[]
+            for line in a.read_text().splitlines():
+                fields=line.split('\t')
+                if len(fields)==9 and fields[2]=='CDS':
+                    fields[7]='1' if fields[7]!='1' else '2'
+                    line='\t'.join(fields)
+                lines.append(line)
+            a.write_text('\n'.join(lines)+'\n')
+            with self.assertRaisesRegex(ValueError,'coding phases differ'):
+                report(gff,a,i,root/'inputs.json',b,True,.25,root/'out')
+
 
 if __name__=='__main__': unittest.main()

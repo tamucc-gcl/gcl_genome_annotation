@@ -7,6 +7,17 @@ method is retained as a benchmark baseline, not silently replaced.
 
 ## First stage: unchanged-model benchmark
 
+InGenAnnot 0.0.20 recalculates transcript bounds from exon bounds on import.
+BRAKER can include a separately recorded stop codon outside its exon/CDS span:
+the real `g1.t1` mRNA starts at 4259, but its first exon/CDS starts at 4262.
+The report accepts only unchanged bounds or the exact unchanged exon envelope,
+and records affected transcript IDs in `transcript_bounds_normalized_to_exons`.
+Transcript IDs, gene parents, reference, strand, exact exon/CDS blocks and CDS
+phases must remain unchanged. The original BRAKER annotation is retained;
+the native GFF is an assessment export, not a replacement annotation.
+This reporting correction does not change native scoring and can reuse its
+completed task with `-resume`.
+
 The first real run demonstrated slow full-database scaling: after about 21 hours
 with four workers, RNA had finished 216/216 batches and protein 61/216. Batch
 costs vary; these counts are not a reliable precise ETA. The original 24-hour

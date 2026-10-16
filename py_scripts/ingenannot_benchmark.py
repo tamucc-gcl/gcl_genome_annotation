@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import statistics
 
-from evidence_aed import features, models, merged
+from evidence_aed import features, models
 from prepare_protein_evidence import checksum
 
 
@@ -38,10 +38,29 @@ def report(original, annotated, identity, inputs, current_scores, cds_only, pena
     before, after = models(original,lengths), models(annotated,lengths)
     if set(before) != set(after):
         raise ValueError('InGenAnnot changed transcript identities during assessment')
+    normalized_bounds = []
     for tid,a in before.items():
         b = after[tid]
-        if any(a[k]!=b[k] for k in ('gene_id','seq','strand','start','end')) or any(merged(a[k])!=merged(b[k]) for k in ('exons','cds')):
+        if any(a[k]!=b[k] for k in ('gene_id','seq','strand')) or any(sorted(a[k])!=sorted(b[k]) for k in ('exons','cds')):
             raise ValueError(f'InGenAnnot changed model structure during assessment: {tid}')
+        original_bounds = (a['start'],a['end'])
+        native_bounds = (b['start'],b['end'])
+        if original_bounds != native_bounds:
+            # InGenAnnot 0.0.20 Utils fixes transcript bounds to the exon envelope.
+            # BRAKER may include a separately recorded stop codon in its mRNA span.
+            exon_bounds = (min(s for s,e in a['exons']),max(e for s,e in a['exons']))
+            if native_bounds != exon_bounds:
+                raise ValueError(f'InGenAnnot changed model structure during assessment: {tid}: unexpected transcript bounds')
+            normalized_bounds.append(tid)
+    def coding_phases(path):
+        result = {tid:[] for tid in before}
+        for row in features(path,lengths):
+            if row['kind'] == 'CDS':
+                for tid in row['attrs']['Parent'].split(','):
+                    result[tid].append((row['start'],row['end'],row['phase']))
+        return {tid:sorted(parts) for tid,parts in result.items()}
+    if coding_phases(original) != coding_phases(annotated):
+        raise ValueError('InGenAnnot changed model structure during assessment: coding phases differ')
     scores = {}
     for row in features(annotated,lengths):
         if row['kind'] not in ('mRNA','transcript'): continue
@@ -83,7 +102,9 @@ def report(original, annotated, identity, inputs, current_scores, cds_only, pena
         for row in rows:
             writer.writerow({k:'.' if v is None else f'{v:.8f}' if isinstance(v,float) else v for k,v in row.items()})
     summary = dict(status='ready',stage='ingenannot_benchmark',transcripts=len(rows),genes=len({r['gene_id'] for r in rows}),
-        models_unchanged=True,profile=dict(version='0.0.20',rna_cds_only=cds_only,rna_overflow_penalty=penalty,protein_cds_only=True),
+        models_unchanged=True,transcript_bounds_normalized_to_exons=normalized_bounds,
+        model_validation_scope='Transcript IDs, gene parents, reference, strand, exact exon/CDS blocks and CDS phases preserved; native transcript bounds may normalize to the exon envelope',
+        profile=dict(version='0.0.20',rna_cds_only=cds_only,rna_overflow_penalty=penalty,protein_cds_only=True),
         model_sha256=checksum(original),reference_identity=identity['reference_identity'],evidence=accepted['evidence'],metrics={})
     for key in ('current_rna_aed','ingenannot_rna_aed','current_protein_aed','ingenannot_protein_aed'):
         values = [r[key] for r in rows if r[key] is not None]
@@ -95,6 +116,9 @@ def report(original, annotated, identity, inputs, current_scores, cds_only, pena
         'Native InGenAnnot assesses unchanged BRAKER models using the same RNA/protein alignments as the current method. '
         'No combined AED is produced. Differences include model scope, evidence handling and the configured RNA penalty; '
         'lower scores alone do not establish improved accuracy. Native GFF scores are rounded to four decimal places.\n\n'
+        f'InGenAnnot normalized {len(normalized_bounds)} transcript bounds to their unchanged exon envelopes. '
+        'Transcript IDs, gene parents, reference, strand, exon/CDS blocks and coding phases are preserved. '
+        'The original BRAKER GFF remains the annotation; the native GFF is an assessment export.\n\n'
         'The paper-based profile uses CDS-only RNA assessment and a 0.25 overflow/splice-disagreement penalty; '
         'these choices are benchmark settings, not calibrated fish filtering thresholds. No models are filtered or refined.\n')
     return summary
