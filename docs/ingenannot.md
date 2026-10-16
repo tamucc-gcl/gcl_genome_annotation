@@ -197,6 +197,12 @@ remain eligible. It never flips an evidence strand to force compatibility.
 `rejected_candidate_reason`. Native outputs remain available for inspection.
 Unexpected coding, identity, parent, coordinate or sequence changes still fail
 validation. Restored transcripts are validated as unchanged pass-through models.
+Native exon changes without a `utr_refine_evidence` tag also restore the original
+transcript and are reported, rather than being accepted as supported extensions.
+Candidate checks additionally reject shortening, changes to existing UTRs, and
+new exonic bases inside the coding span. Native CDS coordinates, strands and
+phases are checked before any restoration, so a fallback cannot conceal a coding
+change. Structural and sequence validation still runs on the complete final set.
 
 Input approval is passed to ranking as a stable content value, so editing the
 validation/report helper does not invalidate the expensive native ranking when

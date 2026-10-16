@@ -106,6 +106,35 @@ class UtrContracts(unittest.TestCase):
                 self.assertEqual(row['three_prime_utr_bp'],'18' if strand=='+' else '20')
                 if strand=='+': self.assertIn('stop_codon',files[2].read_text())
 
+    def test_unmarked_native_change_restores_original_and_reports_reason(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);files=self.fixture(root)
+            original,raw,refined,identity,genome,inputs=files
+            raw.write_text(raw.read_text().replace(';utr_refine_evidence=r1',''))
+            finalize(original,raw,identity,refined)
+            status=self.run_validation(root,files)
+            self.assertEqual(status['changed_transcripts'],0)
+            self.assertIn('lacks UTR evidence provenance',status['rejected_utr_candidates']['t1'])
+            self.assertEqual(models(original,{'chr1':1000})['t1']['exons'],models(refined,{'chr1':1000})['t1']['exons'])
+
+    def test_unmarked_duplicate_exon_rows_restore_original_without_counting_extension(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);files=self.fixture(root)
+            original,raw,refined,identity,genome,inputs=files
+            duplicate=next(line for line in original.read_text().splitlines() if '\texon\t' in line).replace('ID=e1','ID=duplicate')
+            raw.write_text(original.read_text()+duplicate+'\n')
+            finalize(original,raw,identity,refined)
+            status=self.run_validation(root,files)
+            self.assertEqual(status['changed_transcripts'],0)
+            self.assertEqual(set(status['rejected_utr_candidates']),{'t1'})
+
+    def test_restoring_unmarked_candidate_cannot_hide_native_cds_change(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);original,raw,refined,identity,genome,inputs=self.fixture(root)
+            raw.write_text(raw.read_text().replace(';utr_refine_evidence=r1','').replace('\t+\t0\tID=c1','\t+\t1\tID=c1'))
+            with self.assertRaisesRegex(ValueError,'Native UTR refinement changed CDS'):
+                finalize(original,raw,identity,refined)
+
     def test_no_rna_passthrough_and_sequence_changes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); files=self.fixture(root); files[2].write_bytes(files[0].read_bytes())

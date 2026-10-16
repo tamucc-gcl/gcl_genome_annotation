@@ -56,6 +56,18 @@ def finalize(original,native,identity,output):
     native_transcripts={r['attrs']['ID']:r for r in raw if r['kind'] in ('mRNA','transcript')}
     if set(native_transcripts)!=set(original_models):
         raise ValueError('Native UTR refinement changed transcript IDs')
+    native_exons={tid:[] for tid in original_models}
+    def coding_signature(rows):
+        coding={tid:[] for tid in original_models}
+        for row in rows:
+            if row['kind']=='CDS':
+                for tid in row['attrs']['Parent'].split(','):
+                    if tid not in coding: raise ValueError('Native CDS has unresolved transcript parent')
+                    coding[tid].append((row['seq'],row['strand'],row['start'],row['end'],row['phase']))
+        return {tid:sorted(parts) for tid,parts in coding.items()}
+    # Never allow restoring a rejected exon proposal to conceal a coding change.
+    if coding_signature(before)!=coding_signature(raw):
+        raise ValueError('Native UTR refinement changed CDS coordinates, strand or phases')
     rejected={}
     for row in raw:
         if row['kind'] in ('gene','mRNA','transcript'): continue
@@ -64,6 +76,24 @@ def finalize(original,native,identity,output):
             parent=native_transcripts[tid]; original_model=original_models[tid]
             if (row['seq'],row['strand'])!=(parent['seq'],parent['strand']) or (parent['seq'],parent['strand'])!=(original_model['seq'],original_model['strand']):
                 rejected[tid]='Native UTR candidate has incompatible feature/transcript contig or strand; retained original BRAKER transcript'
+            if row['kind']=='exon': native_exons[tid].append((row['start'],row['end']))
+    for tid,old in original_models.items():
+        exons=native_exons[tid]
+        parent=native_transcripts[tid]
+        if parent['attrs'].get('Parent')!=old['gene_id']:
+            raise ValueError('Native UTR refinement changed gene/transcript relationships')
+        reason=None
+        if sorted(exons)!=sorted(old['exons']):
+            if not parent['attrs'].get('utr_refine_evidence'):
+                reason='Native exon change lacks UTR evidence provenance'
+            elif overlap_length(exons,old['exons'])!=sum(e-s for s,e in merged(old['exons'])):
+                reason='Native UTR candidate shortens existing exons'
+            elif subtract(old['exons'],old['cds']):
+                reason='Native UTR candidate changes existing UTRs despite onlynew'
+            elif overlap_length(subtract(exons,old['exons']),[(min(s for s,e in old['cds']),max(e for s,e in old['cds']))]):
+                reason='Native UTR candidate adds exonic bases inside the CDS span'
+        if reason and tid not in rejected:
+            rejected[tid]=reason+'; retained original BRAKER transcript'
     if rejected:
         restored=[]
         for row in raw:
@@ -185,7 +215,7 @@ def validate(original,refined,identity,genome,inputs,old_cds,new_cds,old_protein
             raise ValueError('UTR refinement added exonic bases inside CDS span')
         if subtract(a['exons'],a['cds']) and sorted(a['exons'])!=sorted(b['exons']): raise ValueError('Existing UTRs changed despite onlynew')
         if sorted(a['exons'])!=sorted(b['exons']) and not b['attrs'].get('utr_refine_evidence'):
-            raise ValueError('UTR extension lacks native evidence provenance')
+            raise ValueError(f'UTR extension lacks native evidence provenance: {tid}')
         lower,upper=min(s for s,e in a['cds']),max(e for s,e in a['cds'])
         low=[(s,min(e,lower)) for s,e in b['exons'] if s<lower]
         high=[(max(s,upper),e) for s,e in b['exons'] if e>upper]
