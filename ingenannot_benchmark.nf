@@ -8,7 +8,8 @@ workflow {
     def root = file(params.aed_inputs_root ?: params.outdir).toString()
     def predictions = new groovy.json.JsonSlurper().parse(new File("${root}/structural_annotation/prediction_status.json"))
     if (predictions.status != 'ready') error 'Benchmark requires completed BRAKER predictions'
-    def helpers = ['ingenannot_benchmark.py','evidence_aed.py','prepare_protein_evidence.py'].collect { file("${projectDir}/py_scripts/${it}") }
+    def inputHelpers = ['ingenannot_inputs.py','prepare_protein_evidence.py'].collect { file("${projectDir}/py_scripts/${it}") }
+    def reportHelpers = ['ingenannot_benchmark.py','ingenannot_inputs.py','evidence_aed.py','prepare_protein_evidence.py'].collect { file("${projectDir}/py_scripts/${it}") }
     def requests = Channel.fromList(predictions.assemblies).map { row ->
         def aid = row.assembly_id
         if (row.status != 'ready') error "Prediction not ready: ${aid}"
@@ -20,11 +21,11 @@ workflow {
           rna ? [file("${root}/structural_annotation/braker/${aid}/braker_run/GeneMark-ETP/rnaseq/stringtie/transcripts_merged.gff", checkIfExists: true)] : [],
           protein ? [file("${root}/structural_annotation/evidence_aed/${aid}/protein_alignment/${aid}.miniprot.gff", checkIfExists: true)] : [])
     }
-    PREPARE_INGENANNOT_EVIDENCE(requests, helpers)
+    PREPARE_INGENANNOT_EVIDENCE(requests, inputHelpers)
     def ready = requests.map { aid,gff,validation,status,rna,protein -> tuple(aid,gff) }.join(PREPARE_INGENANNOT_EVIDENCE.out.evidence)
     RUN_INGENANNOT_AED(ready)
     REPORT_INGENANNOT_BENCHMARK(ready.join(RUN_INGENANNOT_AED.out.annotated).map { aid,gff,indexed,annotated ->
         tuple(aid,gff,file("${root}/filtered_assemblies/${aid}/${aid}.contigs.json", checkIfExists: true),indexed,
           file("${root}/structural_annotation/evidence_aed/${aid}/aed_scores.tsv", checkIfExists: true),annotated)
-    }, helpers)
+    }, reportHelpers)
 }

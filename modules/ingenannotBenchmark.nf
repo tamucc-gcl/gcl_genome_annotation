@@ -15,7 +15,7 @@ process PREPARE_INGENANNOT_EVIDENCE {
     """
     set -euo pipefail
     mkdir indexed
-    python ingenannot_benchmark.py check --gff '${gff}' --validation '${validation}' \
+    python ingenannot_inputs.py --gff '${gff}' --validation '${validation}' \
       --current-status '${current_status}' ${options} --out indexed/inputs.json
     LC_ALL=C sort -k1,1 -k4,4n -k5,5n ${rpath} | bgzip -c > indexed/rna.gtf.gz
     tabix -p gff indexed/rna.gtf.gz

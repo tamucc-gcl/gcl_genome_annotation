@@ -8,25 +8,7 @@ import statistics
 
 from evidence_aed import features, models
 from prepare_protein_evidence import checksum
-
-
-def check(gff, validation, current_status, rna, protein, output):
-    validation = json.loads(Path(validation).read_text())
-    current = json.loads(Path(current_status).read_text())
-    if validation.get('status') != 'ready' or current.get('status') != 'ready':
-        raise ValueError('Benchmark requires accepted predictions and completed current AED')
-    if checksum(gff) != validation['gff3_sha256'] or checksum(gff) != current['model_sha256'] or validation['reference_identity'] != current['reference_identity']:
-        raise ValueError('Benchmark models differ from accepted prediction/current AED')
-    for kind, path in [('rna',rna),('protein',protein)]:
-        source = current['evidence'][kind]
-        if source['available'] != bool(path):
-            raise ValueError(f'{kind}: supplied evidence differs from current AED availability')
-        if path and checksum(path) != source['source_sha256']:
-            raise ValueError(f'{kind}: evidence changed since current AED')
-    data = dict(status='ready', model_sha256=checksum(gff), reference_identity=current['reference_identity'],
-                evidence=current['evidence'])
-    Path(output).write_text(json.dumps(data,indent=2)+'\n')
-    return data
+from ingenannot_inputs import check
 
 
 def report(original, annotated, identity, inputs, current_scores, cds_only, penalty, output):
@@ -109,7 +91,13 @@ def report(original, annotated, identity, inputs, current_scores, cds_only, pena
     for key in ('current_rna_aed','ingenannot_rna_aed','current_protein_aed','ingenannot_protein_aed'):
         values = [r[key] for r in rows if r[key] is not None]
         summary['metrics'][key] = dict(available=len(values),median=statistics.median(values) if values else None,
-            mean=statistics.mean(values) if values else None,no_overlap=sum(v==1 for v in values),above_0_7=sum(v>.7 for v in values))
+            mean=statistics.mean(values) if values else None,score_equals_one=sum(v==1 for v in values),above_0_7=sum(v>.7 for v in values))
+        if key.startswith('ingenannot_'):
+            kind=key.split('_')[1]
+            summary['metrics'][key]['no_selected_evidence']=sum(
+                r[key] is not None and r[kind+'_evidence_id'] in (None,'None','.') for r in rows)
+            summary['metrics'][key]['score_one_with_previous_overlap']=sum(
+                r[key]==1 and r['current_'+kind+'_aed']<1 for r in rows if r[key] is not None)
     (output/'benchmark_status.json').write_text(json.dumps(summary,indent=2)+'\n')
     (output/'README.md').write_text('# InGenAnnot AED benchmark\n\nStatus: **ready**\n\n'
         '[Matched RNA/protein scores](benchmark_scores.tsv) | [Settings and provenance](benchmark_status.json)\n\n'
@@ -120,7 +108,10 @@ def report(original, annotated, identity, inputs, current_scores, cds_only, pena
         'Transcript IDs, gene parents, reference, strand, exon/CDS blocks and coding phases are preserved. '
         'The original BRAKER GFF remains the annotation; the native GFF is an assessment export.\n\n'
         'The paper-based profile uses CDS-only RNA assessment and a 0.25 overflow/splice-disagreement penalty; '
-        'these choices are benchmark settings, not calibrated fish filtering thresholds. No models are filtered or refined.\n')
+        'these choices are benchmark settings, not calibrated fish filtering thresholds. No models are filtered or refined.\n\n'
+        'A native score of 1 does not establish zero coordinate overlap. Penalized candidates can fail to beat '
+        'the initial score of 1 and leave no evidence selected. Summary counts distinguish score 1, missing '
+        'selected evidence and score-1 models that had overlap in the unpenalized baseline.\n')
     return summary
 
 

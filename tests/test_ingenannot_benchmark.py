@@ -1,5 +1,7 @@
 import csv
 import json
+import shutil
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -12,6 +14,21 @@ from test_evidence_aed import IDENTITY, MODEL
 
 
 class NativeBenchmarkContracts(unittest.TestCase):
+    def test_preparation_runs_without_reporting_or_scoring_helpers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); gff,v,c,i,b,a=self.fixtures(root)
+            scripts=root/'helpers'; scripts.mkdir()
+            source=Path(__file__).resolve().parents[1]/'py_scripts'
+            for name in ('ingenannot_inputs.py','prepare_protein_evidence.py'):
+                shutil.copy2(source/name,scripts/name)
+            result=subprocess.run([sys.executable,str(scripts/'ingenannot_inputs.py'),
+                '--gff',str(gff),'--validation',str(v),'--current-status',str(c),
+                '--rna',str(root/'rna.gtf'),'--protein',str(root/'protein.gff'),
+                '--out',str(root/'independent_inputs.json')],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(json.loads((root/'independent_inputs.json').read_text()),
+                             json.loads((root/'inputs.json').read_text()))
+
     def fixtures(self,root,rna=True,protein=True):
         gff=root/'models.gff3'; gff.write_text(MODEL)
         validation=root/'validation.json'; validation.write_text(json.dumps(dict(status='ready',gff3_sha256=checksum(gff),reference_identity='test-ref')))
@@ -49,6 +66,17 @@ class NativeBenchmarkContracts(unittest.TestCase):
             root=Path(tmp); gff,v,c,i,b,a=self.fixtures(root)
             a.write_text(a.read_text().replace('aed_ev_tr=0.3000','aed_ev_tr=1.3000'))
             with self.assertRaisesRegex(ValueError,'Invalid native AED'): report(gff,a,i,root/'inputs.json',b,True,.25,root/'out')
+
+    def test_score_one_is_not_reported_as_zero_overlap(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); gff,v,c,i,b,a=self.fixtures(root)
+            a.write_text(a.read_text().replace('aed_ev_tr=0.3000','aed_ev_tr=1.0000').replace('ev_tr=r1','ev_tr=None'))
+            data=report(gff,a,i,root/'inputs.json',b,True,.25,root/'out')
+            stats=data['metrics']['ingenannot_rna_aed']
+            self.assertNotIn('no_overlap',stats)
+            self.assertEqual(stats['score_equals_one'],1)
+            self.assertEqual(stats['no_selected_evidence'],1)
+            self.assertEqual(stats['score_one_with_previous_overlap'],1)
 
     def test_exon_envelope_normalization_preserves_blocks_on_both_strands(self):
         for strand in ('+','-'):

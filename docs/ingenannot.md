@@ -7,6 +7,44 @@ method is retained as a benchmark baseline, not silently replaced.
 
 ## First stage: unchanged-model benchmark
 
+### Selected-case coordinate review
+
+After a completed real benchmark, run this from the project directory:
+
+```bash
+python gcl_genome_annotation/tests/review_ingenannot_evidence.py \
+  --inputs-root testing/genome_annotation \
+  --assembly-id Sfl-n_primary \
+  --outdir testing/ingenannot_review
+```
+
+This selects up to two distinct genes per category: changed RNA choice, RNA
+penalty, weak RNA/protein support with selected evidence, native score 1 despite
+previous overlap, and strong agreement controls. It checks annotation/RNA
+identities, recomputes the CDS-only RNA comparison and overflow conditions for
+all overlapping same-strand assembled RNA candidates at each selected locus,
+and compares the best penalized result with the native score. Selected protein
+chains are extracted in one streaming scan of the existing miniprot GFF and
+their structural scores checked. No alignments or native scoring are rerun.
+
+`review.json` contains coordinate blocks, selected/previous RNA, top candidates,
+CDS bases outside RNA, RNA extra exonic bases inside the CDS span, matching
+assembled exon-boundary introns, and score agreement checks. Coordinates are
+zero-based half-open. These intron comparisons do not measure independent read
+junction support. A disagreement is recorded for inspection rather than hidden.
+The utility requires the retained ETP RNA assembly used by this real benchmark.
+
+Summary metrics use `score_equals_one`, `no_selected_evidence`, and
+`score_one_with_previous_overlap`; native score 1 is not labeled zero overlap.
+
+Input validation lives in `ingenannot_inputs.py`; preparation stages only that
+helper and its checksum dependency. Reporting stages `ingenannot_benchmark.py`
+and its own dependencies. Report edits therefore do not invalidate preparation
+or native scoring. Installing this split changes the preparation task once;
+existing completed native scores can still be reported directly without rerunning
+assessment. The cluster contract edits a private copy of the report helper and
+requires preparation/scoring cache hits and a new report task.
+
 InGenAnnot 0.0.20 recalculates transcript bounds from exon bounds on import.
 BRAKER can include a separately recorded stop codon outside its exon/CDS span:
 the real `g1.t1` mRNA starts at 4259, but its first exon/CDS starts at 4262.

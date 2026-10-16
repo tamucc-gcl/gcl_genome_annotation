@@ -5,6 +5,7 @@ import csv
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 
@@ -46,10 +47,12 @@ def fixtures(root):
 
 def run_case(root,suffix,resume=False,penalty=.25,blocked=False):
     case=root/'pilot'; case.mkdir(exist_ok=True)
-    command=['nextflow','-log',str(case/f'{suffix}.nextflow.log'),'-C',str(ROOT/'nextflow.config'),
-             'run',str(ROOT/'ingenannot_benchmark.nf'),'-profile','slurm','-w',str(case/'work'),
+    pipeline=root/'pipeline'
+    command=['nextflow','-log',str(case/f'{suffix}.nextflow.log'),'-C',str(pipeline/'nextflow.config'),
+             'run',str(pipeline/'ingenannot_benchmark.nf'),'-profile','slurm','-w',str(case/'work'),
              '--aed_inputs_root',str(root/'accepted'),'--outdir',str(case/'results'),
-             '--ingenannot_rna_penalty',str(penalty)]
+             '--ingenannot_rna_penalty',str(penalty),'--ingenannot_aed_cpus','2',
+             '--ingenannot_aed_memory','4 GB']
     if resume: command.append('-resume')
     (case/f'{suffix}.command.json').write_text(json.dumps(command,indent=2))
     print(f'Running native InGenAnnot ({suffix})...',flush=True)
@@ -77,8 +80,10 @@ def run_case(root,suffix,resume=False,penalty=.25,blocked=False):
         for name in ['PREPARE_INGENANNOT_EVIDENCE','RUN_INGENANNOT_AED','REPORT_INGENANNOT_BENCHMARK']:
             found=[t for t in tasks if t['name'].startswith(name+' (')]
             assert len(found)==4
-            if suffix=='resume' or (suffix=='profile_change' and name=='PREPARE_INGENANNOT_EVIDENCE'):
+            if suffix=='resume' or (suffix=='profile_change' and name=='PREPARE_INGENANNOT_EVIDENCE') or (suffix=='report_change' and name!='REPORT_INGENANNOT_BENCHMARK'):
                 assert all(t['status']=='CACHED' for t in found),f'{name} not cached: {found}'
+            if suffix=='report_change' and name=='REPORT_INGENANNOT_BENCHMARK':
+                assert all(t['status']=='COMPLETED' for t in found),f'Report edit did not rerun reporting: {found}'
     print(f'PASS: native InGenAnnot {suffix}',flush=True)
     return dict(case=suffix,passed=True,exit_code=result.returncode)
 
@@ -98,8 +103,21 @@ def main():
         if tests.returncode: raise RuntimeError('Python tests failed; inspect unit_tests.log')
         summary['checks'].append(dict(case='unit_tests',passed=True))
         if not a.resume: fixtures(root)
+        # A private source copy lets this test edit the reporting helper without
+        # touching the user's checkout or a concurrently running workflow.
+        pipeline=root/'pipeline'
+        for relative in ['nextflow.config','ingenannot_benchmark.nf','modules/ingenannotBenchmark.nf',
+                         'environments/ingenannot.yaml','py_scripts/ingenannot_inputs.py',
+                         'py_scripts/ingenannot_benchmark.py','py_scripts/evidence_aed.py',
+                         'py_scripts/prepare_protein_evidence.py']:
+            destination=pipeline/relative
+            destination.parent.mkdir(parents=True,exist_ok=True)
+            if not destination.exists(): shutil.copy2(ROOT/relative,destination)
         summary['checks'].append(run_case(root,'recover' if a.resume else 'fresh',a.resume))
         summary['checks'].append(run_case(root,'resume',True))
+        report_helper=pipeline/'py_scripts/ingenannot_benchmark.py'
+        with report_helper.open('a') as handle: handle.write('\n# Report-only cache regression fixture.\n')
+        summary['checks'].append(run_case(root,'report_change',True))
         summary['checks'].append(run_case(root,'profile_change',True,penalty=0))
         source=root/'accepted/structural_annotation/evidence_aed/A/protein_alignment/A.miniprot.gff'
         original=source.read_bytes()
