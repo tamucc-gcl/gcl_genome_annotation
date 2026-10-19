@@ -81,6 +81,8 @@ def run_case(root,name,resume=False,enabled=True):
         with (out/'transcript_junction_support.tsv').open() as h:rows={r['transcript_id']:r for r in csv.DictReader(h,delimiter='\t')}
         assert rows['t3']['all_pass_fraction']=='.'
         if aid=='A':
+            assert all(row['failed_junctions']==0 for row in state['readsets'])
+            assert all(row['observed_junctions']==row['passing_junctions']==3 for row in state['readsets'])
             with (out/'junction_support.tsv').open() as h:junctions=list(csv.DictReader(h,delimiter='\t'))
             assert {(r['intron_start'],r['intron_end'],r['strand']) for r in junctions}=={('201','300','+'),('401','500','+'),('1101','1200','-')}
             assert all(r['status']=='pass' for r in junctions),junctions

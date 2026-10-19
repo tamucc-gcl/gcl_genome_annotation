@@ -125,6 +125,33 @@ class JunctionSupportContracts(unittest.TestCase):
             g.write_text(g.read_text()+'# changed\n')
             with self.assertRaisesRegex(ValueError,'unchanged accepted'):report(g,v,i,r,folders,root/'bad')
 
+    def test_native_124_fallback_fail_overlap_is_audited_not_double_counted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);g,v,i,r,folders=self.fixtures(root)
+            folder=folders[0]
+            self.native(folder/'filtered.fail.junctions.tab',[(200,299,'+',12),(400,499,'+',2)])
+            state=finish(folder,.5)
+            self.assertEqual(state['native_fail_table_rows'],2)
+            self.assertEqual(state['native_fail_table_pass_overlap'],1)
+            self.assertEqual(state['failed_junctions'],1)
+            self.assertEqual(state['passing_junctions'],1)
+            self.assertEqual(state['native_fail_table_overlap_junctions'],[['chr1',200,300,'+']])
+            self.assertEqual(report(g,v,i,r,folders,root/'out')['counts']['pass'],1)
+            self.assertEqual(table(folder/'filtered.fail.junctions.tab'),table(folder/'all.junctions.tab'))
+            (folder/'version.txt').write_text('portcullis 1.2.5\n')
+            with self.assertRaisesRegex(ValueError,'partition'):finish(folder,.5)
+            (folder/'version.txt').write_text('portcullis 1.2.4\n')
+            (folder/'filter.log').write_text('Random forest classification\n')
+            with self.assertRaisesRegex(ValueError,'partition'):finish(folder,.5)
+
+    def test_fallback_overlap_does_not_hide_changed_counts_or_foreign_junctions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);g,v,i,r,folders=self.fixtures(root);folder=folders[0]
+            self.native(folder/'filtered.fail.junctions.tab',[(200,299,'+',13),(400,499,'+',2)])
+            with self.assertRaisesRegex(ValueError,'counts differ'):finish(folder,.5)
+            self.native(folder/'filtered.fail.junctions.tab',[(200,299,'+',12),(400,499,'+',2),(600,699,'+',1)])
+            with self.assertRaisesRegex(ValueError,'partition'):finish(folder,.5)
+
     def test_one_base_shift_empty_tables_and_out_of_bounds_are_explicit(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);g,v,i,r,folders=self.fixtures(root)

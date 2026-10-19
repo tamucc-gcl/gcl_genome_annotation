@@ -77,14 +77,26 @@ def finish(folder, threshold):
     raw=table(folder/'all.junctions.tab')
     passed=table(folder/'filtered.pass.junctions.tab')
     failed=table(folder/'filtered.fail.junctions.tab')
-    if set(passed)&set(failed) or set(raw)!=set(passed)|set(failed):
-        raise ValueError('Portcullis pass/fail tables do not partition observed junctions')
-    for key,value in (passed | failed).items():
-        if value!=raw[key]:raise ValueError('Portcullis filtered junction counts differ from raw')
     log=(folder/'filter.log').read_text(errors='replace')
-    state.update(tool='Portcullis',version=(folder/'version.txt').read_text().strip(),threshold=threshold,
-        observed_junctions=len(raw),passing_junctions=len(passed),failed_junctions=len(failed),
-        native_low_junction_fallback='lenient rule-based filter' in log,
+    version=(folder/'version.txt').read_text().strip()
+    fallback='lenient rule-based filter' in log
+    overlap=set(passed)&set(failed)
+    # Portcullis 1.2.4 rule_filter.filter_one calls failed.loc[...] without
+    # assigning its result. Native fallback fail exports can therefore retain
+    # passing rows. Preserve native files, audit the defect, and use the pass
+    # decision as authoritative. Other versions/modes remain strict.
+    known_overlap=bool(overlap) and fallback and bool(re.search(r'\b1\.2\.4\b',version))
+    if (overlap and not known_overlap) or set(raw)!=(set(passed)|set(failed)):
+        raise ValueError('Portcullis pass/fail tables do not partition observed junctions')
+    for exported in (passed,failed):
+        for key,value in exported.items():
+            if value!=raw[key]:raise ValueError('Portcullis filtered junction counts differ from raw')
+    state.update(tool='Portcullis',version=version,threshold=threshold,
+        observed_junctions=len(raw),passing_junctions=len(passed),failed_junctions=len(set(raw)-set(passed)),
+        native_fail_table_rows=len(failed),native_fail_table_pass_overlap=len(overlap),
+        native_fail_table_overlap_junctions=[list(key) for key in sorted(overlap)],
+        classification_scope='Native passing decisions; failed = observed minus passing; native fail-table overlap audited without editing exports',
+        native_low_junction_fallback=fallback,
         table_sha256={name:checksum(folder/name) for name in ('all.junctions.tab','filtered.pass.junctions.tab','filtered.fail.junctions.tab')})
     dump(folder/'junctions.json',state)
     return state

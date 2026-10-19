@@ -72,6 +72,15 @@ and reference bounds are checked before reporting. Nextflow owns file staging
 and caching. Report/model changes do not invalidate native junction analysis;
 changing BAMs, strand metadata or classifier settings does.
 
+Portcullis 1.2.4's native small-dataset rule filter has an export bug:
+`filter_one` evaluates `failed.loc[...]` without assigning the subset, so its
+failed table can include passing junctions. In that exact version/fallback mode,
+overlap is audited in `native_fail_table_pass_overlap` and the affected keys are
+recorded. Native exports are not changed. Classification uses native passing
+decisions, with failed junctions defined as observed minus passing. Missing or
+foreign junctions, changed raw counts and pass/fail overlap in other versions or
+modes still fail validation. This does not change native filtering rules.
+
 ## Cluster acceptance and real-data pilot
 
 First run the tiny actual-tool test on Crest:
