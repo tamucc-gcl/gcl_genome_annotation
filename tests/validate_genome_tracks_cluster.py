@@ -19,6 +19,19 @@ def task_process(task):
     return task['name'].split(' (', 1)[0].rsplit(':', 1)[-1]
 
 
+def check_telomere_ends(folder, aid, identity, motif):
+    """Both inserted terminal arrays must be covered; a continuous call can span both."""
+    lengths={c['id']:c['length'] for c in json.loads(Path(identity).read_text())['contigs']}
+    rows=[line.split('\t') for line in (folder/f'{aid}.telomere.gff3').read_text().splitlines()
+          if line.strip() and not line.startswith('#')]
+    terminal=[r for r in rows if r[0]=='chr1' and r[2]=='telomeric_repeat']
+    assert any(int(r[3])==1 for r in terminal),f'{aid}: missing left terminal array'
+    assert any(int(r[4])==lengths['chr1'] for r in terminal),f'{aid}: missing right terminal array'
+    for row in rows:
+        attrs=dict(token.split('=',1) for token in row[8].split(';') if '=' in token)
+        assert attrs['motif']==motif,f'{aid}: wrong telomere motif: {attrs}'
+
+
 def fixtures(root):
     folder=root/'fixtures';folder.mkdir(exist_ok=True)
     rng=random.Random(42)
@@ -71,7 +84,8 @@ def run_case(root,name,resume=False):
         assert all(s['status']==('disabled' if disabled or (aid=='D' and t!='telomere') else 'ready') for t,s in state['tracks'].items())
         if aid=='D' and not disabled:assert state['tracks']['telomere']['features']==0,state
         if not disabled and aid!='D':
-            assert state['tracks']['telomere']['features']>=2,state
+            assert state['tracks']['telomere']['features']>=1,state
+            check_telomere_ends(folder,aid,root/'fixtures'/f'{aid}.json',state['settings']['telomere_motif'])
             assert state['tracks']['infernal']['features']>=1,state
             for track in state['tracks']:
                 assert (folder/f'{aid}.{track}.gff3').is_file()

@@ -8,10 +8,30 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'py_scripts'))
 from genome_tracks import TRACKS, centromeres, normalize, telomeres
 from report_genome_tracks import report
-from validate_genome_tracks_cluster import task_process
+from validate_genome_tracks_cluster import task_process, fixtures, check_telomere_ends
+from reference_repeats import fasta
 
 
 class GenomeTracksTests(unittest.TestCase):
+    def test_satellite_motif_can_join_both_telomere_arrays(self):
+        fixtures(self.root)
+        genome=self.root/'fixtures/B.fa';tsv=self.root/'windows.tsv'
+        motif='TTAGG';reverse='CCTAA';window=1000
+        with tsv.open('w') as handle:
+            handle.write('id\twindow\tforward_repeat_number\treverse_repeat_number\ttelomeric_repeat\n')
+            for name,seq in fasta(genome):
+                for start in range(0,len(seq),window):
+                    part=seq[start:start+window]
+                    handle.write(f'{name}\t{start+len(part)}\t{part.count(motif)}\t{part.count(reverse)}\t{motif}\n')
+        output=self.root/'B.telomere.gff3'
+        telomeres(tsv,genome,'B',motif,window,2,1000,output)
+        rows=[s for s in output.read_text().splitlines() if not s.startswith('#')]
+        self.assertEqual(len(rows),1)
+        self.assertIn('position=spanning',rows[0])
+        check_telomere_ends(self.root,'B',self.root/'fixtures/B.json',motif)
+        output.write_text(output.read_text().replace('\t1\t','\t2\t',1))
+        with self.assertRaisesRegex(AssertionError,'missing left'):check_telomere_ends(self.root,'B',self.root/'fixtures/B.json',motif)
+
     def test_exact_process_match_excludes_infernal_merge(self):
         tasks=[{'name':f'GENOME_TRACKS:INFERNAL_PARALLEL:INFERNAL ({aid}:chunk_{chunk:03d})'}
                for aid in 'AB' for chunk in range(2)]
