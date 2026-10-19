@@ -59,8 +59,16 @@ Implementation update (19 October): model assessment and TE flags passed cluster
 acceptance and the real-data pilot, and were accepted. [Model selection](model-selection.md)
 now adapts the existing filter with per-transcript decisions, isoform rescue and
 synchronized retained/excluded coding sets. Local tests and Nextflow parsing pass;
-cluster selection acceptance and the full-data selection pilot are next. AED and
-junction exclusions remain opt-in; TE association is flag-only by default.
+cluster selection acceptance and the full-data selection pilot subsequently passed
+(45,060 retained transcripts, 21,378 retained genes). AED and junction exclusions
+remain opt-in; TE association is flag-only by default.
+
+Final identifiers, selected-set AGAT/BUSCO/OMArk and the full structural QC report
+are now connected; see [scope, maps and acceptance](final-structural-qc.md).
+Local contracts and Nextflow 23.10.1 parsing pass. Native before/after AGAT cluster
+acceptance and the real selected-set BUSCO/OMArk/report pilot are next. Structural
+report figures are now implemented; the later unified report will connect them
+with preparation/repeat/RNA and functional-track reports.
 
 ### Reporting requirements
 

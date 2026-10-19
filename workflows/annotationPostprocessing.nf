@@ -7,6 +7,7 @@ include { ANNOTATION_BASELINE as FINAL_ANNOTATION_QC } from './annotationBaselin
 include { JUNCTION_SUPPORT } from './junctionSupport.nf'
 include { MODEL_ASSESSMENT } from './modelAssessment.nf'
 include { MODEL_SELECTION } from './modelSelection.nf'
+include { FINAL_STRUCTURAL_ANNOTATION } from './finalStructuralAnnotation.nf'
 
 workflow ANNOTATION_POSTPROCESSING {
     take:
@@ -17,6 +18,8 @@ workflow ANNOTATION_POSTPROCESSING {
     repeatRequests // Native RepeatMasker GFF and pre-filter repeat library for assessment.
 
     main:
+    if (params.run_finalization && !params.run_model_selection)
+        error 'Final identifiers and structural QC require run_model_selection=true'
     if (params.run_model_selection && !params.run_model_assessment)
         error 'Model selection requires run_model_assessment=true'
     if (params.ingenannot_rna_penalty < 0 || params.ingenannot_rna_penalty > 1)
@@ -77,6 +80,8 @@ workflow ANNOTATION_POSTPROCESSING {
     junctionReports = Channel.empty()
     aedReports = Channel.empty()
     selectedAnnotations = Channel.empty()
+    identifiedAnnotations = Channel.empty()
+    beforeQc = Channel.empty()
     if (params.run_junction_qc) {
         JUNCTION_SUPPORT(jobs.map { aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices ->
             tuple(aid,readsets,genome,identity,bams,indices)
@@ -92,6 +97,8 @@ workflow ANNOTATION_POSTPROCESSING {
         },['annotation_baseline.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
             file("${projectDir}/py_scripts/${it}", checkIfExists: true)
         })
+        beforeQc = FINAL_ANNOTATION_QC.out.agat.mix(FINAL_ANNOTATION_QC.out.busco).mix(FINAL_ANNOTATION_QC.out.omark)
+            .mix(FINAL_ANNOTATION_QC.out.selections.map { aid,folder -> tuple(aid,file("${folder}/selection.json")) })
     }
     if (params.run_aed) {
         ALIGN_AED_PROTEINS(proteinRequests,['prepare_protein_evidence.py','reference_repeats.py'].collect {
@@ -131,11 +138,18 @@ workflow ANNOTATION_POSTPROCESSING {
                     file("${folder}/${aid}_cds.fa"),file("${folder}/annotation_status.json"),identity)
             },MODEL_ASSESSMENT.out.transcripts.join(MODEL_ASSESSMENT.out.status))
             selectedAnnotations = MODEL_SELECTION.out.annotation
+            if (params.run_finalization) {
+                FINAL_STRUCTURAL_ANNOTATION(jobs.map { aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices ->
+                    tuple(aid,settings,genome,identity)
+                },selectedAnnotations,MODEL_ASSESSMENT.out.transcripts.join(MODEL_ASSESSMENT.out.status),beforeQc)
+                identifiedAnnotations = FINAL_STRUCTURAL_ANNOTATION.out.annotation
+            }
         }
     }
 
     emit:
     annotation = FINALIZE_ANNOTATION.out.bundle
     selected_annotation = selectedAnnotations
+    identified_annotation = identifiedAnnotations
     utr_status = VALIDATE_UTR_REFINEMENT.out.status
 }

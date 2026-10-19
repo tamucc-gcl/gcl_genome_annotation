@@ -125,5 +125,20 @@ assessment sets plus complete decision tables under `structural_annotation/selec
 AED and junction filtering remain off by default; TE flags alone do not remove models.
 Original accepted models and reports remain preserved. Local validation passes;
 run `python tests/validate_selection_cluster.py --outdir testing/selection_contracts_01`
-on Crest before the real selection pilot. Final renaming, selected-set QC and
-downstream functional annotation are not yet reconnected.
+on Crest when changing selection behavior. Cluster selection acceptance and the
+real-data pilot passed: 45,060 transcripts and 21,378 genes were retained from
+45,235 transcripts and 21,506 genes.
+
+[Final identifiers and structural QC](docs/final-structural-qc.md) now follow
+selection in main. The existing assembly-based ID scheme is applied to GFF,
+protein/CDS FASTAs and assessment tables, with complete retained/excluded maps.
+The existing AGAT/BUSCO/OMArk modules assess the selected identified set under
+`qc/selected/`; the accepted unfiltered comparison remains under `qc/final/`.
+Final deliverables and maps are under `structural_annotation/identified/`.
+The structural report at `qc/structural/README.md` links HTML/Markdown reports,
+complete gene/transcript QC tables, native summaries and ten PNG/SVG figure groups.
+Local checks pass. First run
+`python tests/validate_final_structural_cluster.py --outdir testing/final_structural_contracts_01`
+on Crest for native AGAT and cache acceptance, then use the normal sbatch with
+`-resume` for the real selected-set BUSCO/OMArk pilot. Functional annotation remains
+the next integration. `--run_finalization false` disables this increment.

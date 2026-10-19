@@ -4,7 +4,9 @@
 existing `FILTER_GENE_MODELS` module and its three structural cutoffs. Original
 BRAKER outputs, accepted unfiltered models, AED and junction reports are preserved.
 Identifiers, coordinates, phases and coding sequences are not changed by selection.
-Final renaming, selected-set QC and functional annotation are subsequent increments.
+Final renaming and selected-set QC now follow selection; see
+[final identifiers and structural QC](final-structural-qc.md). Functional annotation
+remains a subsequent increment.
 
 ## Rules and defaults
 
@@ -35,7 +37,8 @@ is absent in a particular evidence mode, that transcript's rule is explicitly
 skipped rather than assigning a bad score. Junction filtering similarly requires
 enabled junction QC; RNA-free, single-exon and no-coding-junction cases are
 unavailable/not applicable rather than zero support. TE removal requires enabled
-TE assessment. `run_model_selection=false` disables selection; otherwise main
+TE assessment. `run_model_selection=false` disables selection; in main also set
+`run_finalization=false` to disable its dependent final-ID/QC stage. Otherwise main
 requires `run_model_assessment=true`.
 
 ## Corrected transcript/gene semantics
@@ -79,8 +82,10 @@ an empty annotation as a successful complete genome annotation.
 
 ## Validation and running
 
-Local tests and Nextflow 23.10.1 parsing pass. Actual cluster runtime acceptance
-and the full-data selection pilot remain pending. On Crest, first run:
+Actual cluster selection acceptance and the full-data selection pilot passed.
+The pilot retained 45,060 of 45,235 transcripts and 21,378 of 21,506 genes; 16
+genes retained a surviving isoform while excluding another. AED/junction filters
+were off and TE association remained flag-only. For changes, the acceptance command is:
 
 ```bash
 python gcl_genome_annotation/tests/validate_selection_cluster.py \

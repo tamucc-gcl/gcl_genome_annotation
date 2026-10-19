@@ -12,7 +12,7 @@ process PREPARE_ANNOTATION_BASELINE {
         genome: genome.toString(), gff: gff.toString(), proteins: proteins.toString(), validation: validation.toString()])
         .getBytes('UTF-8').encodeBase64().toString()
     """
-    python annotation_baseline.py prepare --request '${request}' --outdir selection
+    python ${task.ext.qc_prepare ?: 'annotation_baseline.py'} prepare --request '${request}' --outdir selection
     """
 }
 
@@ -42,6 +42,6 @@ process REPORT_ANNOTATION_BASELINE {
         omark: list(omark).withIndex().collect { p, i -> [aid: omark_ids[i], path: p.toString()] }])
         .getBytes('UTF-8').encodeBase64().toString()
     """
-    python annotation_baseline.py report --request '${request}' --outdir .
+    python ${task.ext.qc_prepare ?: 'annotation_baseline.py'} report --request '${request}' --outdir .
     """
 }

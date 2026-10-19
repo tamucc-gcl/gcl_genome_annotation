@@ -55,4 +55,9 @@ workflow ANNOTATION_BASELINE {
     emit:
     status = REPORT_ANNOTATION_BASELINE.out.status
     report = REPORT_ANNOTATION_BASELINE.out.report
+    selections = PREPARE_ANNOTATION_BASELINE.out.selection
+    agat = AGAT.out.annotation_stats
+    busco = BUSCO.out.busco
+    omark = OMARK.out.omark_summary
+    omark_classes = OMARK.out.omark_ump
 }
