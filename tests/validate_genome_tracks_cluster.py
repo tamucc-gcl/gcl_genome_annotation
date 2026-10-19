@@ -14,6 +14,11 @@ from validate_utr_cluster import ROOT, dump, execute
 from reference_repeats import reference
 
 
+def task_process(task):
+    """Match the process itself, excluding workflow scopes and the task tag."""
+    return task['name'].split(' (', 1)[0].rsplit(':', 1)[-1]
+
+
 def fixtures(root):
     folder=root/'fixtures';folder.mkdir(exist_ok=True)
     rng=random.Random(42)
@@ -48,12 +53,12 @@ def run_case(root,name,resume=False):
     print(f'Running genome tracks ({name}; actual tRNAscan/Infernal/tidk/centroAnno)...',flush=True)
     execute(command,case,case/f'{name}.console.log')
     with (case/'results/pipeline/pipeline_trace.txt').open() as h:tasks=list(csv.DictReader(h,delimiter='\t'))
-    scientific=('tRNASCAN','INFERNAL (','TELOMERE_ANNOTATION','CENTROMERE_ANNOTATION')
-    if name=='disabled':assert not any(any(t in r['name'] for t in scientific) for r in tasks)
+    scientific=('tRNASCAN','INFERNAL','TELOMERE_ANNOTATION','CENTROMERE_ANNOTATION')
+    if name=='disabled':assert not any(task_process(r) in scientific for r in tasks)
     else:
         for tool in scientific:
-            matches=[r for r in tasks if tool in r['name']]
-            assert len(matches)==(4 if tool=='INFERNAL (' else 3 if tool=='TELOMERE_ANNOTATION' else 2),(tool,matches)
+            matches=[r for r in tasks if task_process(r)==tool]
+            assert len(matches)==(4 if tool=='INFERNAL' else 3 if tool=='TELOMERE_ANNOTATION' else 2),(tool,matches)
         if name in ('resume','report_change'):
             for task in tasks:
                 if name=='report_change' and 'REPORT_GENOME_TRACKS' in task['name']:continue

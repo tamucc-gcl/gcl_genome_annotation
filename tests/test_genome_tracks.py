@@ -8,9 +8,18 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'py_scripts'))
 from genome_tracks import TRACKS, centromeres, normalize, telomeres
 from report_genome_tracks import report
+from validate_genome_tracks_cluster import task_process
 
 
 class GenomeTracksTests(unittest.TestCase):
+    def test_exact_process_match_excludes_infernal_merge(self):
+        tasks=[{'name':f'GENOME_TRACKS:INFERNAL_PARALLEL:INFERNAL ({aid}:chunk_{chunk:03d})'}
+               for aid in 'AB' for chunk in range(2)]
+        tasks += [{'name':f'GENOME_TRACKS:INFERNAL_PARALLEL:MERGE_INFERNAL ({aid})'} for aid in 'AB']
+        self.assertEqual(sum(task_process(t)=='INFERNAL' for t in tasks),4)
+        self.assertEqual(sum(task_process(t)=='MERGE_INFERNAL' for t in tasks),2)
+        self.assertEqual(task_process({'name':'GENOME_TRACKS:CENTROMERE_TO_GFF3 (A)'}),'CENTROMERE_TO_GFF3')
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
