@@ -12,10 +12,10 @@ process RUN_PORTCULLIS {
     set -euo pipefail
     mkdir '${rid}'
     python portcullis_inputs.py check --genome '${genome}' --identity '${identity}' --bam '${bam}' --request '${request}' --out '${rid}/inputs.json'
-    portcullis --version > '${rid}/version.txt' 2>&1
-    portcullis prep --use_csi -t ${task.cpus} -o prep '${genome}' '${bam}' > '${rid}/prep.log' 2>&1
-    portcullis junc --use_csi -t ${task.cpus} --strandedness '${strand}' --orientation UNKNOWN -o '${rid}/all' prep > '${rid}/analysis.log' 2>&1
-    portcullis filter -t ${task.cpus} --threshold ${params.portcullis_threshold} --save_bad --intron_gff -o '${rid}/filtered' prep '${rid}/all.junctions.tab' > '${rid}/filter.log' 2>&1
+    portcullis --version 2>&1 | tee '${rid}/version.txt'
+    portcullis prep --use_csi -t ${task.cpus} -o prep '${genome}' '${bam}' 2>&1 | tee '${rid}/prep.log'
+    portcullis junc --use_csi -t ${task.cpus} --strandedness '${strand}' --orientation UNKNOWN -o '${rid}/all' prep 2>&1 | tee '${rid}/analysis.log'
+    portcullis filter -t ${task.cpus} --threshold ${params.portcullis_threshold} --save_bad --intron_gff -o '${rid}/filtered' prep '${rid}/all.junctions.tab' 2>&1 | tee '${rid}/filter.log'
     python portcullis_inputs.py finish --folder '${rid}' --threshold ${params.portcullis_threshold}
     """
 }
