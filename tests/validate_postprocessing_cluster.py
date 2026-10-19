@@ -55,7 +55,7 @@ def run_case(root,name,resume=False,enabled=True):
         '--utr_inputs_root',str(root/'accepted'),'--outdir',str(case/'results'),
         '--utr_refine',str(enabled).lower(),'--utr_ranking_cpus','2','--utr_ranking_memory','4 GB',
         '--aed_alignment_cpus','2','--aed_alignment_memory','4 GB',
-        '--ingenannot_aed_cpus','2','--ingenannot_aed_memory','4 GB','--run_junction_qc','false']
+        '--ingenannot_aed_cpus','2','--ingenannot_aed_memory','4 GB','--run_junction_qc','false','--run_model_assessment','false']
     if resume:command.append('-resume')
     print(f'Running connected UTR/final QC/native AED ({name})...',flush=True)
     execute(command,case,case/f'{name}.console.log')

@@ -105,6 +105,16 @@ quality. See [the InGenAnnot guide](docs/ingenannot.md) for safeguards and scope
 support for the accepted final annotation under `qc/junctions/<assembly>/`.
 Readsets are analyzed separately, with coding and UTR-associated junction summaries.
 This report-only stage does not filter BAMs/models or change AED. It is enabled
-by default for main runs; `--run_junction_qc false` disables it. Before the first
-real-data run, execute `python tests/validate_junctions_cluster.py --outdir testing/junction_contracts_01`
-on Crest. The tiny native-tool acceptance and full-data pilot remain pending.
+by default for main runs; `--run_junction_qc false` disables it. Actual cluster
+acceptance and the real-data pilot were accepted on 19 October 2026. Junction
+filtering is not a mandatory pre-BRAKER step. The [continuation plan](docs/evidence-scoring-plan.md)
+covers reconnecting downstream modules and adding interpretable figures across
+the QC stages. `tests/validate_junctions_cluster.py` remains the small native-tool
+acceptance test for future changes.
+
+[Model assessment](docs/model-assessment.md) reconnects structural/sequence checks
+and repeat-derived gene flags before selection, alongside the accepted AED and
+junction metrics. It preserves all models and separates cached TE database/search
+tasks from flag thresholds and reporting. Local tests pass; run
+`python tests/validate_assessment_cluster.py --outdir testing/assessment_contracts_01`
+on Crest before the real-data pilot. Model filtering remains a separate next step.

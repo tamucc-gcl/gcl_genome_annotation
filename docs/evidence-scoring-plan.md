@@ -1,5 +1,93 @@
 # Evidence scoring, filtering and optional refinement plan
 
+## Current continuation plan — accepted 19 October 2026
+
+This section supersedes conflicting choices in the historical snapshot below.
+Preparation, reference/repeats, RNA alignment, all four BRAKER evidence routes,
+optional native UTR refinement, final unfiltered QC, separate native RNA/protein
+AED and report-only Portcullis junction QC are connected. Junction cluster
+acceptance and the real-data pilot have passed and were accepted by the user.
+This establishes tool execution, handoffs and reporting, not universal biological
+correctness or calibrated filtering thresholds.
+
+Portcullis remains post-alignment evidence assessment compared against accepted
+post-UTR models. It must not become a mandatory pre-BRAKER junction filter or
+change prediction BAMs by default. It supplies complementary QC, not a combined
+AED. Native RNA/protein AED remain separate; AED filtering defaults to off.
+
+Continue in this order, starting from existing modules and helpers:
+
+1. **Model assessment and TE flags.** Reconnect existing structural/sequence
+   integrity metrics and FLAG_TE_GENES to the accepted annotation and repeat
+   outputs. Include native RNA/protein AED and junction summaries in one keyed
+   assessment table. Preserve original evidence columns and missing/not-applicable
+   distinctions. Keep TE, partial/internal-stop and junction concerns as flags by
+   default. Validate overlap aggregation and explicit transcript/gene relationships.
+2. **Model selection.** Adapt FILTER_GENE_MODELS to the new assessment handoff.
+   Retain the agreed existing structural thresholds with documented corrected
+   transcript/gene semantics, independent off/flag/remove controls, complete
+   reasons and synchronized retained/excluded GFF/protein/CDS sets. RNA or protein
+   AED filtering remains explicit opt-in. Do not add default junction exclusions.
+3. **Final identifiers and before/after QC.** Adapt RENAME_GENE_MODELS after
+   selection; retain complete ID maps across GFF, coding sequences and all
+   assessment tables. Reuse AGAT/BUSCO/OMArk for candidate-versus-retained QC.
+   Reuse coding completeness results where sequences/representative sets are
+   unchanged; make model changes visible rather than silently replacing baseline.
+4. **Functional annotation.** Reconnect existing InterProScan, eggNOG, DIAMOND,
+   KofamScan, DeepSig and merge/GFF annotation modules with the selected model set.
+   Preserve source provenance, eligibility and valid no-hit results. General
+   databases remain shared stores; threshold/report-only changes must not repeat
+   unchanged searches. Keep final IDs consistent through merged outputs.
+5. **Other genome annotation tracks.** Reconnect existing ncRNA, telomere and
+   centromere modules and their optional switches, consuming the accepted reference.
+   Keep their feature types distinct from protein-coding model selection.
+6. **Unified reports and figures.** Reuse ANNOTATION_REPORT and
+   r_scripts/annotation_report_plots.R as the starting point. Meet the reporting
+   requirements below and link the final model sets, QC, evidence and decisions.
+7. **End-to-end acceptance and cleanup.** Verify normal uninterrupted execution,
+   all evidence modes, optional disabled stages, added readsets/assemblies,
+   native resume and threshold/report-only cache behavior. Remove obsolete
+   duplicate paths/docs only after the replacement is accepted. Development
+   entries remain testing conveniences, not required user checkpoints.
+
+PASA/EviAnn remain optional future refinement investigations. They do not block
+reconnecting the existing downstream pipeline or replace the accepted UTR route.
+A coding-model-changing refinement would require separate before/after validation,
+sequence extraction, evidence reassessment and QC before promotion.
+
+Implementation update: model assessment and TE flags are now wired into main;
+see [scope and acceptance](model-assessment.md). Local contracts pass. Actual
+cluster acceptance and the real-data pilot must pass before accepting this
+increment or reconnecting model selection.
+
+### Reporting requirements
+
+The report must include interpretable figures, not only raw tables or links:
+
+- Reuse separate raw/processed RNA MultiQC and alignment MultiQC reports; summarize
+  trimming retention, mapping and resolved library strand with clear read/pair units.
+- Reuse repeat summaries and landscapes; display reference retention and masking.
+- Compare candidate/retained AGAT structure distributions and BUSCO/OMArk quality,
+  including exon/CDS/protein lengths, exon counts and isoform counts.
+- Plot separate RNA/protein AED histograms or cumulative distributions with missing
+  evidence distinguished from score 1. Do not restore a combined AED or aliases.
+- Show junction pass/fail/not-observed/unresolved-strand proportions, separate
+  coding/UTR-associated support, transcript support distributions and support by
+  readset. Distinguish distinct junctions from transcript junction occurrences.
+  RNA-free and single-exon cases are not zero-support failures.
+- Compare AED with junction support to reveal complementary evidence; avoid
+  unreadable overplotted points. Show counts/densities and explicit denominators.
+- Summarize TE flags, warnings, rule actions and candidate/retained/excluded counts,
+  with before/after comparisons that make the effect of each setting visible.
+
+Use readable labels, consistent colors, explicit model-set/assembly labels and
+brief interpretation beside each figure. Preserve underlying tables and methods.
+Provide exportable vector figures plus convenient image previews. Reuse native
+tool plots where suitable. Plot/report changes must rerun presentation only,
+without invalidating mapping, repeats, prediction, evidence analysis or searches.
+
+## Historical planning snapshot — 13 October 2026
+
 Planning snapshot: 13 October 2026. The user accepted the proposed order, specified
 MAKER-compatible AED and selected PASA/EviAnn for optional refinement evaluation.
 This records the agreed plan. The initial standalone nucleotide scoring pilot is

@@ -37,7 +37,7 @@ Start evaluation with the existing biological filter policy and thresholds:
 | Short single-exon CDS | <300 bp | Remove |
 | Short gene span | <200 bp | Remove |
 | All recorded introns short | All <10 bp | Remove |
-| Available AED | >0.7 | Remove |
+| RNA or protein AED | No default cutoff | Off; explicit source/cutoff required |
 | TE evidence | Existing flag thresholds initially | Flag; retain |
 
 Expose each rule independently, including threshold overrides, disable and
@@ -51,6 +51,8 @@ relationships and consistent model/sequence sets. Document corrected transcript
 and gene aggregation before implementing it. Equivalent thresholds do not imply
 bit-for-bit reproduction of old buggy decisions. RNA-inclusive AED is a changed
 score and requires validation before interpreting 0.7 as directly comparable.
+The AED row reflects the subsequently accepted opt-in policy; it supersedes the
+original 9 October proposal to remove models above 0.7 by default.
 
 Preserve candidates, excluded models and all filter reasons. Report retained and
 removed counts, length/exon distributions, evidence availability/support and
@@ -58,10 +60,13 @@ enabled completeness metrics so the user can assess the baseline and alternative
 
 ## Implementation status
 
-This records accepted behavior, not completed filter/checkpoint implementation.
-The preflight currently resolves settings and file presence only; the legacy
-annotation entry point has not been migrated. Real pilot inputs and personal
-submission scripts are maintained separately in the consuming project repository.
+As of 19 October, main.nf connects preparation through prediction, UTR refinement,
+unfiltered QC, separate native AED and junction QC. Downstream model selection,
+functional annotation and unified reporting remain to be reconnected. The accepted
+[continuation plan](evidence-scoring-plan.md#current-continuation-plan--accepted-19-october-2026)
+records the order and figure requirements. Junction assessment is accepted as
+report-only and must not become a mandatory pre-BRAKER filter. Real pilot inputs
+and personal submission scripts remain in the consuming project repository.
 
 Step 1 input-contract acceptance passed on 9 October 2026 under Nextflow 23.10.1:
 24 Python tests plus ready, blocked and malformed Nextflow fixtures passed.

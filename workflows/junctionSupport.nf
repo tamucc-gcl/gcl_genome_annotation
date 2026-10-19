@@ -42,4 +42,5 @@ workflow JUNCTION_SUPPORT {
     })
     emit:
     status = REPORT_JUNCTION_SUPPORT.out.status
+    transcripts = REPORT_JUNCTION_SUPPORT.out.transcripts
 }

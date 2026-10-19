@@ -199,10 +199,12 @@ workflow {
         tuple(aid, file("${folder}/${aid}.filtered.fasta"), state)
     }
     def librarySources
+    def teLibrarySources
     if (params.repeat_library) {
         // An explicit complete library is a scientific input, also used by tiny masking fixtures.
         def supplied = file(params.repeat_library, checkIfExists: true)
         librarySources = preparedReferences.map { aid, reference, state -> tuple(aid, supplied) }
+        teLibrarySources = librarySources
     } else {
         if (!params.dfam_database) error 'Provide --dfam_database for the existing Dfam FamDB directory'
         if (!params.diamond_database && !params.repeat_filter_database) error 'Provide --diamond_database or --repeat_filter_database'
@@ -228,6 +230,7 @@ workflow {
             classified = CLASSIFY_REPEATS.out.curated_repeats
         }
         EXTRACT_REPEAT_PEPS()
+        teLibrarySources = classified
         INDEX_REPEAT_PEPS(EXTRACT_REPEAT_PEPS.out.repeat_peps.map { path ->
             tuple('repeat_peps_' + java.security.MessageDigest.getInstance('SHA-256').digest(path.bytes).encodeHex().toString(), path)
         })
@@ -368,7 +371,8 @@ workflow {
             }.map { aid,genome,proteins,reference,row ->
                 tuple(aid,genome,file("${proteins}/proteins.fa"),file("${reference}/${aid}.contigs.json"),file("${proteins}/evidence.json"))
             }
-        ANNOTATION_POSTPROCESSING(postprocessing,proteinAlignmentInputs)
+        ANNOTATION_POSTPROCESSING(postprocessing,proteinAlignmentInputs,
+            REPEAT_MASK_PARALLEL.out.repeat_gff.join(teLibrarySources))
     }
     REPORT_BRAKER(PLAN_BRAKER_INPUTS.out.plan, predictionResults,
         CHECK_BRAKER_SOFTWARE.out.runtime.map { aid, folder -> file("${folder}/inputs.json") }.toList(),

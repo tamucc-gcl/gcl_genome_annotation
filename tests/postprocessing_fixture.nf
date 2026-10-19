@@ -24,5 +24,5 @@ workflow {
         tuple(aid,file("${root}/repeats/${aid}.masked.fasta"),file("${root}/protein_evidence/${aid}/proteins.fa"),
             file("${root}/filtered_assemblies/${aid}/${aid}.contigs.json"),file("${root}/protein_evidence/${aid}/evidence.json"))
     }
-    ANNOTATION_POSTPROCESSING(jobs,proteins)
+    ANNOTATION_POSTPROCESSING(jobs,proteins,Channel.empty())
 }

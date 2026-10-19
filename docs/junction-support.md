@@ -105,8 +105,14 @@ annotation and prediction metadata, while integrated main uses native channels.
 Moving between the two entries may change task cache identities. Keep the same
 entry for subsequent cache tests. `--run_junction_qc false` disables the work.
 
-Implementation and Python tests are verified locally. Actual Nextflow/Portcullis
-cluster acceptance and full-data pilot are pending.
+Accepted 19 October 2026: 161 local Python tests and actual Nextflow 23.10.1 cluster
+acceptance passed, including native fallback, both strands, optional/no-RNA cases,
+resume and report/model-change cache checks. The real-data pilot completed native
+classification for both supplied readsets without fallback or overlapping native
+pass/fail exports; table reconciliation and coding/UTR support were reviewed.
+This QC remains report-only. Mandatory pre-BRAKER junction filtering is not planned.
+Interpretable junction figures are required in the forthcoming unified reporting
+stage; see the [continuation plan](evidence-scoring-plan.md).
 
 ## Sources
 
