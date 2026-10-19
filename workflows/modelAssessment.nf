@@ -1,6 +1,20 @@
 include { PREPARE_MODEL_METRICS; REPORT_MODEL_ASSESSMENT } from '../modules/modelAssessment.nf'
 include { BUILD_TE_REPEAT_DB; SEARCH_TE_PROTEINS; FLAG_TE_GENES } from '../modules/flagTeGenes.nf'
 
+def validateTeSettings(overlap, evalue) {
+    // CLI scientific notation can remain a String in Nextflow 23.10.1.
+    def overlapValue
+    def evalueValue
+    try {
+        overlapValue = new BigDecimal(overlap.toString())
+        evalueValue = new BigDecimal(evalue.toString())
+    } catch (IllegalArgumentException | NullPointerException ex) {
+        throw new IllegalArgumentException('TE overlap fraction/e-value must be finite numbers')
+    }
+    if (overlapValue <= 0 || overlapValue > 1 || evalueValue <= 0)
+        throw new IllegalArgumentException('TE overlap fraction must be >0 and <=1; e-value must be >0')
+}
+
 workflow MODEL_ASSESSMENT {
     take:
     annotations // aid, genome, final GFF, proteins, CDS, validation, identity
@@ -14,8 +28,7 @@ workflow MODEL_ASSESSMENT {
     })
     teReports = Channel.value([])
     if (params.run_te_flagging) {
-        if (params.te_flag_overlap_frac <= 0 || params.te_flag_overlap_frac > 1 || params.te_flag_evalue <= 0)
-            error 'Invalid TE overlap fraction/e-value'
+        validateTeSettings(params.te_flag_overlap_frac, params.te_flag_evalue)
         nativeHelpers = ['te_search.py','prepare_protein_evidence.py'].collect { file("${projectDir}/py_scripts/${it}",checkIfExists:true) }
         BUILD_TE_REPEAT_DB(repeatRequests.map { aid,repeats,library -> tuple(aid,library) },nativeHelpers)
         SEARCH_TE_PROTEINS(annotations.map { aid,genome,gff,proteins,cds,validation,identity -> tuple(aid,proteins) }
