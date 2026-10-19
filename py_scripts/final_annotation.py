@@ -31,6 +31,7 @@ def aed(gff,annotated,identity,inputs,cds_only,penalty,outdir):
         evidence=accepted['evidence'],transcripts=len(rows),genes=len({r['gene_id'] for r in rows}),
         profile=dict(tool='InGenAnnot',version='0.0.20',rna_cds_only=cds_only,rna_overflow_penalty=penalty,protein_cds_only=True),
         models_unchanged=True,transcript_bounds_normalized_to_exons=normalized,
+        native_exon_record_normalizations=accepted['native_exon_record_normalizations'],
         scope='Native RNA and protein AED on the accepted final annotation; no combined score or model filtering')
     status['metrics']={}
     for kind in ('rna','protein'):
@@ -45,6 +46,8 @@ def aed(gff,annotated,identity,inputs,cds_only,penalty,outdir):
         'CDS-only RNA assessment measures coding support, not UTR boundary quality. '
         'Lower AED means closer agreement with selected evidence; it is not a probability of correctness.\n\n'
         '[Scores](aed_scores.tsv) | [Settings and validation](aed_status.json) | [Native output](native/native.aed.gff3)\n\n'
+        f"Repeated identical exon records differ for {len(accepted['native_exon_record_normalizations'])} transcripts in the native export; counts are audited in the status JSON. "
+        'Exact unique exon boundaries, CDS records and coding phases are preserved.\n\n'
         'Assessment does not replace or edit the accepted final GFF3. Filtering is disabled by default; '
         'the downstream filtering stage has not yet been connected.\n')
     return status

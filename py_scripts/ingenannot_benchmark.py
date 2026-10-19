@@ -21,10 +21,19 @@ def assess(original, annotated, identity, inputs):
     if set(before) != set(after):
         raise ValueError('InGenAnnot changed transcript identities during assessment')
     normalized_bounds = []
+    repeated_exons = {}
     for tid,a in before.items():
         b = after[tid]
-        if any(a[k]!=b[k] for k in ('gene_id','seq','strand')) or any(sorted(a[k])!=sorted(b[k]) for k in ('exons','cds')):
+        # Native export can repeat identical exon records for shared isoforms.
+        # Compare exact exon boundaries, not their merged coverage: splitting or
+        # joining an exon must still fail. CDS records and phases remain strict.
+        if (any(a[k]!=b[k] for k in ('gene_id','seq','strand'))
+                or set(a['exons']) != set(b['exons'])
+                or sorted(a['cds']) != sorted(b['cds'])):
             raise ValueError(f'InGenAnnot changed model structure during assessment: {tid}')
+        if sorted(a['exons']) != sorted(b['exons']):
+            repeated_exons[tid] = dict(original_records=len(a['exons']),native_records=len(b['exons']),
+                                       unique_exons=len(set(a['exons'])))
         original_bounds = (a['start'],a['end'])
         native_bounds = (b['start'],b['end'])
         if original_bounds != native_bounds:
@@ -57,6 +66,7 @@ def assess(original, annotated, identity, inputs):
             entry[kind+'_evidence_id'] = attrs.get(evidence)
         entry['rna_penalty'] = attrs.get('ev_tr_penalty')
         scores[tid] = entry
+    accepted['native_exon_record_normalizations'] = repeated_exons
     return before,scores,normalized_bounds,accepted
 
 
@@ -91,7 +101,8 @@ def report(original, annotated, identity, inputs, current_scores, cds_only, pena
             writer.writerow({k:'.' if v is None else f'{v:.8f}' if isinstance(v,float) else v for k,v in row.items()})
     summary = dict(status='ready',stage='ingenannot_benchmark',transcripts=len(rows),genes=len({r['gene_id'] for r in rows}),
         models_unchanged=True,transcript_bounds_normalized_to_exons=normalized_bounds,
-        model_validation_scope='Transcript IDs, gene parents, reference, strand, exact exon/CDS blocks and CDS phases preserved; native transcript bounds may normalize to the exon envelope',
+        native_exon_record_normalizations=accepted['native_exon_record_normalizations'],
+        model_validation_scope='Transcript IDs, gene parents, reference, strand, exact unique exon boundaries, CDS records and phases preserved; repeated identical exon records and native exon-envelope bounds are audited',
         profile=dict(version='0.0.20',rna_cds_only=cds_only,rna_overflow_penalty=penalty,protein_cds_only=True),
         model_sha256=checksum(original),reference_identity=identity['reference_identity'],evidence=accepted['evidence'],metrics={})
     for key in ('current_rna_aed','ingenannot_rna_aed','current_protein_aed','ingenannot_protein_aed'):
@@ -111,6 +122,7 @@ def report(original, annotated, identity, inputs, current_scores, cds_only, pena
         'No combined AED is produced. Differences include model scope, evidence handling and the configured RNA penalty; '
         'lower scores alone do not establish improved accuracy. Native GFF scores are rounded to four decimal places.\n\n'
         f'InGenAnnot normalized {len(normalized_bounds)} transcript bounds to their unchanged exon envelopes. '
+        f"Repeated identical exon records differ for {len(accepted['native_exon_record_normalizations'])} transcripts; counts are recorded in the status JSON. "
         'Transcript IDs, gene parents, reference, strand, exon/CDS blocks and coding phases are preserved. '
         'The original BRAKER GFF remains the annotation; the native GFF is an assessment export.\n\n'
         'The paper-based profile uses CDS-only RNA assessment and a 0.25 overflow/splice-disagreement penalty; '

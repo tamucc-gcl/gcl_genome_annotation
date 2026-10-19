@@ -17,6 +17,48 @@ import test_ingenannot_benchmark as benchmark_tests
 
 
 class FinalAnnotationContracts(unittest.TestCase):
+    def test_duplicate_native_exons_are_audited_without_changing_annotation(self):
+        for strand in ('+','-'):
+            with self.subTest(strand=strand),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp)
+                gff,v,c,identity,baseline,native=benchmark_tests.NativeBenchmarkContracts().fixtures(root)
+                for path in (gff,native):
+                    path.write_text(path.read_text().replace('\t+\t','\t'+strand+'\t'))
+                accepted=json.loads((root/'inputs.json').read_text())
+                accepted['model_sha256']=checksum(gff)
+                (root/'inputs.json').write_text(json.dumps(accepted))
+                original=gff.read_bytes()
+                exon=next(line for line in native.read_text().splitlines() if '\texon\t' in line)
+                native.write_text(native.read_text()+exon+'\n'+exon+'\n')
+                result=aed(gff,native,identity,root/'inputs.json',True,.25,root/'out')
+                audit=result['native_exon_record_normalizations']['t1']
+                self.assertEqual(audit['native_records'],audit['original_records']+2)
+                self.assertEqual(gff.read_bytes(),original)
+                with (root/'out/aed_scores.tsv').open() as handle:
+                    self.assertEqual(next(csv.DictReader(handle,delimiter='\t'))['protein_aed'],'0.1')
+                self.assertEqual(json.loads((root/'out/aed_status.json').read_text())['native_exon_record_normalizations']['t1'],audit)
+
+    def test_identical_exon_coverage_with_changed_segmentation_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            gff,v,c,identity,baseline,native=benchmark_tests.NativeBenchmarkContracts().fixtures(root)
+            exon=next(line for line in native.read_text().splitlines() if '\texon\t' in line)
+            fields=exon.split('\t');middle=(int(fields[3])+int(fields[4]))//2
+            left=fields.copy();left[4]=str(middle)
+            right=fields.copy();right[3]=str(middle+1);right[8]=right[8].replace('ID=','ID=split_')
+            native.write_text(native.read_text().replace(exon,'\t'.join(left)+'\n'+'\t'.join(right)))
+            with self.assertRaisesRegex(ValueError,'changed model structure'):
+                aed(gff,native,identity,root/'inputs.json',True,.25,root/'bad')
+
+    def test_duplicate_cds_records_remain_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            gff,v,c,identity,baseline,native=benchmark_tests.NativeBenchmarkContracts().fixtures(root)
+            cds=next(line for line in native.read_text().splitlines() if '\tCDS\t' in line)
+            native.write_text(native.read_text()+cds+'\n')
+            with self.assertRaisesRegex(ValueError,'changed model structure'):
+                aed(gff,native,identity,root/'inputs.json',True,.25,root/'bad')
+
     def test_final_handoff_retains_coding_files_and_blocks_mutated_sources(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);gff,v,current,identity,baseline,native=benchmark_tests.NativeBenchmarkContracts().fixtures(root)
