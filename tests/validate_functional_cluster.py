@@ -23,7 +23,9 @@ def fixtures(root):
     for aid,mode in zip('ABCDE',('rna_protein','protein','rna','ab_initio','ab_initio')):
         folder=fixture(dest,aid);protein=folder/f'{aid}_proteins.fa'
         if aid=='E':protein.write_text(''.join(f'>{aid}_g{i}.t1\nMA*AA\n' for i in (1,2,3)))
-        else:protein.write_text(f'>{aid}_g1.t1\n{seq}*\n>{aid}_g2.t1\n'+ 'A'*120+f'\n>{aid}_g3.t1\nMA*AA\n')
+        # Poly-alanine contains only DNA alphabet letters and DIAMOND rejects it.
+        # Poly-glutamate is an unambiguous protein, still a deliberate no-hit query.
+        else:protein.write_text(f'>{aid}_g1.t1\n{seq}*\n>{aid}_g2.t1\n'+ 'E'*120+f'\n>{aid}_g3.t1\nMA*AA\n')
         assessment=folder/'transcript_assessment.tsv'
         with assessment.open() as handle:
             reader=csv.DictReader(handle,delimiter='\t');fields=reader.fieldnames;metrics=list(reader)

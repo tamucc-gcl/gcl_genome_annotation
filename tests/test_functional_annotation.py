@@ -57,6 +57,20 @@ def decorate(args,folder,root):
 
 
 class FunctionalContracts(unittest.TestCase):
+    def test_cluster_fixture_search_queries_are_unambiguously_protein(self):
+        from validate_functional_cluster import fixtures
+        from model_metrics import sequences
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);fixtures(root)
+            for aid in 'ABCD':
+                folder=root/f'accepted/structural_annotation/identified/{aid}'
+                prepare(aid,folder/f'{aid}_proteins.fa',folder/f'{aid}.gff3',folder/'transcript_assessment.tsv',
+                        folder/'annotation_status.json',root/f'prepared_{aid}')
+                queries=sequences(root/f'prepared_{aid}/eligible.fa')
+                self.assertEqual(len(queries),2)
+                for tid,seq in queries.items():
+                    self.assertTrue(set(seq)-set('ACGTN'),tid)
+
     def test_eligibility_preserves_partial_and_does_not_delete_internal_stop(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);args,folder=arguments(root)

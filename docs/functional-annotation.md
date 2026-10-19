@@ -113,6 +113,12 @@ task identities and reports missing chunks explicitly. Local Nextflow 23.10.1
 execution of the production routing expression retains all eight expected chunks;
 cluster recovery acceptance remains pending.
 
+The subsequent run reached both chunks but DIAMOND rejected the synthetic
+poly-alanine no-hit query because its alphabet looks like DNA. The fixture now
+uses poly-glutamate; production DIAMOND warnings are not disabled. Use a fresh
+test directory after this fixture change, since `--resume` retains generated
+input fixtures from the original test directory.
+
 After acceptance, use the normal main sbatch with `-resume` and existing database
 arguments. No new config file or user checkpoint is required. A development-only
 `functional_annotation.nf` entry reads completed identified/preflight/selected-OMArk
