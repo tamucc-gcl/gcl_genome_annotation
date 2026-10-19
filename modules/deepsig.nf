@@ -23,9 +23,16 @@ process DEEPSIG {
     """
     set -euo pipefail
 
+    # Singularity exec does not run Docker's conda-activation entrypoint.
+    # Use the installed interpreter's prefix, matching the Bioconda model layout.
+    export DEEPSIG_ROOT=\$(python -c 'import sys; print(sys.prefix + "/share/deepsig")')
+    test -d "\$DEEPSIG_ROOT/models"
+    test -x "\$DEEPSIG_ROOT/tools/biocrf-static"
+    deepsig --version
+
     deepsig \\
-        --fasta ${protein_fasta} \\
-        --outf ${assembly_id}_chunk_${chunk_id}_deepsig_annotation.gff3 \\
+        --fasta '${protein_fasta}' \\
+        --outf '${assembly_id}_chunk_${chunk_id}_deepsig_annotation.gff3' \\
         --organism euk \\
         --outfmt gff3 \\
         --threads ${task.cpus}

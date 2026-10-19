@@ -60,6 +60,14 @@ enabled completeness metrics so the user can assess the baseline and alternative
 
 ## Implementation status
 
+Functional cluster acceptance subsequently passed in
+`testing/functional_contracts_02`: unit/main-syntax checks, recovery, unchanged
+resume, report-only changes, fresh-project shared-index reuse, no hits and disabled
+searches. This exercises native SeqKit/DIAMOND and synthetic four-mode handoffs,
+not all five full databases. The first full-data run reached a DeepSig Conda
+TensorFlow 2.2.0 solve failure. DeepSig now uses a registry-verified, digest-pinned
+BioContainers 1.2.5 image; the full five-tool pilot remains pending.
+
 19 October continuation: final identifiers, complete maps and post-filter
 AGAT/BUSCO/OMArk/structural reporting passed cluster acceptance and the real-data
 pilot. The selected set has 21,378 genes and 45,060 transcripts. BUSCO remains

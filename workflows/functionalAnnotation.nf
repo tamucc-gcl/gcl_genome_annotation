@@ -100,6 +100,7 @@ workflow FUNCTIONAL_ANNOTATION {
         def omark = qc.find { it[0]==aid }
         def provenance = [:]+settings
         provenance.functional_parameters = [n_chunks:params.n_chunks,
+            deepsig_container:params.deepsig_container,
             interproscan_version:params.interproscan_version,eggnog_version:params.eggnog_version,
             eggnog_evalue:params.eggnog_evalue,eggnog_sensemode:params.eggnog_sensemode,
             eggnog_target_orthologs:params.eggnog_target_orthologs,eggnog_goEvidence:params.eggnog_goEvidence,

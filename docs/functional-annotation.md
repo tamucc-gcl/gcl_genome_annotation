@@ -31,7 +31,7 @@ Shared sources use their existing native `storeDir` layouts:
 | eggNOG | `eggnog_database/eggnog_db/`: `eggnog.db`, `eggnog_proteins.dmnd`, `eggnog.taxa.db` |
 | DIAMOND | `diamond_database/<diamond_version>.dmnd`, default `swissprot.dmnd` |
 | KofamScan | `kofamscan_database/kofamscan_db/`: `ko_list` and `profiles/` |
-| DeepSig | Existing tool environment and bundled models |
+| DeepSig | Pinned BioContainers DeepSig 1.2.5 image and bundled models |
 
 Absent standard sources use the existing download modules; a custom DIAMOND
 index must already exist. Shared parents are created on the driver before scratch
@@ -63,6 +63,22 @@ GO terms, database references and signal/pathway notes are added without changin
 coding geometry, phase, feature source or IDs. Free-text GFF delimiters are escaped.
 Final geometry/ID coverage is independently compared with the identified GFF.
 No further filtering or confidence score is added.
+
+DeepSig's initial full-data attempt stopped during Conda resolution: the package
+requires TensorFlow 2.2.0, which was not installable in that solve. DeepSig now
+uses BioContainers 1.2.5 build `pyhca03a8a_1`, pinned by manifest digest in the root
+config, with Conda disabled for that process. Singularity caches the image through
+the existing shared container cache. Its bundled model root is initialized from
+the container Python prefix, following the Bioconda installation layout, because
+Singularity exec does not invoke Docker's activation entrypoint. The process checks
+the model/CRF paths and prints the native version before prediction. No host
+TensorFlow install or sbatch changes are required. Registry metadata and the 1.2.5
+CLI were verified; actual container inference on Crest remains pending.
+
+Sources: [Bioconda requirements](https://github.com/bioconda/bioconda-recipes/blob/master/recipes/deepsig/meta.yaml),
+[model installation](https://github.com/bioconda/bioconda-recipes/blob/master/recipes/deepsig/build.sh),
+[DeepSig 1.2.5 CLI](https://github.com/BolognaBiocomp/deepsig/blob/v1.2.5/deepsig/deepsig.py),
+[BioContainers image tags](https://quay.io/repository/biocontainers/deepsig?tab=tags).
 
 Native-format references: [InterProScan inputs](https://interproscan-docs.readthedocs.io/en/v5/InputFormat.html),
 [KofamScan](https://github.com/takaram/kofam_scan),
