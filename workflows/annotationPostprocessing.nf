@@ -6,6 +6,7 @@ include { PREPARE_INGENANNOT_EVIDENCE; RUN_INGENANNOT_AED } from '../modules/ing
 include { ANNOTATION_BASELINE as FINAL_ANNOTATION_QC } from './annotationBaseline.nf'
 include { JUNCTION_SUPPORT } from './junctionSupport.nf'
 include { MODEL_ASSESSMENT } from './modelAssessment.nf'
+include { MODEL_SELECTION } from './modelSelection.nf'
 
 workflow ANNOTATION_POSTPROCESSING {
     take:
@@ -16,6 +17,8 @@ workflow ANNOTATION_POSTPROCESSING {
     repeatRequests // Native RepeatMasker GFF and pre-filter repeat library for assessment.
 
     main:
+    if (params.run_model_selection && !params.run_model_assessment)
+        error 'Model selection requires run_model_assessment=true'
     if (params.ingenannot_rna_penalty < 0 || params.ingenannot_rna_penalty > 1)
         error 'ingenannot_rna_penalty must be between 0 and 1'
     utrHelpers = ['utr_refinement.py','evidence_aed.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
@@ -73,6 +76,7 @@ workflow ANNOTATION_POSTPROCESSING {
     })
     junctionReports = Channel.empty()
     aedReports = Channel.empty()
+    selectedAnnotations = Channel.empty()
     if (params.run_junction_qc) {
         JUNCTION_SUPPORT(jobs.map { aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices ->
             tuple(aid,readsets,genome,identity,bams,indices)
@@ -120,9 +124,18 @@ workflow ANNOTATION_POSTPROCESSING {
             tuple(aid,genome,file("${folder}/${aid}.gff3"),file("${prediction}/${aid}_proteins.fa"),
                 file("${prediction}/${aid}_cds.fa"),file("${folder}/annotation_status.json"),identity)
         },repeatRequests,aedReports,junctionReports)
+        if (params.run_model_selection) {
+            MODEL_SELECTION(jobs.join(FINALIZE_ANNOTATION.out.bundle).map {
+                aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices,folder ->
+                tuple(aid,file("${folder}/${aid}.gff3"),file("${folder}/${aid}_proteins.fa"),
+                    file("${folder}/${aid}_cds.fa"),file("${folder}/annotation_status.json"),identity)
+            },MODEL_ASSESSMENT.out.transcripts.join(MODEL_ASSESSMENT.out.status))
+            selectedAnnotations = MODEL_SELECTION.out.annotation
+        }
     }
 
     emit:
     annotation = FINALIZE_ANNOTATION.out.bundle
+    selected_annotation = selectedAnnotations
     utr_status = VALIDATE_UTR_REFINEMENT.out.status
 }

@@ -76,9 +76,9 @@ All parameters and process resources remain in root `nextflow.config`.
 
 ## Acceptance and pilot
 
-All 169 local Python tests pass, and the changed entry points, modules and workflows
-compile with the Nextflow 23.10.1 parser. Actual SeqKit/DIAMOND/BEDTools cluster
-acceptance, runtime channel wiring and real-data assessment are pending. First run on Crest:
+Actual SeqKit/DIAMOND/BEDTools cluster acceptance and the real-data assessment
+passed and were accepted on 19 October 2026. The real run assessed 45,235 transcripts
+from 21,506 genes without removal. The acceptance command remains available for changes:
 
 ```bash
 python gcl_genome_annotation/tests/validate_assessment_cluster.py \
@@ -98,5 +98,6 @@ The standalone entry finds the published pre-filter repeat library or accepts
 `--assessment_repeat_library`. Missing enabled inputs are errors, never silently
 disabled. Keep the same entry when testing cache behavior.
 
-Model selection, final renaming, functional annotation and unified QC figures are
-subsequent implementation increments; this stage does not activate their filters.
+[Model selection](model-selection.md) now follows this stage, retaining these
+unfiltered assessment outputs. Final renaming, selected-set QC, functional annotation
+and unified QC figures remain subsequent implementation increments.

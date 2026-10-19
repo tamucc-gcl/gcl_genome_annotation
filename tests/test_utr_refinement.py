@@ -215,31 +215,21 @@ class UtrContracts(unittest.TestCase):
 
 class OptionalAedFilterContracts(unittest.TestCase):
     def test_existing_filter_keeps_default_models_and_uses_selected_source(self):
-        source=Path(__file__).resolve().parents[1]
-        template=(source/'modules/filterGeneModels.nf').read_text().split('    """')[1]
+        # FILTER_GENE_MODELS now uses the validated assessment helper rather than
+        # an embedded Python template. Preserve the source-specific regression.
+        from test_model_selection import fixture, change_assessment, run
+        from model_selection import table
         for selected,expected in [(None,{'g1','g2'}),('rna',{'g2'}),('protein',{'g1'})]:
             with self.subTest(source=selected),tempfile.TemporaryDirectory() as tmp:
-                root=Path(tmp)
-                gff=root/'models.gff3'
-                gff.write_text(''.join(f'chr1\tx\t{k}\t{s}\t{e}\t.\t+\t.\t{attrs}\n'
-                    for gid,tid,s,e in [('g1','t1',101,500),('g2','t2',701,1100)]
-                    for k,attrs in [('gene','ID='+gid),('mRNA','ID='+tid+';Parent='+gid),
-                        ('exon','ID='+tid+'.e;Parent='+tid),('CDS','ID='+tid+'.c;Parent='+tid)]))
-                proteins=root/'proteins.fa';proteins.write_text('>t1\nMAAA\n>t2\nMCCC\n')
-                scores=root/'scores.tsv';scores.write_text('gene_id\ttranscript_id\trna_aed\tprotein_aed\ng1\tt1\t0.9\t0\ng2\tt2\t0.1\t0.9\n')
-                values=dict(assembly_id='A',min_cds_length='0',min_gene_length='0',min_intron_length='0',
-                    braker_gff3=gff.as_posix(),braker_proteins=proteins.as_posix(),aed_scores=scores.as_posix())
-                values["params.filter_max_aed != null ? params.filter_max_aed : 'None'"]='0.7' if selected else 'None'
-                values['params.filter_aed_source ?: ""']=selected or ''
-                script=textwrap.dedent(re.sub(r'\$\{([^}]+)\}',lambda m:values[m[1]],template)).replace('\\\\','\\')
-                (root/'filter.py').write_text(script)
-                shutil.copy2(source/'py_scripts/gene_model_aed.py',root/'gene_model_aed.py')
-                result=subprocess.run([sys.executable,str(root/'filter.py')],cwd=root,capture_output=True,text=True)
-                self.assertEqual(result.returncode,0,result.stderr)
-                import csv
-                with (root/'A.filtered_aed.tsv').open() as handle:
-                    reader=csv.DictReader(handle,delimiter='\t');rows=list(reader)
-                    self.assertEqual(reader.fieldnames,['gene_id','transcript_id','rna_aed','protein_aed'])
+                root=Path(tmp);inputs=fixture(root)
+                change_assessment(inputs[-1],{
+                    't1':dict(rna_aed='.9',protein_aed='0'),
+                    't2':dict(rna_aed='.9',protein_aed='0'),
+                    't3':dict(rna_aed='.1',protein_aed='.9')},aed_enabled=True)
+                options=dict(structural_action='off',max_aed=.7 if selected else None,aed_source=selected)
+                run(root,inputs,options)
+                fields,rows=table(root/'selection/retained/transcript_assessment.tsv','transcript_id')
+                self.assertTrue({'rna_aed','protein_aed'}<=set(fields))
                 self.assertEqual({r['gene_id'] for r in rows},expected)
 
     def test_disabled_filter_does_not_require_evidence(self):

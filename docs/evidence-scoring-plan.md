@@ -55,10 +55,12 @@ reconnecting the existing downstream pipeline or replace the accepted UTR route.
 A coding-model-changing refinement would require separate before/after validation,
 sequence extraction, evidence reassessment and QC before promotion.
 
-Implementation update: model assessment and TE flags are now wired into main;
-see [scope and acceptance](model-assessment.md). Local contracts pass. Actual
-cluster acceptance and the real-data pilot must pass before accepting this
-increment or reconnecting model selection.
+Implementation update (19 October): model assessment and TE flags passed cluster
+acceptance and the real-data pilot, and were accepted. [Model selection](model-selection.md)
+now adapts the existing filter with per-transcript decisions, isoform rescue and
+synchronized retained/excluded coding sets. Local tests and Nextflow parsing pass;
+cluster selection acceptance and the full-data selection pilot are next. AED and
+junction exclusions remain opt-in; TE association is flag-only by default.
 
 ### Reporting requirements
 

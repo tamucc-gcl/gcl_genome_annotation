@@ -52,4 +52,5 @@ workflow MODEL_ASSESSMENT {
     },['model_assessment.py','prepare_protein_evidence.py'].collect { file("${projectDir}/py_scripts/${it}",checkIfExists:true) })
     emit:
     status = REPORT_MODEL_ASSESSMENT.out.status
+    transcripts = REPORT_MODEL_ASSESSMENT.out.transcripts
 }

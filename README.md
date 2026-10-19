@@ -80,7 +80,7 @@ extraction and AGAT. Tiny native UTR acceptance and the real-data UTR pilot
 passed. `main.nf` now routes accepted UTR-refined models into the existing QC
 modules and native InGenAnnot AED. RNA-free or refinement-disabled assemblies
 retain their original models. AED filtering defaults to off; the downstream
-filter module is not yet connected.
+filter module is connected after model assessment; see the current selection scope below.
 
 The accepted model set is published under `structural_annotation/final/<assembly>/`,
 with `annotation_status.json`, GFF3 and unchanged coding FASTAs. Original BRAKER
@@ -115,6 +115,15 @@ acceptance test for future changes.
 [Model assessment](docs/model-assessment.md) reconnects structural/sequence checks
 and repeat-derived gene flags before selection, alongside the accepted AED and
 junction metrics. It preserves all models and separates cached TE database/search
-tasks from flag thresholds and reporting. Local tests pass; run
-`python tests/validate_assessment_cluster.py --outdir testing/assessment_contracts_01`
-on Crest before the real-data pilot. Model filtering remains a separate next step.
+tasks from flag thresholds and reporting. Actual cluster acceptance and the real-data
+pilot passed and were accepted on 19 October 2026.
+
+[Model selection](docs/model-selection.md) follows assessment in main, adapting the
+existing structural cutoffs to individual transcripts and retaining genes with a
+surviving isoform. It writes separate retained/excluded GFF, protein/CDS and
+assessment sets plus complete decision tables under `structural_annotation/selection/`.
+AED and junction filtering remain off by default; TE flags alone do not remove models.
+Original accepted models and reports remain preserved. Local validation passes;
+run `python tests/validate_selection_cluster.py --outdir testing/selection_contracts_01`
+on Crest before the real selection pilot. Final renaming, selected-set QC and
+downstream functional annotation are not yet reconnected.
