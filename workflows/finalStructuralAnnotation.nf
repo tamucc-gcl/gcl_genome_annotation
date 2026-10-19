@@ -33,7 +33,8 @@ workflow FINAL_STRUCTURAL_ANNOTATION {
         file("${projectDir}/py_scripts/${it}",checkIfExists:true)
     })
     reportRows = STRUCTURAL_QC.out.report.toList().map { rows -> rows.sort { it[0] } }
-    STRUCTURAL_QC_INDEX(metadata.toList().map { it.collect { row -> row[0] }.sort() },reportRows.map { it.collect { row -> row[1] } })
+    STRUCTURAL_QC_INDEX(metadata.toList().map { it.collect { row -> row[0] }.sort() },reportRows.map { it.collect { row -> row[1] } },
+        file("${projectDir}/py_scripts/structural_report_index.py",checkIfExists:true))
     emit:
     annotation = RENAME_GENE_MODELS.out.bundle
     report = STRUCTURAL_QC.out.report

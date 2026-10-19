@@ -69,6 +69,7 @@ def run_case(root,name,resume=False):
         assert state['functional_annotation']=='pending' and not state['confidence_list_created']
         assert len(list((qc/'plots').glob('*.svg')))==10 and len(list((qc/'plots').glob('*.png')))==10
         assert state['native_qc_sources']['before'] and state['native_qc_sources']['after']
+        assert (qc/'README.md').is_file() and not list(qc.rglob('*.html'))
         for filename,sha in state['outputs'].items():assert checksum(qc/filename)==sha,filename
         selected=json.loads((case/f'results/qc/selected/{aid}/selection/selection.json').read_text())
         assert selected['model_set']=='selected' and selected['representative_proteins']==1

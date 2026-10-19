@@ -22,22 +22,12 @@ process STRUCTURAL_QC_INDEX {
     input:
     val ids
     path reports,stageAs:'reports/*'
+    path index_helper
     output:
     path 'README.md',emit: report
     script:
     def expected = groovy.json.JsonOutput.toJson(ids).bytes.encodeBase64().toString()
     """
-    python - <<'PY'
-    import base64, json
-    from pathlib import Path
-    rows=[json.loads(p.read_text()) for p in Path('reports').glob('*/structural_qc_status.json')]
-    expected=json.loads(base64.b64decode('${expected}'))
-    if sorted(r['assembly_id'] for r in rows)!=sorted(expected): raise ValueError('Missing/duplicate assembly structural reports')
-    lines=['# Structural annotation QC', '', '| Assembly | Before genes | After genes | Before transcripts | After transcripts |', '|---|---:|---:|---:|---:|']
-    for row in sorted(rows,key=lambda r:r['assembly_id']):
-        aid=row['assembly_id'];before,after=row['model_sets']
-        lines.append(f"| [{aid}]({aid}/report.html) | {before['genes']} | {after['genes']} | {before['transcripts']} | {after['transcripts']} |")
-    Path('README.md').write_text('\n'.join(lines)+'\n')
-    PY
+    python structural_report_index.py --expected '${expected}' --reports ${reports} --out README.md
     """
 }

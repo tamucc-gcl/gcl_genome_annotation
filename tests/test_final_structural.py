@@ -10,6 +10,7 @@ import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'py_scripts'))
 from final_identifiers import rename
 from structural_report import report
+from structural_report_index import write_index
 from model_selection import table, select
 from model_metrics import sequences
 from evidence_aed import models
@@ -115,7 +116,9 @@ class FinalStructuralContracts(unittest.TestCase):
             _,metrics=table(root/'report/completeness_metrics.tsv','metric')
             self.assertEqual(next(r['value'] for r in metrics if r['metric']=='busco_complete'),'90.0')
             self.assertEqual(len(list((root/'report/plots').glob('*.svg'))),10)
-            self.assertIn('Functional annotation remains pending',(root/'report/report.html').read_text())
+            self.assertIn('Functional annotation remains pending',(root/'report/README.md').read_text())
+            self.assertNotIn('.html',(root/'report/README.md').read_text())
+            self.assertFalse(list((root/'report').rglob('*.html')))
             _,rows=table(root/'report/structural_qc_transcripts.tsv','transcript_id')
             self.assertTrue(all(r['gene_id']=='A_g1' for r in rows));self.assertEqual(rows[0]['omark_representative_classification'],'Consistent')
 
@@ -126,6 +129,21 @@ class FinalStructuralContracts(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'different annotation'):report('A',final,root/'selection',data[-1]/'transcript_assessment.tsv',data[-1]/'assessment_status.json',[],qc,root/'bad')
             value['gff3_sha256']=checksum(final/'A.gff3');meta.write_text(json.dumps(value));qc[3].write_text('unexpected tool output')
             with self.assertRaisesRegex(ValueError,'Unrecognized BUSCO'):report('A',final,root/'selection',data[-1]/'transcript_assessment.tsv',data[-1]/'assessment_status.json',[],qc,root/'bad')
+
+    def test_markdown_index_links_and_missing_assembly_guard(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);folder=root/'A';folder.mkdir()
+            (folder/'structural_qc_status.json').write_text(json.dumps(dict(status='ready',assembly_id='A',model_sets=[dict(genes=2,transcripts=3),dict(genes=1,transcripts=2)])))
+            write_index([folder],['A'],root/'README.md')
+            self.assertIn('[A](A/README.md)',(root/'README.md').read_text())
+            self.assertNotIn('.html',(root/'README.md').read_text())
+            import base64,subprocess
+            command=[sys.executable,str(Path(__file__).resolve().parents[1]/'py_scripts/structural_report_index.py'),
+                '--expected',base64.b64encode(b'["A"]').decode(),'--reports',str(folder),'--out',str(root/'cli.md')]
+            result=subprocess.run(command,capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual((root/'cli.md').read_text(),(root/'README.md').read_text())
+            with self.assertRaisesRegex(ValueError,'Missing/duplicate'):write_index([folder],['A','B'],root/'README.md')
 
 
 def table_map(path):

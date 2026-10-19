@@ -135,7 +135,7 @@ protein/CDS FASTAs and assessment tables, with complete retained/excluded maps.
 The existing AGAT/BUSCO/OMArk modules assess the selected identified set under
 `qc/selected/`; the accepted unfiltered comparison remains under `qc/final/`.
 Final deliverables and maps are under `structural_annotation/identified/`.
-The structural report at `qc/structural/README.md` links HTML/Markdown reports,
+The structural report at `qc/structural/README.md` links GitHub-viewable Markdown reports,
 complete gene/transcript QC tables, native summaries and ten PNG/SVG figure groups.
 Local checks pass. First run
 `python tests/validate_final_structural_cluster.py --outdir testing/final_structural_contracts_01`

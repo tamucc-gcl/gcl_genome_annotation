@@ -64,8 +64,10 @@ ID prefix changes native result identifiers and correctly invalidates selected Q
 ## Structural report
 
 Open `qc/structural/README.md` for the assembly index, or
-`qc/structural/<assembly>/report.html` for the self-contained browser report.
-It also provides a Markdown report, complete gene/transcript tables,
+`qc/structural/<assembly>/README.md` for the GitHub-viewable assembly report.
+Pipeline-written reports are Markdown only. Existing native tool reports,
+including MultiQC and RepeatMasker HTML, are retained as requested.
+The report provides complete gene/transcript tables,
 `structural_qc.tsv`, `completeness_metrics.tsv`, native QC summary copies and a
 fingerprinted `structural_qc_status.json`.
 

@@ -6,7 +6,6 @@ remain distinct; no automatic high-confidence list is inferred from them.
 """
 import argparse
 from collections import Counter,defaultdict
-import html
 import json
 import math
 from pathlib import Path
@@ -224,26 +223,21 @@ def report(aid,identified,selection,before_table,before_status,before_qc,after_q
         identified_model_sha256=ident['gff3_sha256'],selection_sha256=ident['selection_sha256'],model_sets=assembly_rows,
         native_qc_sources=qc_inputs,functional_annotation='pending',confidence_list_created=False,
         scope='Selection and final-ID integrity, structure, separate native AED, junction/repeat diagnostics and before/after AGAT/BUSCO/OMArk; no further model removal',
-        outputs={str(p.relative_to(out)).replace('\\','/'):checksum(p) for p in out.rglob('*') if p.is_file() and p.name not in ('structural_qc_status.json','README.md','report.html')})
+        outputs={str(p.relative_to(out)).replace('\\','/'):checksum(p) for p in out.rglob('*') if p.is_file() and p.name not in ('structural_qc_status.json','README.md')})
     (out/'structural_qc_status.json').write_text(json.dumps(summary,indent=2)+'\n')
     lines=['# Structural annotation QC','',f'Assembly: **{aid}**. Status: **ready**.','',
         '| Model set | Genes | Coding transcripts | PASS | WARN | FAIL |','|---|---:|---:|---:|---:|---:|']
     for r in assembly_rows:lines.append('| '+ ' | '.join(str(r[k]) for k in ['model_set','genes','transcripts','structure_pass','structure_warn','structure_fail'])+' |')
     intro='This report compares accepted unfiltered post-UTR models with the selected final-ID set. Retained AED and junction results are re-keyed through the ID map, not recalculated. It records selection effects; it does not establish universal biological accuracy. Functional annotation remains pending. No combined AED or automatic high-confidence list is generated.'
-    lines+=['',intro,'','[Interactive-browser report](report.html) | [Model summaries](structural_qc.tsv) | [Gene table](structural_qc_genes.tsv) | [Transcript table](structural_qc_transcripts.tsv) | [Completeness metrics](completeness_metrics.tsv)', '',
+    lines+=['',intro,'','[Model summaries](structural_qc.tsv) | [Gene table](structural_qc_genes.tsv) | [Transcript table](structural_qc_transcripts.tsv) | [Completeness metrics](completeness_metrics.tsv)', '',
         f'[Final identified models and maps](../../../structural_annotation/identified/{aid}/README.md) | [Selection decisions](../../../structural_annotation/selection/{aid}/README.md) | [Before QC](../../final/README.md) | [Post-filter QC](../../selected/README.md) | [Native Portcullis QC](../../junctions/{aid}/README.md)',
         f'[Before AGAT distribution figures](../../final/{aid}/agat/annotation_stats_distribution_plots/{aid}/) | [After AGAT distribution figures](../../selected/{aid}/agat/annotation_stats_distribution_plots/{aid}/)','']
-    body=[f'<h1>Structural annotation QC: {html.escape(aid)}</h1>',f'<p>{html.escape(intro)}</p>', '<p><a href="README.md">Tables, identifiers and source report links</a></p>']
-    body.append('<table><tr><th>Set</th><th>Genes</th><th>Transcripts</th><th>PASS</th><th>WARN</th><th>FAIL</th></tr>'+''.join('<tr>'+''.join(f'<td>{r[k]}</td>' for k in ['model_set','genes','transcripts','structure_pass','structure_warn','structure_fail'])+'</tr>' for r in assembly_rows)+'</table>')
     for name,title,caption in figures:
         lines+=['## '+title,'',caption,'',f'![{title}](plots/{name}.png)',f'[Vector figure](plots/{name}.svg)','']
-        body.append(f'<section><h2>{html.escape(title)}</h2><p>{html.escape(caption)}</p><a href="plots/{name}.svg"><img src="plots/{name}.png" alt="{html.escape(title)}"></a></section>')
     for title,name,text in raw:
         lines += [f'[{title}](native/{name})']
-        body.append(f'<details><summary>{html.escape(title)}</summary><pre>{html.escape(text)}</pre></details>')
     lines+=['','Native AGAT reports include all features and isoforms; native distribution figures remain in the AGAT QC directories. The figures above use explicitly labelled transcript or gene populations. Missing evidence and non-applicable single-exon junction metrics remain distinct from zero support.','', '[Machine-readable validation](structural_qc_status.json)']
     (out/'README.md').write_text('\n'.join(lines)+'\n')
-    (out/'report.html').write_text('<!doctype html><html><meta charset="utf-8"><title>Structural QC</title><style>body{font:16px system-ui;max-width:1200px;margin:35px auto;padding:0 24px;color:#243244}img{width:100%;height:auto}section{margin:40px 0}table{border-collapse:collapse}td,th{padding:10px 18px;border-bottom:1px solid #ccc}pre{white-space:pre-wrap;background:#f3f5f7;padding:16px}summary{padding:12px;cursor:pointer}</style><body>'+''.join(body)+'</body></html>')
     return summary
 
 
