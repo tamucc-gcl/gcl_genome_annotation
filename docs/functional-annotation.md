@@ -106,6 +106,13 @@ Native-format parser tests cover the other four tools; the fixture does not clai
 to run their large databases. It runs no prediction, mapping, repeats or general
 database downloads. Recovery uses the same directory and `--resume`.
 
+The first cluster run exposed a chunk-routing error: a one-to-one `join` attached
+assembly settings to only one of two chunks. The workflow now uses keyed
+`combine`, preserving every chunk. The validator checks the exact assembly/chunk
+task identities and reports missing chunks explicitly. Local Nextflow 23.10.1
+execution of the production routing expression retains all eight expected chunks;
+cluster recovery acceptance remains pending.
+
 After acceptance, use the normal main sbatch with `-resume` and existing database
 arguments. No new config file or user checkpoint is required. A development-only
 `functional_annotation.nf` entry reads completed identified/preflight/selected-OMArk

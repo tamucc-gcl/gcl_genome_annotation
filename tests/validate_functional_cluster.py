@@ -52,8 +52,14 @@ def run_case(root,name,resume=False,fresh=False):
     execute(command,case,case/f'{name}.console.log')
     with (case/'results/pipeline/pipeline_trace.txt').open() as h:tasks=list(csv.DictReader(h,delimiter='\t'))
     searches=[t for t in tasks if re.search(r':DIAMOND \(',t['name'])]
-    if name=='disabled':assert not searches,searches
-    else:assert len(searches)==8,len(searches)
+    if name=='disabled':assert not searches,f'Disabled DIAMOND unexpectedly ran: {searches}'
+    else:
+        expected_searches={f'{aid}:eligible.part_{part:03d}' for aid in 'ABCD' for part in (1,2)}
+        observed_searches={re.search(r':DIAMOND \((.*)\)$',t['name']).group(1) for t in searches}
+        assert len(searches)==8 and observed_searches==expected_searches,(
+            f'Expected both protein chunks for each of A/B/C/D (8 DIAMOND tasks); '
+            f'observed {len(searches)}: {sorted(observed_searches)}. '
+            f'Missing: {sorted(expected_searches-observed_searches)}; trace: {case/"results/pipeline/pipeline_trace.txt"}')
     if name in ('resume','report_change'):
         for t in tasks:
             if name=='report_change' and 'REPORT_FUNCTIONAL_ANNOTATION' in t['name']:continue

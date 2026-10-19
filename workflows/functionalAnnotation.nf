@@ -29,7 +29,9 @@ workflow FUNCTIONAL_ANNOTATION {
         .map { aid,settings,folder,proteins,eligibility,count -> tuple(aid,proteins) })
     chunks = CHUNK_PROTEINS.out.chunks.flatMap { aid,paths ->
         (paths instanceof List ? paths : [paths]).sort { it.name }.collect { path -> tuple(aid,path.baseName,path) }
-    }.join(jobs.map { aid,settings,folder -> tuple(aid,settings) })
+    // Multiple chunks share an assembly key. join consumes a settings row once;
+    // combine(by:0) attaches that row to every chunk for the assembly.
+    }.combine(jobs.map { aid,settings,folder -> tuple(aid,settings) }, by: 0)
 
     // Shared sources are requested only by assemblies actually using each tool.
     // Existing storeDir outputs are reused even in a fresh project without -resume.
