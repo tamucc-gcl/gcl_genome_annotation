@@ -5,5 +5,7 @@ channels:
 dependencies:
   - python=3.11
   - portcullis=1.2.4
-  - samtools=1.21
-  - pysam=0.22.1
+  # Portcullis builds constrain their Samtools/Python ABI. Let the solver
+  # select compatible BAM libraries rather than reuse the alignment env pins.
+  - samtools
+  - pysam
