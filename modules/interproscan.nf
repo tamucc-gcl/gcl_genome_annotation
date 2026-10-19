@@ -9,11 +9,11 @@
 process INTERPROSCAN {
     tag "${assembly_id}:${chunk_id}"
     label 'interproscan'
-    //publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+    //publishDir "${params.outdir}/functional_annotation/${assembly_id}", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), val(chunk_id), path(protein_fasta)
-    path(interproscan_db)
+    tuple val(database_source), path(interproscan_db)
 
     output:
     tuple val(assembly_id), val(chunk_id), path("${assembly_id}.${chunk_id}.interproscan.tsv"), emit: interproscan_tsv
@@ -22,14 +22,10 @@ process INTERPROSCAN {
     """
     set -euo pipefail
 
-    # Strip '*' stop characters (InterProScan rejects them)
-    awk '
-      /^>/ {print; next}
-      {gsub(/\\*/, "", \$0); print}
-    ' "${protein_fasta}" > clean.nostop.fa
+    test -d '${interproscan_db}/pfam'
 
     /opt/interproscan/interproscan.sh \\
-        --input clean.nostop.fa \\
+        --input "${protein_fasta}" \\
         --output-file-base "${assembly_id}.${chunk_id}.interproscan" \\
         --cpu ${task.cpus} \\
         --formats TSV \\
@@ -59,7 +55,7 @@ process INTERPROSCAN {
 process MERGE_INTERPROSCAN {
     tag "${assembly_id}"
     label 'mergeFiles'
-    publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/functional_annotation/${assembly_id}", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), path(tsvs)
@@ -122,7 +118,9 @@ process DOWNLOAD_INTERPROSCAN_DB {
     test -n "\$topdir"
 
     # normalize folder name so Nextflow output path is deterministic
-    mv "\$topdir" "interproscan-data-${interproscan_version}"
+    if [ "\$topdir" != "interproscan-data-${interproscan_version}" ]; then
+        mv "\$topdir" "interproscan-data-${interproscan_version}"
+    fi
 
     # sanity check matches declared Nextflow output
     test -d "interproscan-data-${interproscan_version}/data"

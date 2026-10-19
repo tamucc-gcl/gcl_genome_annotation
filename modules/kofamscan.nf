@@ -8,7 +8,7 @@
 process KOFAMSCAN {
     tag "${assembly_id}:${chunk_id}"
     label 'kofamscan'
-    //publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+    //publishDir "${params.outdir}/functional_annotation/${assembly_id}", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), val(chunk_id), path(protein_fasta)
@@ -22,6 +22,9 @@ process KOFAMSCAN {
     script:
     """
     set -euo pipefail
+
+    test -d '${kofamscan_db_dir}/profiles'
+    test -s '${kofamscan_db_dir}/ko_list'
 
     exec_annotation \
         --cpu ${task.cpus} \
@@ -49,7 +52,7 @@ process KOFAMSCAN {
 process MERGE_KOFAMSCAN {
     tag "${assembly_id}"
     label 'mergeFiles'
-    publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/functional_annotation/${assembly_id}", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), path(annot_files)
@@ -61,16 +64,11 @@ process MERGE_KOFAMSCAN {
     """
     set -euo pipefail
 
-    ls -1 ${annot_files} | sort -V > annot.list
+    printf '%s\\n' ${annot_files.collect { "'${it}'" }.join(' ')} | sort -V > annot.list
 
-    first=\$(head -n 1 annot.list)
-
-    # Write header from first chunk
-    head -n 1 "\$first" > ${assembly_id}.kofamscan.tsv
-
-    # Append data rows from all chunks
+    : > ${assembly_id}.kofamscan.tsv
     while read -r f; do
-        tail -n +2 "\$f" >> ${assembly_id}.kofamscan.tsv
+        cat "\$f" >> ${assembly_id}.kofamscan.tsv
     done < annot.list
 
     sed -i '/^\\s*\$/d' ${assembly_id}.kofamscan.tsv

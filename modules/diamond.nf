@@ -9,7 +9,7 @@
 process DIAMOND {
   tag "${assembly_id}:${chunk_id}"
   label 'diamond'
-  //publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+  //publishDir "${params.outdir}/functional_annotation/${assembly_id}", mode: params.publish_dir_mode
 
   input:
   tuple val(assembly_id), val(chunk_id), path(protein_fasta)
@@ -53,7 +53,7 @@ process DIAMOND {
 
 process MERGE_DIAMOND {
     tag "${assembly_id}"
-    publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/functional_annotation/${assembly_id}", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), path(annot_files)
@@ -65,7 +65,7 @@ process MERGE_DIAMOND {
     """
     set -euo pipefail
     echo -e "qseqid\tsseqid\tstitle\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\tsstart\tsend\tevalue\tbitscore" > ${assembly_id}.diamond.tsv
-    ls -1 ${annot_files} | sort -V | while read -r f; do
+    printf '%s\\n' ${annot_files.collect { "'${it}'" }.join(' ')} | sort -V | while read -r f; do
         cat "\$f" >> ${assembly_id}.diamond.tsv
     done
     """

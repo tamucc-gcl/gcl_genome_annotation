@@ -2,6 +2,11 @@
 
 ## Current continuation plan — accepted 19 October 2026
 
+Current milestone: steps 1–3 below passed cluster and real-data acceptance.
+Step 4 is now connected using the existing five functional tools and merge/GFF
+modules; [functional cluster acceptance and the full database pilot](functional-annotation.md)
+are next. Other genome tracks and unified reporting remain subsequent work.
+
 This section supersedes conflicting choices in the historical snapshot below.
 Preparation, reference/repeats, RNA alignment, all four BRAKER evidence routes,
 optional native UTR refinement, final unfiltered QC, separate native RNA/protein

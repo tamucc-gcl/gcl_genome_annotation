@@ -1,8 +1,7 @@
 name: deepsig
 channels:
-  - bioconda
   - conda-forge
-  - defaults
+  - bioconda
 dependencies:
   - deepsig
   - protobuf >=3.20,<4

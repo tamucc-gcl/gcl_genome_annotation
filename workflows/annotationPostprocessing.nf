@@ -81,6 +81,7 @@ workflow ANNOTATION_POSTPROCESSING {
     aedReports = Channel.empty()
     selectedAnnotations = Channel.empty()
     identifiedAnnotations = Channel.empty()
+    selectedOmarkClasses = Channel.empty()
     beforeQc = Channel.empty()
     if (params.run_junction_qc) {
         JUNCTION_SUPPORT(jobs.map { aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices ->
@@ -143,6 +144,7 @@ workflow ANNOTATION_POSTPROCESSING {
                     tuple(aid,settings,genome,identity)
                 },selectedAnnotations,MODEL_ASSESSMENT.out.transcripts.join(MODEL_ASSESSMENT.out.status),beforeQc)
                 identifiedAnnotations = FINAL_STRUCTURAL_ANNOTATION.out.annotation
+                selectedOmarkClasses = FINAL_STRUCTURAL_ANNOTATION.out.omark_classes
             }
         }
     }
@@ -151,5 +153,6 @@ workflow ANNOTATION_POSTPROCESSING {
     annotation = FINALIZE_ANNOTATION.out.bundle
     selected_annotation = selectedAnnotations
     identified_annotation = identifiedAnnotations
+    omark_classes = selectedOmarkClasses
     utr_status = VALIDATE_UTR_REFINEMENT.out.status
 }

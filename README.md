@@ -12,7 +12,7 @@ the synthetic acceptance summary has not been supplied.
 ![](assets/genome_annotation_pipeline.png)
 ## Pipeline rework
 
-The new [input and taxonomy preflight](docs/foundation-preflight.md) supports two-sheet validation, global defaults, per-assembly overrides and taxonomy-derived settings. The integrated `main.nf` connects preparation, repeats, alignment, BRAKER3 prediction, optional native UTR refinement, final unfiltered QC and native RNA/protein AED. Functional annotation and model filtering have not yet been connected. Standalone entries remain available for development and testing.
+The new [input and taxonomy preflight](docs/foundation-preflight.md) supports two-sheet validation, global defaults, per-assembly overrides and taxonomy-derived settings. The integrated `main.nf` connects preparation, repeats, alignment, BRAKER3 prediction, optional native UTR refinement, QC, native RNA/protein AED, junction assessment, selection and final identifiers. [Functional annotation](docs/functional-annotation.md) now reconnects the original searches and GFF decoration to the selected identified models; cluster acceptance and the five-tool real-data pilot are pending. Other genome tracks and unified reporting remain to be reconnected. Standalone entries remain available for development and testing.
 Input-contract acceptance passed on Nextflow 23.10.1.
 
 [Protein evidence preparation](docs/protein-evidence.md) adds validated,
@@ -140,5 +140,7 @@ complete gene/transcript QC tables, native summaries and ten PNG/SVG figure grou
 Local checks pass. First run
 `python tests/validate_final_structural_cluster.py --outdir testing/final_structural_contracts_01`
 on Crest for native AGAT and cache acceptance, then use the normal sbatch with
-`-resume` for the real selected-set BUSCO/OMArk pilot. Functional annotation remains
-the next integration. `--run_finalization false` disables this increment.
+`-resume` for the real selected-set BUSCO/OMArk pilot. Cluster and real-data results
+subsequently passed. Functional annotation is now connected as described above.
+`--run_finalization false` disables this increment and also requires disabling
+functional annotation.

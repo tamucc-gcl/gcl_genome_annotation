@@ -60,6 +60,21 @@ enabled completeness metrics so the user can assess the baseline and alternative
 
 ## Implementation status
 
+19 October continuation: final identifiers, complete maps and post-filter
+AGAT/BUSCO/OMArk/structural reporting passed cluster acceptance and the real-data
+pilot. The selected set has 21,378 genes and 45,060 transcripts. BUSCO remains
+97.8% complete at reported precision; OMArk missing rose slightly from 4.09% to
+4.17%, while consistency improved. This is a filtering tradeoff to inspect.
+
+The user authorized reconnecting functional searches and merging/GFF decoration.
+The existing five search modules and product hierarchy now consume identified
+models. Accepted structural/AED/junction/TE fields are joined, all transcripts
+remain represented, and eligibility/no-hit/disabled states are explicit.
+See [functional scope and acceptance](functional-annotation.md). Local Python
+checks and Nextflow 23.10.1 parsing pass; cluster acceptance and the full database
+pilot are pending. Other genome tracks, unified reporting and end-to-end cleanup
+remain subsequent increments. Historical entries below describe earlier milestones.
+
 As of 19 October, main.nf connects preparation through prediction, UTR refinement,
 unfiltered QC, separate native AED and junction QC. Downstream model selection,
 functional annotation and unified reporting remain to be reconnected. The accepted

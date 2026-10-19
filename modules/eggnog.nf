@@ -9,10 +9,10 @@
 process EGGNOG {
   tag "${assembly_id}:${chunk_id}"
   label 'eggnog'
-  //publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+  //publishDir "${params.outdir}/functional_annotation/${assembly_id}", mode: params.publish_dir_mode
 
   input:
-  tuple val(assembly_id), val(chunk_id), path(protein_fasta)
+  tuple val(assembly_id), val(chunk_id), path(protein_fasta), val(tax_scope)
   path eggnog_db_dir
 
   output:
@@ -23,6 +23,10 @@ process EGGNOG {
   script:
   """
   set -euo pipefail
+
+  test -s "${eggnog_db_dir}/eggnog.db"
+  test -s "${eggnog_db_dir}/eggnog_proteins.dmnd"
+  test -s "${eggnog_db_dir}/eggnog.taxa.db"
 
   emapper.py \
     -i "${protein_fasta}" \\
@@ -36,7 +40,7 @@ process EGGNOG {
     --dmnd_iterate yes \\
     --dmnd_algo auto \\
     --pfam_realign none \\
-    --tax_scope "${params.eggnog_taxid}" \\
+    --tax_scope "${tax_scope}" \\
     --target_orthologs "${params.eggnog_target_orthologs}" \\
     --go_evidence "${params.eggnog_goEvidence}"
   """
@@ -57,7 +61,7 @@ process EGGNOG {
 
 process MERGE_EGGNOG {
     tag "${assembly_id}"
-    publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/functional_annotation/${assembly_id}", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), path(annot_files)
@@ -70,7 +74,7 @@ process MERGE_EGGNOG {
     set -euo pipefail
 
     # Ensure deterministic order (part_001, part_002, ...)
-    ls -1 ${annot_files} | sort -V > annot.list
+    printf '%s\\n' ${annot_files.collect { "'${it}'" }.join(' ')} | sort -V > annot.list
 
     first=\$(head -n 1 annot.list)
 
@@ -123,5 +127,8 @@ process DOWNLOAD_EGGNOG_DB {
   gunzip -f eggnog.db.gz
   tar -xzf eggnog.taxa.tar.gz && rm -f eggnog.taxa.tar.gz
   gunzip -f eggnog_proteins.dmnd.gz
+  test -s eggnog.db
+  test -s eggnog_proteins.dmnd
+  test -s eggnog.taxa.db
   """
 }

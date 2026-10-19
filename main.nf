@@ -19,9 +19,12 @@ include { INDEX_RNA_REFERENCE; ALIGN_RNA_READSET; QC_RNA_ALIGNMENT; RESOLVE_RNA_
 include { PLAN_BRAKER_INPUTS; VALIDATE_BRAKER_INPUTS; CHECK_BRAKER_SOFTWARE; BRAKER; VALIDATE_BRAKER_OUTPUTS; REPORT_BRAKER; ASSERT_BRAKER } from './modules/braker.nf'
 include { PLAN_CONNECTED_RNA_ALIGNMENT } from './modules/connectedRnaAlignment.nf'
 include { ANNOTATION_POSTPROCESSING } from './workflows/annotationPostprocessing.nf'
+include { FUNCTIONAL_ANNOTATION } from './workflows/functionalAnnotation.nf'
 
 workflow {
     if (!params.sample_sheet) error 'Provide --sample_sheet'
+    if (params.run_functional_annotation && !params.run_finalization && !params.braker_check_only)
+        error 'Functional annotation requires run_finalization=true (or disable run_functional_annotation)'
     if (params.n_rm_chunks < 1 || params.repeat_seed < 0) error 'Invalid repeat batches/seed'
     if (!(params.job_speed in [null, 's', 'q', 'qq'])) error '--job_speed must be s, q, qq or null'
     if ((params.rna_min_intron as int) < 1 || (params.rna_max_intron as int) < (params.rna_min_intron as int)) error 'Invalid RNA intron limits'
@@ -373,6 +376,11 @@ workflow {
             }
         ANNOTATION_POSTPROCESSING(postprocessing,proteinAlignmentInputs,
             REPEAT_MASK_PARALLEL.out.repeat_gff.join(teLibrarySources))
+        if (params.run_functional_annotation) {
+            FUNCTIONAL_ANNOTATION(assemblies.join(ANNOTATION_POSTPROCESSING.out.identified_annotation).map { aid,row,folder ->
+                tuple(aid,row.settings,folder)
+            },ANNOTATION_POSTPROCESSING.out.omark_classes)
+        }
     }
     REPORT_BRAKER(PLAN_BRAKER_INPUTS.out.plan, predictionResults,
         CHECK_BRAKER_SOFTWARE.out.runtime.map { aid, folder -> file("${folder}/inputs.json") }.toList(),

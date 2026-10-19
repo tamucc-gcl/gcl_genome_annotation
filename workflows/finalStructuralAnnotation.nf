@@ -37,5 +37,6 @@ workflow FINAL_STRUCTURAL_ANNOTATION {
         file("${projectDir}/py_scripts/structural_report_index.py",checkIfExists:true))
     emit:
     annotation = RENAME_GENE_MODELS.out.bundle
+    omark_classes = SELECTED_ANNOTATION_QC.out.omark_classes
     report = STRUCTURAL_QC.out.report
 }

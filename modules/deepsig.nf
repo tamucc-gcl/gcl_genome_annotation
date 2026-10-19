@@ -9,7 +9,7 @@
 process DEEPSIG {
     tag "${assembly_id}:${chunk_id}"
     label 'deepsig'
-    //publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+    //publishDir "${params.outdir}/functional_annotation/${assembly_id}", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), val(chunk_id), path(protein_fasta)
@@ -48,7 +48,7 @@ process DEEPSIG {
 process MERGE_DEEPSIG {
     tag "${assembly_id}"
     label 'mergeFiles'
-    publishDir "${params.outdir}/functional_annotation", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/functional_annotation/${assembly_id}", mode: params.publish_dir_mode
 
     input:
     tuple val(assembly_id), path(gff_files)
@@ -60,7 +60,7 @@ process MERGE_DEEPSIG {
     """
     set -euo pipefail
 
-    ls -1 ${gff_files} | sort -V > gff.list
+    printf '%s\\n' ${gff_files.collect { "'${it}'" }.join(' ')} | sort -V > gff.list
 
     first=\$(head -n 1 gff.list)
 
