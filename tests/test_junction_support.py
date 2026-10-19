@@ -26,11 +26,15 @@ class JunctionSupportContracts(unittest.TestCase):
                 dict(id='chr1',length=4,uppercase_sha256=hashlib.sha256(b'ACGT').hexdigest())])))
             bam=root/'test.bam';bam.write_bytes(b'fixture')
             request=encoded(dict(assembly_id='A',readset=dict(readset_id='R1',strandedness='forward',layout='single')))
-            pysam=MagicMock();handle=pysam.AlignmentFile.return_value.__enter__.return_value
+            pysam=MagicMock();pysam.__version__='test';handle=pysam.AlignmentFile.return_value.__enter__.return_value
             handle.references=['chr1'];handle.lengths=[4];handle.header.to_dict.return_value={'HD':{'SO':'coordinate'}}
             with patch.dict(sys.modules,{'pysam':pysam}):
                 check(genome,identity,bam,request,root/'checked.json')
                 self.assertEqual(json.loads((root/'checked.json').read_text())['reference_identity'],'ref')
+                self.assertEqual(json.loads((root/'checked.json').read_text())['orientation'],'SE')
+                bad_orientation=encoded(dict(assembly_id='A',orientation='FR',readset=dict(readset_id='R1',strandedness='forward',layout='single')))
+                with self.assertRaisesRegex(ValueError,'orientation does not match'):
+                    check(genome,identity,bam,bad_orientation,root/'bad')
                 handle.references=['other']
                 with self.assertRaisesRegex(ValueError,'dictionary'):check(genome,identity,bam,request,root/'bad')
                 genome.write_text('>chr1\nAAAA\n')

@@ -3,7 +3,7 @@ process RUN_PORTCULLIS {
     label 'portcullis'
     publishDir "${params.outdir}/qc/junctions/${aid}/readsets", mode: 'copy', overwrite: true
     input:
-    tuple val(aid), val(rid), val(request), val(strand), path(genome), path(identity), path(bam, stageAs: 'alignment.bam'), path(bai, stageAs: 'alignment.bam.csi')
+    tuple val(aid), val(rid), val(request), val(strand), val(orientation), path(genome), path(identity), path(bam, stageAs: 'alignment.bam'), path(bai, stageAs: 'alignment.bam.csi')
     path helpers
     output:
     tuple val(aid), val(rid), path("${rid}"), emit: junctions
@@ -14,7 +14,7 @@ process RUN_PORTCULLIS {
     python portcullis_inputs.py check --genome '${genome}' --identity '${identity}' --bam '${bam}' --request '${request}' --out '${rid}/inputs.json'
     portcullis --version 2>&1 | tee '${rid}/version.txt'
     portcullis prep --use_csi -t ${task.cpus} -o prep '${genome}' '${bam}' 2>&1 | tee '${rid}/prep.log'
-    portcullis junc --use_csi -t ${task.cpus} --strandedness '${strand}' --orientation UNKNOWN -o '${rid}/all' prep 2>&1 | tee '${rid}/analysis.log'
+    portcullis junc --use_csi -t ${task.cpus} --strandedness '${strand}' --orientation '${orientation}' -o '${rid}/all' prep 2>&1 | tee '${rid}/analysis.log'
     portcullis filter -t ${task.cpus} --threshold ${params.portcullis_threshold} --save_bad --intron_gff -o '${rid}/filtered' prep '${rid}/all.junctions.tab' 2>&1 | tee '${rid}/filter.log'
     python portcullis_inputs.py finish --folder '${rid}' --threshold ${params.portcullis_threshold}
     """

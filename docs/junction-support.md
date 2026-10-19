@@ -15,9 +15,20 @@ or invent a second junction filter. `--extra` and BAM filtering are not enabled.
 
 Readset analysis uses 8 CPUs, 48 GB and 48 hours by default, configured centrally
 with `portcullis_cpus`, `portcullis_memory`, `portcullis_time` and
-`portcullis_threshold`. Physical mate orientation is left UNKNOWN rather than
-assuming all supplied paired libraries are FR. Reverse/forward library strand
-maps to firststrand/secondstrand; unstranded libraries use unstranded mode.
+`portcullis_threshold`. Single-end libraries explicitly use native `SE`
+orientation. Paired libraries use `portcullis_paired_orientation` (default `FR`,
+matching the current HISAT2 mapping default; `RF`, `FF` and `UNKNOWN` are also
+accepted). Reverse/forward library strand maps to firststrand/secondstrand;
+unstranded libraries use unstranded mode. UNKNOWN orientation prevents the native
+tool from deriving read-based strand in this version, so use a known orientation
+when assessing stranded RNA. Native aggregate strand diagnostics can still label
+single-end alignments as R2; this does not change the explicit SE analysis mode.
+
+This tool environment uses Python 3.9. Portcullis 1.2.4's embedding helper calls
+`Py_GetPath()` before Python initialization; Python >=3.10 returns NULL there.
+This causes the native `basic_string: construction from null is not valid`
+failure when the filter first invokes Python. The runtime pin avoids that
+incompatibility without replacing native rules or classification.
 
 ## Outputs
 

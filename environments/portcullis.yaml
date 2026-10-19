@@ -3,7 +3,9 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - python=3.11
+  # Portcullis 1.2.4 calls Py_GetPath before initializing embedded Python.
+  # Python >=3.10 returns NULL there and crashes its native filter helper.
+  - python=3.9
   - portcullis=1.2.4
   # Portcullis builds constrain their Samtools/Python ABI. Let the solver
   # select compatible BAM libraries rather than reuse the alignment env pins.

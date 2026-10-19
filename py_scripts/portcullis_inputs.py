@@ -7,6 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import sys
 
 from prepare_protein_evidence import checksum
 from reference_repeats import fasta
@@ -28,6 +29,9 @@ def check(genome, identity, bam, request, output):
         raise ValueError('Unsafe/missing readset identity')
     if row['strandedness'] not in ('forward','reverse','unstranded') or row['layout'] not in ('paired','single'):
         raise ValueError('Portcullis requires resolved library strand and layout')
+    orientation=request.get('orientation','SE' if row['layout']=='single' else 'FR')
+    if orientation not in (('SE',) if row['layout']=='single' else ('FR','RF','FF','UNKNOWN')):
+        raise ValueError('Portcullis orientation does not match read layout')
     reference=json.loads(Path(identity).read_text())
     contigs=[dict(id=h.split()[0],length=len(s),uppercase_sha256=hashlib.sha256(s.upper().encode('ascii')).hexdigest())
              for h,s in fasta(genome)]
@@ -40,6 +44,7 @@ def check(genome, identity, bam, request, output):
             raise ValueError('Portcullis requires coordinate-sorted BAMs')
         handle.check_index()
     dump(output,dict(status='ready',assembly_id=request['assembly_id'],readset=row,
+        orientation=orientation,python_version=sys.version.split()[0],pysam_version=pysam.__version__,
         reference_identity=reference['reference_identity'],bam_bytes=Path(bam).stat().st_size,
         input_validation_scope='Accepted genome sequence identity and BAM dictionary, sort header and readable index; Nextflow manages BAM file identity/staging'))
 

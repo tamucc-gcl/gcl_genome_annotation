@@ -10,6 +10,8 @@ workflow JUNCTION_SUPPORT {
     main:
     if (params.portcullis_threshold < 0 || params.portcullis_threshold > 1)
         error 'portcullis_threshold must be between 0 and 1'
+    if (!(params.portcullis_paired_orientation in ['FR','RF','FF','UNKNOWN']))
+        error 'portcullis_paired_orientation must be FR, RF, FF or UNKNOWN'
     RUN_PORTCULLIS(alignments.flatMap { aid,readsets,genome,identity,bams,indices ->
         if (readsets.size() != bams.size() || bams.size() != indices.size())
             error "Portcullis readset/BAM count mismatch for ${aid}"
@@ -20,8 +22,9 @@ workflow JUNCTION_SUPPORT {
         readsets.withIndex().collect { row,i ->
             def strand = [reverse:'firststrand',forward:'secondstrand',unstranded:'unstranded'][row.strandedness]
             if (!strand) error "Unresolved Portcullis library strand: ${aid}/${row.readset_id}"
-            def request = groovy.json.JsonOutput.toJson([assembly_id:aid,readset:row]).getBytes('UTF-8').encodeBase64().toString()
-            tuple(aid,row.readset_id,request,strand,genome,identity,bams[i],indices[i])
+            def orientation = row.layout == 'single' ? 'SE' : params.portcullis_paired_orientation
+            def request = groovy.json.JsonOutput.toJson([assembly_id:aid,readset:row,orientation:orientation]).getBytes('UTF-8').encodeBase64().toString()
+            tuple(aid,row.readset_id,request,strand,orientation,genome,identity,bams[i],indices[i])
         }
     },['portcullis_inputs.py','reference_repeats.py','prepare_protein_evidence.py'].collect {
         file("${projectDir}/py_scripts/${it}", checkIfExists:true)
