@@ -18,6 +18,17 @@ The existing per-assembly/global settings control `run_trnascan`, `run_infernal`
 each assembly's preflight-resolved `telomere_motif`, rather than a shared fallback.
 Window/count/end-distance settings remain in the single `nextflow.config`.
 
+The first full-genome centroAnno pilot was SIGKILLed three times after reaching
+203–221 GiB RSS despite a 16 GB request. Accounting did not report `OUT_OF_MEMORY`,
+so this strongly suggests memory pressure without establishing the kill source.
+The default now reserves a whole Crest normal node (`centromere_cpus=64`,
+`centromere_memory='300 GB'`) while running at most `centromere_threads=8` native
+threads. Tool threads are capped by the allocated CPUs, so small acceptance jobs
+still use two. These are configurable resource settings, not a verified memory
+cap or guarantee of completion; the updated real-genome pilot remains pending.
+The label terminates on failure rather than repeating identical memory-heavy
+attempts. Other clusters can reduce the allocation through these same parameters.
+
 `--rfam_database /work/birdlab/databases/rfam` is the **store parent**, containing
 `rfam_db/Rfam.cm`, `Rfam.clanin` and `Rfam.cm.i1f`, `.i1i`, `.i1m`, `.i1p`.
 The user confirmed this existing layout. Nextflow's native `storeDir` reuses it

@@ -54,6 +54,9 @@ process CENTROMERE_ANNOTATION {
         emit: hor_fa
 
     script:
+    // Allocation can reserve the node without multiplying decomposition memory by 64 threads.
+    def threads = Math.min(task.cpus as int, params.centromere_threads as int)
+    if (threads < 1) error 'centromere_cpus and centromere_threads must be positive'
     """
     set -euo pipefail
 
@@ -62,7 +65,7 @@ process CENTROMERE_ANNOTATION {
         ${assembly} \\
         -o ${assembly_id}_centroanno \\
         -G true \\
-        -t ${task.cpus}
+        -t ${threads}
 
     # ── Concatenate per-scaffold outputs into single files ────────────────────
     #   centroAnno creates per-sequence subdirectories under the output dir.
