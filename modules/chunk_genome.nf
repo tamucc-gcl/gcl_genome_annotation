@@ -35,6 +35,7 @@ process CHUNK_GENOME {
 
     output:
     tuple val(assembly_id), path("${assembly_id}_genome_chunks/chunk_*.fa"), emit: chunks
+    tuple val(assembly_id), path("seq_lengths.tsv"), emit: lengths
 
     script:
     """
@@ -103,6 +104,7 @@ process CHUNK_GENOME {
     stub:
     """
     mkdir -p ${assembly_id}_genome_chunks
+    touch seq_lengths.tsv
     for i in \$(seq 0 \$((${params.n_infernal_chunks} - 1))); do
         printf -v pad "%03d" "\$i"
         touch "${assembly_id}_genome_chunks/chunk_\${pad}.fa"

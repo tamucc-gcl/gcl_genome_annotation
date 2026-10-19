@@ -9,7 +9,9 @@
 process AGAT {
     tag "${assembly_id}"
     label 'agat'
-    publishDir "${params.outdir}/qc/${task.ext.qc_stage ?: 'baseline'}/${assembly_id}/agat", mode: params.publish_dir_mode
+    // Preserve the standalone UTR pilot's layout without a global selector for
+    // its development-only alias. Main uses the final/selected QC scopes.
+    publishDir "${params.outdir}/qc/${task.ext.qc_stage ?: (task.process == 'UTR_AGAT' ? 'utr' : 'baseline')}/${assembly_id}/agat", mode: params.publish_dir_mode
     
     input:
     tuple val(assembly_id), path(assembly_path), path(gff)

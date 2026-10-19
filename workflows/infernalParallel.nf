@@ -64,7 +64,12 @@ workflow INFERNAL_PARALLEL {
         }
 
     // ── Step 4: Run cmscan per chunk ─────────────────────────────────────
-    INFERNAL(ch_genome_chunks, rfam_database)
+    // cmscan E-values use the full assembly search space (both strands), even in chunks.
+    ch_search_space = CHUNK_GENOME.out.lengths.map { aid,lengths ->
+        def bases = new File(lengths.toString()).readLines().sum { it.tokenize('\t')[-1] as long }
+        tuple(aid, bases * 2.0 / 1000000.0)
+    }
+    INFERNAL(ch_genome_chunks.combine(ch_search_space,by:0), rfam_database)
 
     // ── Step 5: Join per-chunk results, group with dynamic size, merge ───
     //   First join all three output types per (assembly_id, chunk_id),

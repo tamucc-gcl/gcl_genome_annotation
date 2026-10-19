@@ -32,16 +32,18 @@ process tRNASCAN {
 
     script:
     """
+    set -euo pipefail
     tRNAscan-SE \
         --thread ${task.cpus} \
-        --eukaryotic \
-        --isotype \
+        -E \
         --detail \
         --output ${assembly_id}.trnascan.tsv \
         --gff ${assembly_id}.trnascan.gff3 \
         --fasta ${assembly_id}.trnascan.fa \
         --bed ${assembly_id}.trnascan.bed \
         ${masked_assembly}
+    # Native successful no-hit runs may omit these optional files.
+    touch ${assembly_id}.trnascan.gff3 ${assembly_id}.trnascan.fa ${assembly_id}.trnascan.bed ${assembly_id}.trnascan.tsv
     """
 
     stub:

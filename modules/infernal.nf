@@ -15,7 +15,7 @@ process INFERNAL {
     //publishDir "${params.outdir}/ncRNA/chunks", mode: params.publish_dir_mode
 
     input:
-    tuple val(assembly_id), val(chunk_id), path(masked_chunk)
+    tuple val(assembly_id), val(chunk_id), path(masked_chunk), val(search_space_mb)
     path rfam_database
 
     output:
@@ -25,8 +25,13 @@ process INFERNAL {
 
     script:
     """
+    set -euo pipefail
+    for required in Rfam.cm Rfam.clanin Rfam.cm.i1f Rfam.cm.i1i Rfam.cm.i1m Rfam.cm.i1p; do
+        test -s "${rfam_database}/\$required"
+    done
     cmscan \
         --cpu ${task.cpus} \
+        -Z ${search_space_mb} \
         --cut_ga \
         --rfam \
         --nohmmonly \
@@ -37,7 +42,7 @@ process INFERNAL {
         ${masked_chunk} > ${assembly_id}.${chunk_id}_rfam.cmscan
 
     perl ${projectDir}/perl_scripts/infernal-tblout2gff.pl \
-        --fmt2 \
+        --fmt2 --all \
         --cmscan ${assembly_id}.${chunk_id}_rfam.tblout > ${assembly_id}.${chunk_id}_rfam.gff3
     """
 

@@ -20,6 +20,7 @@ include { PLAN_BRAKER_INPUTS; VALIDATE_BRAKER_INPUTS; CHECK_BRAKER_SOFTWARE; BRA
 include { PLAN_CONNECTED_RNA_ALIGNMENT } from './modules/connectedRnaAlignment.nf'
 include { ANNOTATION_POSTPROCESSING } from './workflows/annotationPostprocessing.nf'
 include { FUNCTIONAL_ANNOTATION } from './workflows/functionalAnnotation.nf'
+include { GENOME_TRACKS } from './workflows/genomeTracks.nf'
 
 workflow {
     if (!params.sample_sheet) error 'Provide --sample_sheet'
@@ -329,6 +330,10 @@ workflow {
         RESOLVE_RNA_STRAND.out.strand.map { aid, rid, path -> path }.toList(), alignmentBamLocations, alignmentLogs,
         [alignmentHelper, file("${projectDir}/py_scripts/report_rna_alignment.py", checkIfExists: true)])
     ASSERT_RNA_ALIGNMENT(REPORT_RNA_ALIGNMENT.out.status)
+    // Independent genome tracks reuse native reference channels; no prediction dependency.
+    if (!params.braker_check_only) GENOME_TRACKS(preparedReferences.join(assemblies).join(FILTER_ASSEMBLY.out.bundle).map { aid,genome,state,row,folder ->
+        tuple(aid,row.settings,genome,file("${folder}/${aid}.contigs.json",checkIfExists:true))
+    },REPEAT_MASK_PARALLEL.out.masked_fasta)
     // Gene prediction: join scientific files by assembly, never read asynchronous publishDir outputs.
     PLAN_BRAKER_INPUTS(RESOLVE_ANNOTATION_INPUTS.out.bundle, REPORT_REFERENCE_REPEATS.out.status,
         REPORT_PROTEIN_EVIDENCE.out.status, REPORT_RNA_ALIGNMENT.out.status, brakerHelpers)

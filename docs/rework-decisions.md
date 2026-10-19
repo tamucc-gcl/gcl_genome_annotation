@@ -60,6 +60,26 @@ enabled completeness metrics so the user can assess the baseline and alternative
 
 ## Implementation status
 
+Remaining genome tracks are reconnected in `main.nf` using their original modules:
+tRNAscan-SE, parallel Infernal/Rfam, tidk and centroAnno. Resolved assembly flags
+and motifs are honored, references use native filtered/masked channels, and the
+confirmed shared Rfam store is reused. Validated separate GFF3 tracks and Markdown
+summaries are published under `genome_tracks/<assembly_id>`. Source inspection
+required corrections to tRNAscan options, tidk window-end interpretation and
+centroAnno 1.0.2's assembly flag/inclusive end coordinates. Native cluster acceptance
+and the real-genome pilot remain pending; final combined-track packaging/unified
+reporting follow that acceptance. See [scope and test command](genome-tracks.md).
+
+The user supplied successful full-data functional outputs: all five tools
+completed on 45,060 transcripts and 21,378 genes. The supplied merged-table
+checksum and per-tool counts match functional_status.json, and the gene product
+table covers exactly the same gene set. The run reports 43,979 named transcripts,
+1,081 hypothetical transcripts, no model removal and unchanged coding structure.
+DeepSig container execution is now confirmed on Crest. Native annotated GFF
+geometry was validated by the pipeline; that GFF was not supplied for an
+independent local recheck. The normal pipeline's obsolete UTR_AGAT selector was
+removed; standalone UTR pilot publication remains supported by the AGAT module.
+
 Functional cluster acceptance subsequently passed in
 `testing/functional_contracts_02`: unit/main-syntax checks, recovery, unchanged
 resume, report-only changes, fresh-project shared-index reuse, no hits and disabled
