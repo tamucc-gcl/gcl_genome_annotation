@@ -110,7 +110,9 @@ def main():
         for name in ('main.nf','junction_qc.nf','nextflow.config'):shutil.copy2(ROOT/name,pipeline/name)
         probe=subprocess.run(['nextflow','-C',str(pipeline/'nextflow.config'),'run',str(pipeline/'main.nf')],cwd=pipeline,capture_output=True,text=True)
         (root/'main_syntax.console.log').write_text(probe.stdout+probe.stderr)
-        if probe.returncode==0 or 'Provide --sample_sheet' not in probe.stdout+probe.stderr:raise RuntimeError('main.nf syntax/input guard failed')
+        if probe.returncode==0 or 'Provide --sample_sheet' not in probe.stdout+probe.stderr:
+            raise RuntimeError('main.nf syntax/input guard failed; inspect '+str(root/'main_syntax.console.log')+
+                               '\n'+(probe.stdout+probe.stderr)[-6000:])
         summary['checks'].append(dict(case='main_syntax',passed=True))
         execute(['nextflow','-C',str(ROOT/'nextflow.config'),'run',str(ROOT/'tests/utr_fixture_bams.nf'),'-profile','slurm',
             '--fixture_sams',str(root/'sams'),'--outdir',str(root/'accepted'),'-w',str(root/'bam_work'),'-resume'],root,root/'bam_fixture.console.log')

@@ -17,7 +17,12 @@ workflow JUNCTION_SUPPORT {
             error "Duplicate Portcullis readset for ${aid}"
         if (!(aid ==~ /[A-Za-z0-9][A-Za-z0-9_.-]*/) || readsets.any { !(it.readset_id ==~ /[A-Za-z0-9][A-Za-z0-9_.-]*/) })
             error 'Portcullis assembly/readset IDs must be safe file identifiers'
-        readsets.withIndex().collect { row,i -> tuple(aid,row.readset_id,row,genome,identity,bams[i],indices[i]) }
+        readsets.withIndex().collect { row,i ->
+            def strand = [reverse:'firststrand',forward:'secondstrand',unstranded:'unstranded'][row.strandedness]
+            if (!strand) error "Unresolved Portcullis library strand: ${aid}/${row.readset_id}"
+            def request = groovy.json.JsonOutput.toJson([assembly_id:aid,readset:row]).getBytes('UTF-8').encodeBase64().toString()
+            tuple(aid,row.readset_id,request,strand,genome,identity,bams[i],indices[i])
+        }
     },['portcullis_inputs.py','reference_repeats.py','prepare_protein_evidence.py'].collect {
         file("${projectDir}/py_scripts/${it}", checkIfExists:true)
     })
@@ -27,7 +32,8 @@ workflow JUNCTION_SUPPORT {
         aid,readsets,genome,identity,bams,indices -> tuple(aid,readsets,identity)
     }).combine(nativeRows).map { aid,gff,validation,readsets,identity,rows ->
         def selected = rows.findAll { it[0] == aid }.sort { a,b -> a[1] <=> b[1] }
-        tuple(aid,readsets,gff,validation,identity,selected.collect { it[2] })
+        def request = groovy.json.JsonOutput.toJson([assembly_id:aid,readsets:readsets]).getBytes('UTF-8').encodeBase64().toString()
+        tuple(aid,request,gff,validation,identity,selected.collect { it[2] })
     },['junction_support.py','portcullis_inputs.py','evidence_aed.py','reference_repeats.py','prepare_protein_evidence.py'].collect {
         file("${projectDir}/py_scripts/${it}", checkIfExists:true)
     })

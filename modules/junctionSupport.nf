@@ -3,14 +3,11 @@ process RUN_PORTCULLIS {
     label 'portcullis'
     publishDir "${params.outdir}/qc/junctions/${aid}/readsets", mode: 'copy', overwrite: true
     input:
-    tuple val(aid), val(rid), val(metadata), path(genome), path(identity), path(bam, stageAs: 'alignment.bam'), path(bai, stageAs: 'alignment.bam.csi')
+    tuple val(aid), val(rid), val(request), val(strand), path(genome), path(identity), path(bam, stageAs: 'alignment.bam'), path(bai, stageAs: 'alignment.bam.csi')
     path helpers
     output:
     tuple val(aid), val(rid), path("${rid}"), emit: junctions
     script:
-    def strand = [reverse:'firststrand',forward:'secondstrand',unstranded:'unstranded'][metadata.strandedness]
-    if (!strand) error "Unresolved Portcullis library strand: ${aid}/${rid}"
-    def request = groovy.json.JsonOutput.toJson([assembly_id:aid,readset:metadata]).getBytes('UTF-8').encodeBase64().toString()
     """
     set -euo pipefail
     mkdir '${rid}'
@@ -28,7 +25,7 @@ process REPORT_JUNCTION_SUPPORT {
     label 'aed_python'
     publishDir "${params.outdir}/qc/junctions/${aid}", mode: 'copy', overwrite: true
     input:
-    tuple val(aid), val(readsets), path(gff), path(validation), path(identity), path(bundles, stageAs: 'readsets/*')
+    tuple val(aid), val(request), path(gff), path(validation), path(identity), path(bundles, stageAs: 'readsets/*')
     path helpers
     output:
     tuple val(aid), path('junction_status.json'), emit: status
@@ -36,7 +33,6 @@ process REPORT_JUNCTION_SUPPORT {
     tuple val(aid), path('junction_support.tsv'), emit: junctions
     tuple val(aid), path('README.md'), emit: report
     script:
-    def request = groovy.json.JsonOutput.toJson([assembly_id:aid,readsets:readsets]).getBytes('UTF-8').encodeBase64().toString()
     def paths = bundles instanceof Collection ? bundles : [bundles]
     def options = paths.collect { "--readset '${it}'" }.join(' ')
     """
