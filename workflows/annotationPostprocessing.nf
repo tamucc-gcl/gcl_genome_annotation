@@ -4,6 +4,7 @@ include { ASSEMBLE_AED_RNA; MERGE_AED_RNA; ALIGN_AED_PROTEINS } from '../modules
 include { FINALIZE_ANNOTATION; REPORT_FINAL_AED } from '../modules/finalAnnotation.nf'
 include { PREPARE_INGENANNOT_EVIDENCE; RUN_INGENANNOT_AED } from '../modules/ingenannotBenchmark.nf'
 include { ANNOTATION_BASELINE as FINAL_ANNOTATION_QC } from './annotationBaseline.nf'
+include { JUNCTION_SUPPORT } from './junctionSupport.nf'
 
 workflow ANNOTATION_POSTPROCESSING {
     take:
@@ -68,6 +69,13 @@ workflow ANNOTATION_POSTPROCESSING {
     },['final_annotation_inputs.py','prepare_protein_evidence.py'].collect {
         file("${projectDir}/py_scripts/${it}", checkIfExists: true)
     })
+    if (params.run_junction_qc) {
+        JUNCTION_SUPPORT(jobs.map { aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices ->
+            tuple(aid,readsets,genome,identity,bams,indices)
+        },FINALIZE_ANNOTATION.out.bundle.map { aid,folder ->
+            tuple(aid,file("${folder}/${aid}.gff3"),file("${folder}/annotation_status.json"))
+        })
+    }
     if (params.run_baseline_qc) {
         FINAL_ANNOTATION_QC(jobs.join(FINALIZE_ANNOTATION.out.bundle).map {
             aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices,folder ->

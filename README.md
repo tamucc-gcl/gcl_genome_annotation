@@ -100,3 +100,11 @@ connected cluster acceptance remains pending. `--utr_refine false`,
 `--run_baseline_qc false` and `--run_aed false` disable the respective optional
 work. The default RNA AED profile assesses coding support, not UTR boundary
 quality. See [the InGenAnnot guide](docs/ingenannot.md) for safeguards and scope.
+
+[Portcullis junction QC](docs/junction-support.md) now reports exact splice-junction
+support for the accepted final annotation under `qc/junctions/<assembly>/`.
+Readsets are analyzed separately, with coding and UTR-associated junction summaries.
+This report-only stage does not filter BAMs/models or change AED. It is enabled
+by default for main runs; `--run_junction_qc false` disables it. Before the first
+real-data run, execute `python tests/validate_junctions_cluster.py --outdir testing/junction_contracts_01`
+on Crest. The tiny native-tool acceptance and full-data pilot remain pending.

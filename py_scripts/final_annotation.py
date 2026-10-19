@@ -46,6 +46,7 @@ def aed(gff,annotated,identity,inputs,cds_only,penalty,outdir):
         'CDS-only RNA assessment measures coding support, not UTR boundary quality. '
         'Lower AED means closer agreement with selected evidence; it is not a probability of correctness.\n\n'
         '[Scores](aed_scores.tsv) | [Settings and validation](aed_status.json) | [Native output](native/native.aed.gff3)\n\n'
+        '[RNA junction support](../../../qc/junctions/'+str(accepted.get('assembly_id') or Path(gff).stem)+'/README.md) (when enabled).\n\n'
         f"Repeated identical exon records differ for {len(accepted['native_exon_record_normalizations'])} transcripts in the native export; counts are audited in the status JSON. "
         'Exact unique exon boundaries, CDS records and coding phases are preserved.\n\n'
         'Assessment does not replace or edit the accepted final GFF3. Filtering is disabled by default; '

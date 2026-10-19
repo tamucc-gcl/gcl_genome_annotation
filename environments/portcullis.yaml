@@ -1,0 +1,9 @@
+name: portcullis
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - portcullis=1.2.4
+  - samtools=1.21
+  - pysam=0.22.1
