@@ -44,7 +44,9 @@ process FILTER_GENOME_TRACK {
     tuple val(aid), val(track), path("${aid}.${track}.gff3"), path("${track}.status.json"), path("${track}_filter"), emit: filtered
     script:
     def encoded=groovy.json.JsonOutput.toJson(policy).getBytes('UTF-8').encodeBase64().toString()
-    def extra=aux.collect { "'${it}'" }.join(' ')
+    // A one-file path input is a TaskPath (itself iterable by path component).
+    def auxiliaryFiles=aux instanceof Collection ? aux : [aux]
+    def extra=auxiliaryFiles.collect { "'${it}'" }.join(' ')
     """
     python filter_genome_tracks.py --aid '${aid}' --track '${track}' --source '${source}' --identity '${identity}' \
       --native-status '${raw_status}' --policy '${encoded}' --aux ${extra} --outdir .
@@ -64,7 +66,8 @@ process REPORT_GENOME_TRACKS {
     path('README.md'), emit: readme
     script:
     def encoded = groovy.json.JsonOutput.toJson(settings).getBytes('UTF-8').encodeBase64().toString()
-    def arguments = statuses.collect { "'${it}'" }.join(' ')
+    def statusFiles=statuses instanceof Collection ? statuses : [statuses]
+    def arguments = statusFiles.collect { "'${it}'" }.join(' ')
     """
     python report_genome_tracks.py --aid '${aid}' --settings '${encoded}' --identity '${identity}' --statuses ${arguments} --outdir .
     """
