@@ -538,3 +538,18 @@ outputs and baseline QC remain intact. Native ranking uses stable approved input
 values so report-helper edits do not force reranking. Local validation tests pass;
 native cluster UTR tests and real-extension review are pending. Final native AED
 rescoring and main.nf promotion follow those checks.
+
+## Genome-track post-search QC (2026-10-20)
+
+The user authorized configurable telomere density/end-distance filtering and
+similar QC for the other genome tracks. Selected GFF3 files are the defaults;
+validated raw features and native outputs remain accessible. Telomeres use
+per-window density >=0.50 before merging and a merged-region end gap <=10 kb.
+These are adjustable heuristics. tRNAs reuse EukHighConfidenceFilter's native
+high-confidence class; Rfam reuses native inclusion and overlap annotations;
+centroAnno uses existing identity >=0.80 and high-confidence HOR fields.
+No additional caller, tool upgrade, HTML report or functional-centromere claim
+is introduced. Filter changes are downstream of searches for cache reuse.
+tRNAscan-SE must rerun once to emit native score breakdown/structures.
+Local unit/syntax/routing checks pass; the new native filtering acceptance and
+real-genome QC review remain pending. See docs/genome-tracks.md for policies.

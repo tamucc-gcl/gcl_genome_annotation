@@ -29,6 +29,7 @@ process tRNASCAN {
     tuple val(assembly_id), path("${assembly_id}.trnascan.fa"),              emit: trnascan_fa
     tuple val(assembly_id), path("${assembly_id}.trnascan.bed"), emit: trnascan_bed
     tuple val(assembly_id), path("${assembly_id}.trnascan.tsv"), emit: trnascan_tsv
+    tuple val(assembly_id), path("${assembly_id}.trnascan.tsv"), path("${assembly_id}.trnascan.ss"), emit: confidence_inputs
 
     script:
     """
@@ -37,13 +38,15 @@ process tRNASCAN {
         --thread ${task.cpus} \
         -E \
         --detail \
+        --breakdown \
+        --struct ${assembly_id}.trnascan.ss \
         --output ${assembly_id}.trnascan.tsv \
         --gff ${assembly_id}.trnascan.gff3 \
         --fasta ${assembly_id}.trnascan.fa \
         --bed ${assembly_id}.trnascan.bed \
         ${masked_assembly}
     # Native successful no-hit runs may omit these optional files.
-    touch ${assembly_id}.trnascan.gff3 ${assembly_id}.trnascan.fa ${assembly_id}.trnascan.bed ${assembly_id}.trnascan.tsv
+    touch ${assembly_id}.trnascan.gff3 ${assembly_id}.trnascan.fa ${assembly_id}.trnascan.bed ${assembly_id}.trnascan.tsv ${assembly_id}.trnascan.ss
     """
 
     stub:
@@ -52,5 +55,6 @@ process tRNASCAN {
     touch ${assembly_id}.trnascan.fa
     touch ${assembly_id}.trnascan.bed
     touch ${assembly_id}.trnascan.tsv
+    touch ${assembly_id}.trnascan.ss
     """
 }

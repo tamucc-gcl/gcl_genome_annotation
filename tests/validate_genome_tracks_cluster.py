@@ -47,17 +47,17 @@ def fixtures(root):
     unit=''.join(rng.choice('ACGT') for _ in range(171))
     rna='GCGCGC'+'GCGGAUUUAGCUCAGUUGGGAGAGCGCCAGACUGAAGAUCUGGAGGUCCUGUGUUCGAUCCACAGAAUUCGCA'+'GCGCGC'
     rows=[]
-    for aid,motif in (('A','TTAGGG'),('B','TTAGG'),('C','TTAGGG'),('D','TTAGGG')):
+    for aid,motif in (('A','TTAGGG'),('B','TTAGG'),('C','TTAGGG'),('D','TTAGGG'),('E','TTAGGG')):
         source=folder/f'{aid}.source.fa'
-        source.write_text('>chr1\n'+motif*60+unit*150+rna.replace('U','T')+motif*60+'\n>short\n'+'AC'*100+'\n')
-        if aid=='D':source.write_text('>chr1\n'+'AC'*100+'\n')
+        source.write_text('>chr1\n'+motif*300+unit*150+rna.replace('U','T')+motif*300+'\n>short\n'+'AC'*100+'\n')
+        if aid in 'DE':source.write_text('>chr1\n'+'AC'*100+'\n')
         bundle=folder/aid
         state=reference(source,aid,0,bundle)
         assert state['status']=='ready',f'{aid}: fixture reference failed: {state}'
         shutil.copy2(bundle/f'{aid}.filtered.fasta',folder/f'{aid}.fa')
         shutil.copy2(bundle/f'{aid}.filtered.fasta',folder/f'{aid}.masked.fa')
         shutil.copy2(bundle/f'{aid}.contigs.json',folder/f'{aid}.json')
-        rows.append(dict(assembly_id=aid,settings={**{'run_'+t:aid in 'AB' or (aid=='D' and t=='telomere') for t in ('trnascan','infernal','telomere','centromere')},'telomere_motif':motif}))
+        rows.append(dict(assembly_id=aid,settings={**{'run_'+t:aid in 'AB' or (aid=='D' and t=='telomere') or (aid=='E' and t=='trnascan') for t in ('trnascan','infernal','telomere','centromere')},'telomere_motif':motif}))
     dump(folder/'assemblies.json',rows)
     (folder/'model.sto').write_text('# STOCKHOLM 1.0\n#=GF ID Test_RNA\n#=GF AC RF99999\n#=GF GA 5.0\ns1 '+rna+'\n#=GC SS_cons '+'('*6+'.'*(len(rna)-12)+')'*6+'\n//\n')
 
@@ -71,6 +71,8 @@ def run_case(root,name,resume=False):
         '--telomere_end_window','1000','--outdir',str(case/'results')]
     if resume:command+=['-resume']
     if name=='disabled':command+=['--genome_tracks_test_disabled','true']
+    if name=='filter_change':command+=['--telomere_filter_min_density','0.8','--telomere_filter_max_end_distance','2000']
+    if name=='filters_disabled':command+=['--telomere_filter','false','--trna_filter','false','--ncrna_filter','false','--centromere_filter','false']
     print(f'Running genome tracks ({name}; actual tRNAscan/Infernal/tidk/centroAnno)...',flush=True)
     execute(command,case,case/f'{name}.console.log')
     with (case/'results/pipeline/pipeline_trace.txt').open() as h:tasks=list(csv.DictReader(h,delimiter='\t'))
@@ -79,19 +81,24 @@ def run_case(root,name,resume=False):
     else:
         for tool in scientific:
             matches=[r for r in tasks if task_process(r)==tool]
-            assert len(matches)==(4 if tool=='INFERNAL' else 3 if tool=='TELOMERE_ANNOTATION' else 2),(tool,matches)
+            assert len(matches)==(4 if tool=='INFERNAL' else 3 if tool in ('TELOMERE_ANNOTATION','tRNASCAN') else 2),(tool,matches)
         if name in ('resume','report_change','reenabled'):
             for task in tasks:
                 if name=='report_change' and 'REPORT_GENOME_TRACKS' in task['name']:continue
                 assert task['status']=='CACHED',task
-    for aid in 'ABCD':
+        if name in ('filter_change','filters_disabled'):
+            for task in tasks:
+                if task_process(task) in scientific:assert task['status']=='CACHED',f'Filter change reran search: {task}'
+    expected={row['assembly_id']:row['settings'] for row in json.loads((root/'fixtures/assemblies.json').read_text())}
+    for aid in 'ABCDE':
         folder=case/f'results/genome_tracks/{aid}'
         state=json.loads((folder/'genome_tracks_status.json').read_text())
         assert state['status']=='ready',f'{aid}: genome tracks not ready: {state}'
         disabled=name=='disabled' or aid=='C'
-        assert all(s['status']==('disabled' if disabled or (aid=='D' and t!='telomere') else 'ready') for t,s in state['tracks'].items()),f'{aid}: unexpected enabled/disabled states in {folder}: {state}'
+        assert all(s['status']==('disabled' if name=='disabled' or not expected[aid]['run_'+t] else 'ready') for t,s in state['tracks'].items()),f'{aid}: unexpected enabled/disabled states in {folder}: {state}'
         if aid=='D' and not disabled:assert state['tracks']['telomere']['features']==0,state
-        if not disabled and aid!='D':
+        if aid=='E' and not disabled:assert state['tracks']['trnascan']['features']==0,state
+        if not disabled and aid in 'AB':
             check_centromere_mode(case/f'results/centromere/{aid}.centroanno.log')
             assert state['tracks']['telomere']['features']>=1,state
             check_telomere_ends(folder,aid,root/'fixtures'/f'{aid}.json',state['settings']['telomere_motif'])
@@ -99,6 +106,13 @@ def run_case(root,name,resume=False):
             for track in state['tracks']:
                 path=folder/f'{aid}.{track}.gff3'
                 assert path.is_file(),f'{aid}/{track}: missing or broken published GFF3: {path} (target: {path.resolve()})'
+                assert (folder/'raw'/path.name).is_file(),f'Missing preserved raw track: {path.name}'
+                assert (folder/f'{track}_filter/decisions.tsv').is_file(),f'Missing {track} audit'
+            if name=='filters_disabled':
+                assert all(not t['filter_policy']['enabled'] and t['features']==t['raw_features'] for t in state['tracks'].values()),state
+            if name=='filter_change':
+                policy=state['tracks']['telomere']['filter_policy']
+                assert float(policy['min_density'])==0.8 and int(policy['max_end_distance'])==2000,policy
         assert not list(folder.glob('*.html')),f'{aid}: unexpected pipeline-written HTML: {list(folder.glob("*.html"))}'
     print('PASS: '+name,flush=True);return dict(case=name,passed=True)
 
@@ -108,7 +122,8 @@ def main():
     if sys.flags.optimize:p.error('Run without -O')
     root=Path(a.outdir).resolve();root.mkdir(parents=True,exist_ok=True)
     if any(root.iterdir()) and not a.resume:p.error('--outdir must be empty')
-    summary=dict(status='failed',checks=[],scope='Actual tRNAscan-SE, synthetic calibrated Infernal CM, tidk and centroAnno 1.0.2; two assemblies/motifs, fewer contigs than requested chunks, disabled/no-hit tracks, coordinates/IDs, resume/report-only cache; no BRAKER, mapping, repeats or functional searches; full Rfam/genome pilot pending.')
+    if a.resume and not (root/'fixtures/E.json').is_file():p.error('These filter fixtures require a new --outdir; this directory predates the no-hit tRNA case')
+    summary=dict(status='failed',checks=[],scope='Actual tRNAscan-SE/EukHighConfidenceFilter, synthetic calibrated Infernal CM, tidk and centroAnno 1.0.2; native confidence and configurable track QC, raw/selected audits, two motifs, no-hit/disabled tracks and filters, threshold/report/resume cache; no BRAKER, mapping, repeats or functional searches; full-genome QC pilot pending.')
     try:
         execute([sys.executable,'-m','unittest','discover','-s',str(ROOT/'tests'),'-p','test_*.py'],ROOT,root/'unit_tests.log')
         summary['checks'].append(dict(case='unit_tests',passed=True))
@@ -135,6 +150,8 @@ def main():
         summary['checks'].append(run_case(root,'disabled',True))
         # Re-enable from cached results after the disabled report occupied the same path.
         summary['checks'].append(run_case(root,'reenabled',True))
+        summary['checks'].append(run_case(root,'filter_change',True))
+        summary['checks'].append(run_case(root,'filters_disabled',True))
         summary['status']='passed'
     except Exception as exc:
         details=traceback.format_exc()
