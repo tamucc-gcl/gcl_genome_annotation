@@ -8,11 +8,18 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'py_scripts'))
 from genome_tracks import TRACKS, centromeres, normalize, telomeres
 from report_genome_tracks import report
-from validate_genome_tracks_cluster import task_process, fixtures, check_telomere_ends
+from validate_genome_tracks_cluster import task_process, fixtures, check_telomere_ends, check_centromere_mode
 from reference_repeats import fasta
 
 
 class GenomeTracksTests(unittest.TestCase):
+    def test_centromere_native_mode_guard_rejects_satellite_only_run(self):
+        log=self.root/'centroanno.log'
+        log.write_text('scaffold_1 Length: 40125647\nClustering is over, there are 59 templates.\nParse bad regions...\n')
+        with self.assertRaisesRegex(AssertionError,'assembly-region scan not found'):check_centromere_mode(log)
+        log.write_text('Detecting tandem repeat regions in the genome...\nDetecting end.\nThere are 2 regions.\n')
+        check_centromere_mode(log)
+
     def test_satellite_motif_can_join_both_telomere_arrays(self):
         fixtures(self.root)
         genome=self.root/'fixtures/B.fa';tsv=self.root/'windows.tsv'

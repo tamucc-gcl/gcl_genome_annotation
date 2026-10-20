@@ -32,6 +32,13 @@ def check_telomere_ends(folder, aid, identity, motif):
         assert attrs['motif']==motif,f'{aid}: wrong telomere motif: {attrs}'
 
 
+def check_centromere_mode(log):
+    # Native package output: the default satellite-only mode never performs this scan.
+    text=Path(log).read_text()
+    assert 'Detecting tandem repeat regions in the ' in text,(
+        f'{log}: native assembly-region scan not found; verify packaged centroAnno uses -x anno-asm')
+
+
 def fixtures(root):
     folder=root/'fixtures';folder.mkdir(exist_ok=True)
     rng=random.Random(42)
@@ -84,6 +91,7 @@ def run_case(root,name,resume=False):
         assert all(s['status']==('disabled' if disabled or (aid=='D' and t!='telomere') else 'ready') for t,s in state['tracks'].items())
         if aid=='D' and not disabled:assert state['tracks']['telomere']['features']==0,state
         if not disabled and aid!='D':
+            check_centromere_mode(case/f'results/centromere/{aid}.centroanno.log')
             assert state['tracks']['telomere']['features']>=1,state
             check_telomere_ends(folder,aid,root/'fixtures'/f'{aid}.json',state['settings']['telomere_motif'])
             assert state['tracks']['infernal']['features']>=1,state

@@ -8,7 +8,7 @@
     repeat (HOR) structure directly from genome assemblies without requiring
     prior knowledge of monomer templates.
 
-    Mode: genome assembly (-G true), centroAnno 1.0.2 (whole-chromosome/assembly annotation)
+    Mode: anno-asm, qjh96 centroAnno 1.0.2 build 0 (whole-chromosome/assembly annotation)
 
     Inputs:
         - assembly_id:      Sample identifier
@@ -52,6 +52,7 @@ process CENTROMERE_ANNOTATION {
         emit: monomer_fa
     tuple val(assembly_id), path("${assembly_id}.HORs.fa"),
         emit: hor_fa
+    tuple val(assembly_id), path("${assembly_id}.centroanno.log"), emit: runtime_log
 
     script:
     // Allocation can reserve the node without multiplying decomposition memory by 64 threads.
@@ -64,8 +65,8 @@ process CENTROMERE_ANNOTATION {
     centroAnno \\
         ${assembly} \\
         -o ${assembly_id}_centroanno \\
-        -G true \\
-        -t ${threads}
+        -x anno-asm \\
+        -t ${threads} 2>&1 | tee '${assembly_id}.centroanno.log'
 
     # ── Concatenate per-scaffold outputs into single files ────────────────────
     #   centroAnno creates per-sequence subdirectories under the output dir.
@@ -109,6 +110,7 @@ process CENTROMERE_ANNOTATION {
     touch ${assembly_id}.centromere_hors.csv
     touch ${assembly_id}.monomerTemplates.fa
     touch ${assembly_id}.HORs.fa
+    touch ${assembly_id}.centroanno.log
     """
 }
 

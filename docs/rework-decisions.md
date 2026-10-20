@@ -60,6 +60,18 @@ enabled completeness metrics so the user can assess the baseline and alternative
 
 ## Implementation status
 
+20 October centroAnno regression: the rework incorrectly replaced the original
+`-x anno-asm` with `-G true` based on the upstream v1.0.2 tag. Inspection of the
+actual qjh96 `centroanno-1.0.2-0.conda` executable shows the original `-x` selector
+and satellite-assembly default; its recipe builds a developer-local source tree.
+Restore `-x anno-asm`, pin build 0, retain native runtime logs, and make acceptance
+require evidence of native assembly-region scanning. Package SHA256:
+`c9bae8cdb001aa1ac3ea4a2a975b054f030af75525fc811b6a6bf9a28792b94f`.
+The resource-only change did not resolve the repeated kill. Keep the conservative
+node allocation pending corrected-mode measurements; do not claim a successful
+full-genome pilot yet. Earlier tiny native acceptance passed but did not distinguish
+satellite-only from assembly mode; that gap is now covered in the runner.
+
 Remaining genome tracks are reconnected in `main.nf` using their original modules:
 tRNAscan-SE, parallel Infernal/Rfam, tidk and centroAnno. Resolved assembly flags
 and motifs are honored, references use native filtered/masked channels, and the
