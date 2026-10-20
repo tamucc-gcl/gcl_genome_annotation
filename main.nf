@@ -21,6 +21,7 @@ include { PLAN_CONNECTED_RNA_ALIGNMENT } from './modules/connectedRnaAlignment.n
 include { ANNOTATION_POSTPROCESSING } from './workflows/annotationPostprocessing.nf'
 include { FUNCTIONAL_ANNOTATION } from './workflows/functionalAnnotation.nf'
 include { GENOME_TRACKS } from './workflows/genomeTracks.nf'
+include { ANNOTATION_RELEASE } from './workflows/annotationRelease.nf'
 
 workflow {
     if (!params.sample_sheet) error 'Provide --sample_sheet'
@@ -381,10 +382,20 @@ workflow {
             }
         ANNOTATION_POSTPROCESSING(postprocessing,proteinAlignmentInputs,
             REPEAT_MASK_PARALLEL.out.repeat_gff.join(teLibrarySources))
+        def functionalRelease = Channel.empty()
         if (params.run_functional_annotation) {
             FUNCTIONAL_ANNOTATION(assemblies.join(ANNOTATION_POSTPROCESSING.out.identified_annotation).map { aid,row,folder ->
                 tuple(aid,row.settings,folder)
             },ANNOTATION_POSTPROCESSING.out.omark_classes)
+            functionalRelease = FUNCTIONAL_ANNOTATION.out.annotation.join(FUNCTIONAL_ANNOTATION.out.table)
+                .join(FUNCTIONAL_ANNOTATION.out.gene_products).join(FUNCTIONAL_ANNOTATION.out.status)
+        }
+        if (params.run_finalization) {
+            ANNOTATION_RELEASE(preparedReferences.join(REPEAT_MASK_PARALLEL.out.masked_fasta)
+                .join(FILTER_ASSEMBLY.out.bundle).join(REPEAT_MASK_PARALLEL.out.repeat_gff)
+                .join(VALIDATE_REFERENCE_REPEATS.out.status).map { aid,genome,state,masked,folder,repeats,status ->
+                    tuple(aid,genome,masked,file("${folder}/${aid}.contigs.json",checkIfExists:true),repeats,status)
+                },ANNOTATION_POSTPROCESSING.out.identified_annotation,functionalRelease,GENOME_TRACKS.out.gff3,GENOME_TRACKS.out.status)
         }
     }
     REPORT_BRAKER(PLAN_BRAKER_INPUTS.out.plan, predictionResults,

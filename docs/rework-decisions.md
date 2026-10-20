@@ -553,3 +553,17 @@ is introduced. Filter changes are downstream of searches for cache reuse.
 tRNAscan-SE must rerun once to emit native score breakdown/structures.
 Local unit/syntax/routing checks pass; the new native filtering acceptance and
 real-genome QC review remain pending. See docs/genome-tracks.md for policies.
+
+## Final annotation release packaging (2026-10-20)
+
+The user approved final packaging and output organization after accepting the
+full-genome track QC and telomere review. Added `release/<assembly>/` with a
+combined GFF3, separate selected tracks, identified coding FASTAs, references,
+existing complete ID maps, a track ID map, assessment/functional tables and
+provenance/checksums. Coding models and scientific methods are unchanged;
+RepeatMasker feature IDs are namespaced with an explicit map. Native task paths
+connect the branches; Nextflow publishes a copied release. Source stage outputs
+and raw audits remain in place, and no prior files are deleted. The manifest
+defines current deliverables after optional settings change. Unified QC report
+work remains separate. Local tests pass; native release acceptance and the
+full-genome packaging pilot remain pending.

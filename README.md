@@ -1,6 +1,12 @@
 # gcl_genome_annotation
 Pipeline for Genome Annotation
 
+The final deliverables are collected in **`release/README.md`** and
+`release/<assembly>/`: combined/separate annotations, reference and coding FASTAs,
+complete ID maps, tables and checksum manifests. See
+[final annotation packaging](docs/annotation-release.md). Raw results and stage
+reports retain their existing paths. Native packaging acceptance is pending.
+
 [Unfiltered annotation baseline](docs/annotation-baseline.md) reconnects the existing
 AGAT, BUSCO and OMArk modules after validated predictions. `annotation_qc.nf`
 assesses completed BRAKER outputs without rerunning prediction. Local contracts
@@ -12,7 +18,7 @@ the synthetic acceptance summary has not been supplied.
 ![](assets/genome_annotation_pipeline.png)
 ## Pipeline rework
 
-The new [input and taxonomy preflight](docs/foundation-preflight.md) supports two-sheet validation, global defaults, per-assembly overrides and taxonomy-derived settings. The integrated `main.nf` connects preparation, repeats, alignment, BRAKER3 prediction, optional native UTR refinement, QC, native RNA/protein AED, junction assessment, selection and final identifiers. [Functional annotation](docs/functional-annotation.md) reconnects the original searches and GFF decoration to selected identified models; cluster acceptance and the five-tool real-data pilot passed. [Genome annotation tracks](docs/genome-tracks.md) reconnect tRNAscan-SE, Infernal/Rfam, tidk and centroAnno; native cluster acceptance and the real-genome pilot are pending. Final track packaging and unified reporting remain subsequent steps. Standalone entries remain available for development and testing.
+The new [input and taxonomy preflight](docs/foundation-preflight.md) supports two-sheet validation, global defaults, per-assembly overrides and taxonomy-derived settings. The integrated `main.nf` connects preparation, repeats, alignment, BRAKER3 prediction, optional native UTR refinement, QC, native RNA/protein AED, junction assessment, selection and final identifiers. [Functional annotation](docs/functional-annotation.md) reconnects the original searches and GFF decoration to selected identified models; cluster acceptance and the five-tool real-data pilot passed. [Genome annotation tracks](docs/genome-tracks.md) reconnect tRNAscan-SE, Infernal/Rfam, tidk and centroAnno; native filtering acceptance and the full-genome QC review passed. Final track packaging is implemented with validation pending; unified reporting remains subsequent work. Standalone entries remain available for development and testing.
 Input-contract acceptance passed on Nextflow 23.10.1.
 
 [Protein evidence preparation](docs/protein-evidence.md) adds validated,

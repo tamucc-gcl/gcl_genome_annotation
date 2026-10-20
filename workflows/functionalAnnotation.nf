@@ -128,6 +128,7 @@ workflow FUNCTIONAL_ANNOTATION {
     emit:
     annotation = ANNOTATE_GFF3.out.annotated_gff3
     table = MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv
+    gene_products = ANNOTATE_GFF3.out.gene_summary
     status = REPORT_FUNCTIONAL_ANNOTATION.out.status
     report = REPORT_FUNCTIONAL_ANNOTATION.out.report
 }

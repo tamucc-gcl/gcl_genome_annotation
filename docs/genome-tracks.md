@@ -157,9 +157,9 @@ including when cached enabled results replace a previously disabled report.
 Native inputs stage under a separate path from normalized outputs, so normalization
 cannot overwrite its source or report a checksum of modified input bytes.
 
-These outputs are separate from the annotated coding GFF3. Combining accepted
-tracks into the final release and unified reporting follows the native pilot;
-coding identifiers, model structures and functional tables are unchanged here.
+These outputs remain separate from the annotated coding GFF3. Release packaging
+combines accepted tracks into an additional GFF3 without altering coding IDs,
+model structures or functional tables. Unified QC reporting remains subsequent work.
 Reports are Markdown; the existing native tidk SVG remains available.
 
 ## Cluster acceptance
@@ -181,7 +181,11 @@ Use a new test directory for this update because the fixtures changed. Then use
 `--resume` with that same directory to recover a failed test.
 
 Local Python and Nextflow parsing/routing checks are not a substitute for this
-Linux-tool acceptance. The native search pilot passed previously; the new QC
-stages still require this acceptance and a real-genome review. The existing
+Linux-tool acceptance. Native filtering acceptance and the real-genome QC review
+passed, including the selected telomere spot-check. The existing
 normal sbatch command needs no extra arguments: retain
 `--rfam_database /work/birdlab/databases/rfam` and `-resume`.
+
+Final selected tracks now feed [release packaging](annotation-release.md),
+alongside coding models and RepeatMasker features. Raw tracks and rejection
+audits retain their existing paths.
