@@ -112,7 +112,10 @@ def filter_track(aid,track,source,identity,native_status,policy,aux,outdir):
                 if 'high confidence set' not in [v.strip() for v in tag.split(',')]:reason='native_tRNA_not_high_confidence'
             elif track=='infernal':
                 if a.get('inc') not in ('!','?'):raise ValueError('Rfam inclusion annotation missing')
-                if a.get('olp') not in ('*','~','='):raise ValueError('Rfam overlap annotation missing')
+                # Infernal fmt 2: no overlap (*), best overlapping hit (^),
+                # overlap without a winning competitor ($; since 1.1.4), loser (=).
+                if a.get('olp') not in ('*','^','$','='):
+                    raise ValueError(f"Rfam overlap annotation missing/unknown for {a['ID']}: {a.get('olp')!r}")
                 if a['inc']!='!':reason='below_native_inclusion'
                 elif policy['remove_overlaps'] and a['olp']=='=':reason='native_lower_ranked_overlap'
             elif track=='centromere':

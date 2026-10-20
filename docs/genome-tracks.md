@@ -117,6 +117,10 @@ Rfam searches already use curated family-specific GA thresholds. Following the
 post-search QC uses Infernal's inclusion and overlap annotations, without adding
 an arbitrary global E-value threshold or custom overlap ranking. The existing
 search annotates overlaps across models; this is not restricted to clan members.
+Native overlap flags `*` (no overlap), `^` (best overlapping hit), and `$`
+(overlaps better hits, but none marked `^`; available since Infernal 1.1.4)
+are retained. Only `=` is removed by the overlap filter. See the
+[Infernal format-2 specification](https://eddylab.org/infernal/Userguide.pdf).
 tRNAscan and Rfam remain separate potentially overlapping tracks.
 
 The pinned centroAnno build supplies identity and HOR confidence fields. QC

@@ -56,12 +56,21 @@ class TrackFilterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'Note column'):trna_categories(table)
 
     def test_rfam_uses_native_overlap_and_inclusion_without_new_evalue_cutoff(self):
-        lines=[f'chr1\tInfernal\tncRNA\t{1+i*50}\t{40+i*50}\t30\t+\t.\tID=n{i};inc={inc};olp={olp};evalue=0.1\n' for i,(inc,olp) in enumerate([('!','~'),('!','='),('?','*')])]
+        # All four native fmt-2 overlap categories, plus a below-inclusion hit.
+        lines=[f'chr1\tInfernal\tncRNA\t{1+i*50}\t{40+i*50}\t30\t+\t.\tID=n{i};inc={inc};olp={olp};evalue=0.1\n' for i,(inc,olp) in enumerate([('!','^'),('!','='),('?','*'),('!','$'),('!','*')])]
         s=self.run_filter('infernal',lines,dict(enabled=True,remove_overlaps=True))
-        self.assertEqual(s['features'],1)
+        self.assertEqual(s['features'],3)
+        retained=(self.root/'selected/A.infernal.gff3').read_text()
+        self.assertIn('ID=n0;',retained)
+        self.assertIn('ID=n3;',retained)
+        self.assertIn('ID=n4;',retained)
         self.assertEqual(s['reasons']['native_lower_ranked_overlap'],1)
-        self.assertEqual(self.run_filter('infernal',lines,dict(enabled=True,remove_overlaps=False))['features'],2)
-        with self.assertRaisesRegex(ValueError,'overlap annotation missing'):self.run_filter('infernal',[lines[0].replace('olp=~','olp=unknown')],dict(enabled=True,remove_overlaps=True))
+        self.assertEqual(self.run_filter('infernal',lines,dict(enabled=True,remove_overlaps=False))['features'],4)
+        for invalid in ('unknown','~'):
+            with self.assertRaisesRegex(ValueError,'overlap annotation missing/unknown.*n0'):
+                self.run_filter('infernal',[lines[0].replace('olp=^','olp='+invalid)],dict(enabled=True,remove_overlaps=True))
+        with self.assertRaisesRegex(ValueError,'overlap annotation missing/unknown.*None'):
+            self.run_filter('infernal',[lines[0].replace('olp=^;','')],dict(enabled=True,remove_overlaps=True))
 
     def test_centromere_identity_and_native_hor_confidence(self):
         lines=['chr1\tcentroAnno\tsatellite_DNA\t1\t50\t.\t.\t.\tID=m1;identity=0.9\n',
