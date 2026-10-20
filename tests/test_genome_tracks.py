@@ -13,6 +13,17 @@ from reference_repeats import fasta
 
 
 class GenomeTracksTests(unittest.TestCase):
+    def test_acceptance_preserves_details_for_empty_assertion(self):
+        import validate_genome_tracks_cluster as validation
+        root=self.root/'failed-acceptance'
+        with patch.object(sys,'argv',['validate_genome_tracks_cluster.py','--outdir',str(root)]), \
+             patch.object(validation,'execute',side_effect=AssertionError()), patch('builtins.print'):
+            self.assertEqual(validation.main(),1)
+        state=json.loads((root/'acceptance.json').read_text())
+        self.assertTrue(state['error'].startswith('AssertionError: see '))
+        self.assertIn('AssertionError',state['traceback'])
+        self.assertTrue((root/'failure_traceback.txt').is_file())
+
     def test_centromere_native_mode_guard_rejects_satellite_only_run(self):
         log=self.root/'centroanno.log'
         log.write_text('scaffold_1 Length: 40125647\nClustering is over, there are 59 templates.\nParse bad regions...\n')
@@ -89,6 +100,18 @@ class GenomeTracksTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'parents'):normalize('A','trnascan',native,self.identity,out)
         native.write_text(('chr1\ttest\ttRNA\t1\t25\t.\t+\t.\tID=x\n')*2)
         with self.assertRaisesRegex(ValueError,'Duplicate'):normalize('A','trnascan',native,self.identity,out)
+
+    def test_normalization_preserves_native_input_and_provenance(self):
+        source=self.root/'native.gff3';out=self.root/'accepted.gff3'
+        original='chr1\ttest\ttRNA\t1\t25\t.\t+\t.\tID=native1\n'
+        source.write_text(original)
+        with self.assertRaisesRegex(ValueError,'distinct paths'):normalize('A','trnascan',source,self.identity,source)
+        with patch('genome_tracks.dump'):state=normalize('A','trnascan',source,self.identity,out)
+        self.assertEqual(source.read_text(),original)
+        from reference_repeats import sha
+        self.assertEqual(state['source_sha256'],sha(source))
+        self.assertEqual(state['gff3_sha256'],sha(out))
+        self.assertNotEqual(state['source_sha256'],state['gff3_sha256'])
 
     def test_disabled_empty_and_missing_results(self):
         settings={'run_'+t:False for t in TRACKS}

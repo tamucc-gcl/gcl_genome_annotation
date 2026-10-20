@@ -1,9 +1,10 @@
 process VALIDATE_GENOME_TRACK {
     tag "${aid}/${track}"
     label 'genome_track_report'
-    publishDir "${params.outdir}/genome_tracks/${aid}", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/genome_tracks/${aid}", mode: params.publish_dir_mode, overwrite: true
     input:
-    tuple val(aid), val(track), path(source), path(identity)
+    // Keep the staged native file distinct from the normalized published output.
+    tuple val(aid), val(track), path(source, stageAs: 'incoming/native.gff3'), path(identity)
     path helpers
     output:
     tuple val(aid), val(track), path("${aid}.${track}.gff3"), path("${track}.status.json"), emit: validated
@@ -16,7 +17,8 @@ process VALIDATE_GENOME_TRACK {
 process REPORT_GENOME_TRACKS {
     tag "${aid}"
     label 'genome_track_report'
-    publishDir "${params.outdir}/genome_tracks/${aid}", mode: params.publish_dir_mode
+    // Resume must replace a report published by a different enabled/disabled policy.
+    publishDir "${params.outdir}/genome_tracks/${aid}", mode: params.publish_dir_mode, overwrite: true
     input:
     tuple val(aid), val(settings), path(identity), path(statuses)
     path helpers

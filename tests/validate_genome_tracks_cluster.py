@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import sys
+import traceback
 
 from validate_utr_cluster import ROOT, dump, execute
 from reference_repeats import reference
@@ -52,7 +53,7 @@ def fixtures(root):
         if aid=='D':source.write_text('>chr1\n'+'AC'*100+'\n')
         bundle=folder/aid
         state=reference(source,aid,0,bundle)
-        assert state['status']=='ready'
+        assert state['status']=='ready',f'{aid}: fixture reference failed: {state}'
         shutil.copy2(bundle/f'{aid}.filtered.fasta',folder/f'{aid}.fa')
         shutil.copy2(bundle/f'{aid}.filtered.fasta',folder/f'{aid}.masked.fa')
         shutil.copy2(bundle/f'{aid}.contigs.json',folder/f'{aid}.json')
@@ -74,21 +75,21 @@ def run_case(root,name,resume=False):
     execute(command,case,case/f'{name}.console.log')
     with (case/'results/pipeline/pipeline_trace.txt').open() as h:tasks=list(csv.DictReader(h,delimiter='\t'))
     scientific=('tRNASCAN','INFERNAL','TELOMERE_ANNOTATION','CENTROMERE_ANNOTATION')
-    if name=='disabled':assert not any(task_process(r) in scientific for r in tasks)
+    if name=='disabled':assert not any(task_process(r) in scientific for r in tasks),f'Disabled native searches unexpectedly ran: {tasks}'
     else:
         for tool in scientific:
             matches=[r for r in tasks if task_process(r)==tool]
             assert len(matches)==(4 if tool=='INFERNAL' else 3 if tool=='TELOMERE_ANNOTATION' else 2),(tool,matches)
-        if name in ('resume','report_change'):
+        if name in ('resume','report_change','reenabled'):
             for task in tasks:
                 if name=='report_change' and 'REPORT_GENOME_TRACKS' in task['name']:continue
                 assert task['status']=='CACHED',task
     for aid in 'ABCD':
         folder=case/f'results/genome_tracks/{aid}'
         state=json.loads((folder/'genome_tracks_status.json').read_text())
-        assert state['status']=='ready'
+        assert state['status']=='ready',f'{aid}: genome tracks not ready: {state}'
         disabled=name=='disabled' or aid=='C'
-        assert all(s['status']==('disabled' if disabled or (aid=='D' and t!='telomere') else 'ready') for t,s in state['tracks'].items())
+        assert all(s['status']==('disabled' if disabled or (aid=='D' and t!='telomere') else 'ready') for t,s in state['tracks'].items()),f'{aid}: unexpected enabled/disabled states in {folder}: {state}'
         if aid=='D' and not disabled:assert state['tracks']['telomere']['features']==0,state
         if not disabled and aid!='D':
             check_centromere_mode(case/f'results/centromere/{aid}.centroanno.log')
@@ -96,8 +97,9 @@ def run_case(root,name,resume=False):
             check_telomere_ends(folder,aid,root/'fixtures'/f'{aid}.json',state['settings']['telomere_motif'])
             assert state['tracks']['infernal']['features']>=1,state
             for track in state['tracks']:
-                assert (folder/f'{aid}.{track}.gff3').is_file()
-        assert not list(folder.glob('*.html'))
+                path=folder/f'{aid}.{track}.gff3'
+                assert path.is_file(),f'{aid}/{track}: missing or broken published GFF3: {path} (target: {path.resolve()})'
+        assert not list(folder.glob('*.html')),f'{aid}: unexpected pipeline-written HTML: {list(folder.glob("*.html"))}'
     print('PASS: '+name,flush=True);return dict(case=name,passed=True)
 
 
@@ -131,9 +133,15 @@ def main():
         helper=pipeline/'py_scripts/report_genome_tracks.py';helper.write_text(helper.read_text()+'\n# report-only cache fixture\n')
         summary['checks'].append(run_case(root,'report_change',True))
         summary['checks'].append(run_case(root,'disabled',True))
+        # Re-enable from cached results after the disabled report occupied the same path.
+        summary['checks'].append(run_case(root,'reenabled',True))
         summary['status']='passed'
     except Exception as exc:
-        summary['error']=str(exc);print('FAIL: '+str(exc),flush=True)
+        details=traceback.format_exc()
+        (root/'failure_traceback.txt').write_text(details)
+        summary['error']=str(exc) or f'{type(exc).__name__}: see {root/"failure_traceback.txt"}'
+        summary['traceback']=details
+        print('FAIL: '+summary['error'],flush=True)
     dump(root/'acceptance.json',summary);print('Acceptance summary: '+str(root/'acceptance.json'))
     return 0 if summary['status']=='passed' else 1
 

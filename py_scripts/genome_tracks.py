@@ -81,6 +81,8 @@ def telomeres(tsv, genome, aid, motif, window, minimum, terminal, output):
 
 
 def normalize(aid, track, source, identity, output):
+    if Path(source).resolve() == Path(output).resolve():
+        raise ValueError('Native source and normalized output must have distinct paths')
     data, lengths = dictionary(identity)
     rows, ids, parents = [], set(), []
     with Path(source).open() as handle:

@@ -86,6 +86,10 @@ Validation blocks unknown contigs, out-of-bounds coordinates, invalid strands,
 duplicate IDs, dangling parents and missing/duplicate enabled results. A completed
 search with no features is distinct from a disabled track. Old published files can
 remain after disabling a track; the current status manifest is authoritative.
+Genome-track publication explicitly overwrites older reports/GFF3 files on resume,
+including when cached enabled results replace a previously disabled report.
+Native inputs stage under a separate path from normalized outputs, so normalization
+cannot overwrite its source or report a checksum of modified input bytes.
 
 These outputs are separate from the annotated coding GFF3. Combining accepted
 tracks into the final release and unified reporting follows the native pilot;
