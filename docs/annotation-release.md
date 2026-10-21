@@ -55,8 +55,8 @@ Functional GFF3 geometry is checked using the existing functional validation
 helper. No ncRNA or repeat feature is counted as a protein-coding gene.
 
 The final release does not replace the original scientific outputs or imply
-that centromeric repeat predictions establish functional centromeres. It does
-not implement the still-planned unified QC report or add pipeline HTML.
+that centromeric repeat predictions establish functional centromeres. The
+[unified Markdown report](unified-report.md) is a separate downstream stage.
 
 ## Acceptance
 
@@ -76,4 +76,4 @@ with the same directory after a failure.
 Then resume the usual `main.nf` run. New packaging tasks should run while existing
 scientific tasks remain cached. Review `release/README.md` and each assembly's
 `release_status.json` before exporting the release. Cluster packaging acceptance
-and the full-genome release pilot are pending.
+and the full-genome release review passed; the user verified all payload checksums.

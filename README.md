@@ -1,11 +1,17 @@
 # gcl_genome_annotation
 Pipeline for Genome Annotation
 
+The [unified Markdown report](docs/unified-report.md) is generated as
+`annotation_report.md`: one report with assembly subsections, key figures inline
+and detailed figures/tables linked. It reports results and methods without
+tuning advice. Native reporting acceptance and full-genome review are pending.
+
 The final deliverables are collected in **`release/README.md`** and
 `release/<assembly>/`: combined/separate annotations, reference and coding FASTAs,
 complete ID maps, tables and checksum manifests. See
 [final annotation packaging](docs/annotation-release.md). Raw results and stage
-reports retain their existing paths. Native packaging acceptance is pending.
+reports retain their existing paths. Native packaging acceptance and the full-genome
+release/checksum review passed.
 
 [Unfiltered annotation baseline](docs/annotation-baseline.md) reconnects the existing
 AGAT, BUSCO and OMArk modules after validated predictions. `annotation_qc.nf`

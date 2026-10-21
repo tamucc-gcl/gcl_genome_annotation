@@ -567,3 +567,15 @@ and raw audits remain in place, and no prior files are deleted. The manifest
 defines current deliverables after optional settings change. Unified QC report
 work remains separate. Local tests pass; native release acceptance and the
 full-genome packaging pilot remain pending.
+
+## Unified report format (2026-10-21)
+
+The user selected one complete Markdown report with assembly-specific subsections,
+key figures inline and detailed figures/tables linked, and results/methods only
+without interpretation or tuning recommendations. Adapted the original report
+entry, formatting helpers and subject order to the accepted release/stage schemas.
+Reused structural QC figures and restored detailed functional frequency plots
+with current IDs/denominators. No composite confidence score or pipeline HTML is
+introduced. Report-only changes are downstream of scientific tasks and release
+packaging. Local source/plot/routing checks precede native cluster acceptance and
+the full-genome report review.

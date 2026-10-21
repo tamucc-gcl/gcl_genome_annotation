@@ -22,6 +22,7 @@ include { ANNOTATION_POSTPROCESSING } from './workflows/annotationPostprocessing
 include { FUNCTIONAL_ANNOTATION } from './workflows/functionalAnnotation.nf'
 include { GENOME_TRACKS } from './workflows/genomeTracks.nf'
 include { ANNOTATION_RELEASE } from './workflows/annotationRelease.nf'
+include { ANNOTATION_REPORT } from './modules/annotation_report.nf'
 
 workflow {
     if (!params.sample_sheet) error 'Provide --sample_sheet'
@@ -360,6 +361,8 @@ workflow {
     VALIDATE_BRAKER_INPUTS(predictionInputs, brakerHelpers)
     CHECK_BRAKER_SOFTWARE(predictionInputs.join(VALIDATE_BRAKER_INPUTS.out.status), brakerHelpers)
     def predictionResults = Channel.value([])
+    def unifiedStructural = Channel.empty()
+    def unifiedStages = Channel.empty()
     if (!params.braker_check_only) {
         BRAKER(predictionInputs.join(CHECK_BRAKER_SOFTWARE.out.runtime), brakerHelpers)
         VALIDATE_BRAKER_OUTPUTS(predictionInputs.join(BRAKER.out.prediction).map { aid, spec, genome, proteins, bams, indices, identity, prediction ->
@@ -396,10 +399,33 @@ workflow {
                 .join(VALIDATE_REFERENCE_REPEATS.out.status).map { aid,genome,state,masked,folder,repeats,status ->
                     tuple(aid,genome,masked,file("${folder}/${aid}.contigs.json",checkIfExists:true),repeats,status)
                 },ANNOTATION_POSTPROCESSING.out.identified_annotation,functionalRelease,GENOME_TRACKS.out.gff3,GENOME_TRACKS.out.status)
+            unifiedStructural = ANNOTATION_POSTPROCESSING.out.structural_reports
+            unifiedStages = RESOLVE_ANNOTATION_INPUTS.out.bundle.map { tuple('preflight','run',file("${it}/resolved_inputs.json",checkIfExists:true)) }
+                .mix(REPORT_PROTEIN_EVIDENCE.out.status.map { tuple('protein','run',it) })
+                .mix(REPORT_RNA_PREPARATION.out.status.map { tuple('rna','run',it) })
+                .mix(REPORT_RNA_ALIGNMENT.out.status.map { tuple('rna_alignment','run',it) })
+                .mix(REPORT_REFERENCE_REPEATS.out.status.map { tuple('reference_repeats','run',it) })
+                .mix(ANNOTATION_POSTPROCESSING.out.utr_status.map { aid,p -> tuple('utr',aid,p) })
+                .mix(ANNOTATION_POSTPROCESSING.out.selection_status.map { aid,p -> tuple('selection',aid,p) })
         }
     }
     REPORT_BRAKER(PLAN_BRAKER_INPUTS.out.plan, predictionResults,
         CHECK_BRAKER_SOFTWARE.out.runtime.map { aid, folder -> file("${folder}/inputs.json") }.toList(),
         params.braker_check_only, '../rna_alignment/multiqc/multiqc_report.html', file("${projectDir}/py_scripts/report_braker.py"))
     ASSERT_BRAKER(REPORT_BRAKER.out.status)
+    if (!params.braker_check_only && params.run_finalization) {
+        def reportStages=unifiedStages.mix(REPORT_BRAKER.out.status.map { tuple('braker','run',it) }).toList()
+            .map { it.sort { a,b -> (a[0]<=>b[0]) ?: (a[1]<=>b[1]) } }
+        def reportStructural=unifiedStructural.toList().map { it.sort { row -> row[0] } }
+        def reportConfiguration=[:]
+        ['tetools_version','dfam_version','rfam_version','braker_threads','braker_rounds','ingenannot_rna_cds_only','ingenannot_rna_penalty',
+         'utr_refine','rna_no_temp_splicesite','run_baseline_qc','run_aed','run_junction_qc','run_functional_annotation',
+         'interproscan_version','eggnog_version','diamond_version','kofamscan_version'].each { key ->
+            if (params.containsKey(key)) reportConfiguration[key]=params[key]
+        }
+        ANNOTATION_REPORT(ANNOTATION_RELEASE.out.annotation.toList().map { it.sort { row -> row[0] }.collect { row -> row[1] } },
+            reportStructural.map { it.collect { row -> row[0] } }, reportStructural.map { it.collect { row -> row[1] } },
+            reportStages.map { it.collect { row -> [row[0],row[1]] } }, reportStages.map { it.collect { row -> row[2] } },reportConfiguration,
+            ['generate_annotation_report.py','unified_report.py','reference_repeats.py'].collect { file("${projectDir}/py_scripts/${it}",checkIfExists:true) })
+    }
 }
