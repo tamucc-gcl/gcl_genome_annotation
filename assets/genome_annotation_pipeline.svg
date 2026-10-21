@@ -1,11 +1,66 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc" font-family="Arial, Helvetica, sans-serif">
-  <title id="title">GCL Genome Annotation Pipeline</title>
-  <desc id="desc">A broad overview of the Nextflow DSL2 pipeline. Prepared assemblies undergo repeat discovery, curation and softmasking. RNA and protein evidence support BRAKER3 gene prediction, with genome-only prediction also supported. Optional UTR refinement and model assessment precede structural selection and final identifiers, then functional annotation. Before and after selection quality control, repeat annotations, and independent genome tracks accompany the validated annotation release and unified report. Analyses depend on enabled settings and available evidence.</desc>
-  <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M2 1 L8 5 L2 9" fill="none" stroke="#777670" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="1600"
+   height="900"
+   viewBox="0 0 1600 900"
+   role="img"
+   aria-labelledby="title desc"
+   font-family="Arial, Helvetica, sans-serif"
+   version="1.1"
+   id="svg71"
+   sodipodi:docname="genome_annotation_pipeline.svg"
+   inkscape:export-filename="genome_annotation_pipeline.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview71"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:export-bgcolor="#ffffffff"
+     inkscape:zoom="1.2433333"
+     inkscape:cx="800.67024"
+     inkscape:cy="450"
+     inkscape:window-width="2560"
+     inkscape:window-height="1364"
+     inkscape:window-x="1912"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg71" />
+  <title
+     id="title">GCL Genome Annotation Pipeline</title>
+  <desc
+     id="desc">A broad overview of the Nextflow DSL2 pipeline. Prepared assemblies undergo repeat discovery, curation and softmasking. RNA and protein evidence support BRAKER3 gene prediction, with genome-only prediction also supported. Optional UTR refinement and model assessment precede structural selection and final identifiers, then functional annotation. Before and after selection quality control, repeat annotations, and independent genome tracks accompany the validated annotation release and unified report. Analyses depend on enabled settings and available evidence.</desc>
+  <defs
+     id="defs1">
+    <marker
+       id="arrow"
+       viewBox="0 0 10 10"
+       refX="8"
+       refY="5"
+       markerWidth="6"
+       markerHeight="6"
+       orient="auto-start-reverse">
+      <path
+         d="M2 1 L8 5 L2 9"
+         fill="none"
+         stroke="#777670"
+         stroke-width="1.5"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         id="path1" />
     </marker>
-    <style>
+    <style
+       id="style1">
       .title { font-size:32px; font-weight:700; fill:#2c2c2a }
       .subtitle { font-size:18px; fill:#66655f }
       .band { font-size:13px; font-weight:700; letter-spacing:1.6px; text-anchor:middle }
@@ -21,128 +76,660 @@
       .green { fill:#eaf3de; stroke:#639338; stroke-width:1.5 }
     </style>
   </defs>
-  <rect width="1600" height="900" fill="#fff"/>
-  <text x="48" y="57" class="title">GCL Genome Annotation Pipeline</text>
-  <text x="48" y="89" class="subtitle">From genome assemblies and supporting evidence to an integrated annotation release</text>
-  <text x="1552" y="56" text-anchor="end" font-size="16" fill="#66655f">Nextflow DSL2</text>
-
+  <rect
+     width="1600"
+     height="900"
+     fill="#fff"
+     id="rect1" />
+  <text
+     x="48"
+     y="57"
+     class="title"
+     id="text1">GCL Genome Annotation Pipeline</text>
+  <text
+     x="48"
+     y="89"
+     class="subtitle"
+     id="text2">From genome assemblies and supporting evidence to an integrated annotation release</text>
+  <text
+     x="1552"
+     y="56"
+     text-anchor="end"
+     font-size="16"
+     fill="#66655f"
+     id="text3">Nextflow DSL2</text>
   <!-- Inputs: databases are shared resources, rather than a mandatory download stage. -->
-  <rect x="48" y="128" width="272" height="17" rx="4" fill="#d3d1c7"/>
-  <text x="184" y="141" class="band" fill="#444441">REFERENCE</text>
-  <rect x="48" y="157" width="272" height="133" rx="10" class="neutral"/>
-  <text x="184" y="191" class="heading" fill="#444441">Genome assemblies</text>
-  <text x="184" y="222" class="body" fill="#5f5e5a">Validate inputs and taxonomy</text>
-  <text x="184" y="248" class="body" fill="#5f5e5a">Normalize and filter references</text>
-  <text x="184" y="274" class="small" fill="#5f5e5a">One or multiple assemblies</text>
-
-  <rect x="350" y="128" width="574" height="17" rx="4" fill="#9fe1cb"/>
-  <text x="637" y="141" class="band" fill="#085041">SUPPORTING EVIDENCE</text>
-  <rect x="350" y="157" width="574" height="133" rx="10" class="evidence"/>
-  <line x1="637" y1="178" x2="637" y2="270" stroke="#9ac8b8"/>
-  <text x="493" y="191" class="heading" fill="#085041">RNA reads</text>
-  <text x="493" y="222" class="body" fill="#0f6e56">Prepare, QC and align</text>
-  <text x="493" y="248" class="body" fill="#0f6e56">HISAT2</text>
-  <text x="493" y="274" class="small" fill="#0f6e56">When RNA evidence is supplied</text>
-  <text x="780" y="191" class="heading" fill="#085041">Protein sequences</text>
-  <text x="780" y="222" class="body" fill="#0f6e56">Acquire and combine evidence</text>
-  <text x="780" y="248" class="body" fill="#0f6e56">OrthoDB / NCBI / local FASTAs</text>
-  <text x="780" y="274" class="small" fill="#0f6e56">When protein evidence is requested</text>
-
-  <rect x="954" y="128" width="598" height="17" rx="4" fill="#9fe1cb"/>
-  <text x="1253" y="141" class="band" fill="#085041">SHARED REFERENCE DATABASES</text>
-  <rect x="954" y="157" width="598" height="133" rx="10" class="evidence"/>
-  <text x="1253" y="191" class="heading" fill="#085041">Resources across stages</text>
-  <text x="1253" y="222" class="body" fill="#0f6e56">Repeat, protein, RNA-family and functional databases</text>
-  <text x="1253" y="248" class="body" fill="#0f6e56">Lineage and orthology resources for quality assessment</text>
-  <text x="1253" y="274" class="small" fill="#0f6e56">Reused by enabled analyses</text>
-
+  <rect
+     x="48"
+     y="128"
+     width="272"
+     height="17"
+     rx="4"
+     fill="#d3d1c7"
+     id="rect3" />
+  <text
+     x="184"
+     y="141"
+     class="band"
+     fill="#444441"
+     id="text4">REFERENCE</text>
+  <rect
+     x="48"
+     y="157"
+     width="272"
+     height="133"
+     rx="10"
+     class="neutral"
+     id="rect4" />
+  <text
+     x="184"
+     y="191"
+     class="heading"
+     fill="#444441"
+     id="text5">Genome assemblies</text>
+  <text
+     x="184"
+     y="222"
+     class="body"
+     fill="#5f5e5a"
+     id="text6">Validate inputs and taxonomy</text>
+  <text
+     x="184"
+     y="248"
+     class="body"
+     fill="#5f5e5a"
+     id="text7">Normalize and filter references</text>
+  <text
+     x="184"
+     y="274"
+     class="small"
+     fill="#5f5e5a"
+     id="text8">One or multiple assemblies</text>
+  <rect
+     x="350"
+     y="128"
+     width="574"
+     height="17"
+     rx="4"
+     fill="#9fe1cb"
+     id="rect8" />
+  <text
+     x="637"
+     y="141"
+     class="band"
+     fill="#085041"
+     id="text9">SUPPORTING EVIDENCE</text>
+  <rect
+     x="350"
+     y="157"
+     width="574"
+     height="133"
+     rx="10"
+     class="evidence"
+     id="rect9" />
+  <line
+     x1="637"
+     y1="178"
+     x2="637"
+     y2="270"
+     stroke="#9ac8b8"
+     id="line9" />
+  <text
+     x="493"
+     y="191"
+     class="heading"
+     fill="#085041"
+     id="text10">RNA reads</text>
+  <text
+     x="493"
+     y="222"
+     class="body"
+     fill="#0f6e56"
+     id="text11">Prepare, QC and align</text>
+  <text
+     x="493"
+     y="248"
+     class="body"
+     fill="#0f6e56"
+     id="text12">HISAT2</text>
+  <text
+     x="493"
+     y="274"
+     class="small"
+     fill="#0f6e56"
+     id="text13">When RNA evidence is supplied</text>
+  <text
+     x="780"
+     y="191"
+     class="heading"
+     fill="#085041"
+     id="text14">Protein sequences</text>
+  <text
+     x="780"
+     y="222"
+     class="body"
+     fill="#0f6e56"
+     id="text15">Acquire and combine evidence</text>
+  <text
+     x="780"
+     y="248"
+     class="body"
+     fill="#0f6e56"
+     id="text16">OrthoDB / NCBI / local FASTAs</text>
+  <text
+     x="780"
+     y="274"
+     class="small"
+     fill="#0f6e56"
+     id="text17">When protein evidence is requested</text>
+  <rect
+     x="954"
+     y="128"
+     width="598"
+     height="17"
+     rx="4"
+     fill="#9fe1cb"
+     id="rect17" />
+  <text
+     x="1253"
+     y="141"
+     class="band"
+     fill="#085041"
+     id="text18">SHARED REFERENCE DATABASES</text>
+  <rect
+     x="954"
+     y="157"
+     width="598"
+     height="133"
+     rx="10"
+     class="evidence"
+     id="rect18" />
+  <text
+     x="1253"
+     y="191"
+     class="heading"
+     fill="#085041"
+     id="text19">Resources across stages</text>
+  <text
+     x="1253"
+     y="222"
+     class="body"
+     fill="#0f6e56"
+     id="text20">Repeat, protein, RNA-family and functional databases</text>
+  <text
+     x="1253"
+     y="248"
+     class="body"
+     fill="#0f6e56"
+     id="text21">Lineage and orthology resources for quality assessment</text>
+  <text
+     x="1253"
+     y="274"
+     class="small"
+     fill="#0f6e56"
+     id="text22">Reused by enabled analyses</text>
   <!-- Primary scientific flow. -->
-  <path d="M184 290 V350" class="flow"/>
-  <path d="M493 290 V317 H486 V350" class="feed"/>
-  <path d="M780 290 V306 H548 V350" class="feed"/>
-  <rect x="48" y="328" width="272" height="17" rx="4" fill="#efc3b2"/>
-  <text x="184" y="341" class="band" fill="#712b13">REPEAT ANNOTATION</text>
-  <rect x="350" y="328" width="876" height="17" rx="4" fill="#cecbf6"/>
-  <text x="788" y="341" class="band" fill="#3c3489">STRUCTURAL ANNOTATION</text>
-  <rect x="1256" y="328" width="296" height="17" rx="4" fill="#c0dd97"/>
-  <text x="1404" y="341" class="band" fill="#27500a">FUNCTIONAL ANNOTATION</text>
-
-  <rect x="48" y="357" width="272" height="177" rx="10" class="repeat"/>
-  <text x="184" y="393" class="heading" fill="#712b13">Discover and mask</text>
-  <text x="184" y="425" class="body" fill="#993c1d">Model and curate repeats</text>
-  <text x="184" y="452" class="body" fill="#993c1d">Build a combined repeat library</text>
-  <text x="184" y="479" class="body" fill="#993c1d">Softmask the reference</text>
-  <text x="184" y="505" class="small" fill="#993c1d">RepeatModeler2 · Dfam</text>
-  <text x="184" y="524" class="small" fill="#993c1d">RepeatMasker</text>
-  <path d="M320 445 H350" class="flow"/>
-
-  <rect x="350" y="357" width="272" height="177" rx="10" class="structural"/>
-  <text x="486" y="393" class="heading" fill="#3c3489">Predict genes</text>
-  <text x="486" y="431" font-size="27" font-weight="700" text-anchor="middle" fill="#534ab7">BRAKER3</text>
-  <text x="486" y="467" class="body" fill="#534ab7">RNA and/or protein evidence</text>
-  <text x="486" y="494" class="body" fill="#534ab7">or genome-only prediction</text>
-  <path d="M622 445 H652" class="flow"/>
-
-  <rect x="652" y="357" width="272" height="177" rx="10" class="structural"/>
-  <text x="788" y="393" class="heading" fill="#3c3489">Refine and assess</text>
-  <text x="788" y="425" class="body" fill="#534ab7">Optional UTR refinement</text>
-  <text x="788" y="452" class="body" fill="#534ab7">RNA / protein support (AED)</text>
-  <text x="788" y="479" class="body" fill="#534ab7">Splice support and TE flags</text>
-  <text x="788" y="512" class="small" fill="#534ab7">InGenAnnot · Portcullis</text>
-  <path d="M924 445 H954" class="flow"/>
-
-  <rect x="954" y="357" width="272" height="177" rx="10" class="structural"/>
-  <text x="1090" y="393" class="heading" fill="#3c3489">Select gene models</text>
-  <text x="1090" y="425" class="body" fill="#534ab7">Apply structural selection rules</text>
-  <text x="1090" y="452" class="body" fill="#534ab7">Optional evidence filters</text>
-  <text x="1090" y="479" class="body" fill="#534ab7">Assign final identifiers</text>
-  <text x="1090" y="512" class="small" fill="#534ab7">Retain decision audits and ID maps</text>
-  <path d="M1226 445 H1256" class="flow"/>
-
-  <rect x="1256" y="357" width="296" height="177" rx="10" class="green"/>
-  <text x="1404" y="393" class="heading" fill="#27500a">Assign functions</text>
-  <text x="1404" y="425" class="body" fill="#3b6d11">Products, domains and pathways</text>
-  <text x="1404" y="452" class="body" fill="#3b6d11">Merge into coding annotations</text>
-  <text x="1404" y="487" class="small" fill="#3b6d11">InterProScan · eggNOG-mapper</text>
-  <text x="1404" y="512" class="small" fill="#3b6d11">DIAMOND · KofamScan · DeepSig</text>
-
+  <path
+     d="M184 290 V350"
+     class="flow"
+     id="path22" />
+  <path
+     d="M493 290 V317 H486 V350"
+     class="feed"
+     id="path23" />
+  <path
+     d="M780 290 V306 H548 V350"
+     class="feed"
+     id="path24" />
+  <rect
+     x="48"
+     y="328"
+     width="272"
+     height="17"
+     rx="4"
+     fill="#efc3b2"
+     id="rect24" />
+  <text
+     x="184"
+     y="341"
+     class="band"
+     fill="#712b13"
+     id="text24">REPEAT ANNOTATION</text>
+  <rect
+     x="350"
+     y="328"
+     width="876"
+     height="17"
+     rx="4"
+     fill="#cecbf6"
+     id="rect25" />
+  <text
+     x="788"
+     y="341"
+     class="band"
+     fill="#3c3489"
+     id="text25">STRUCTURAL ANNOTATION</text>
+  <rect
+     x="1256"
+     y="328"
+     width="296"
+     height="17"
+     rx="4"
+     fill="#c0dd97"
+     id="rect26" />
+  <text
+     x="1404"
+     y="341"
+     class="band"
+     fill="#27500a"
+     id="text26">FUNCTIONAL ANNOTATION</text>
+  <rect
+     x="48"
+     y="357"
+     width="272"
+     height="177"
+     rx="10"
+     class="repeat"
+     id="rect27" />
+  <text
+     x="184"
+     y="393"
+     class="heading"
+     fill="#712b13"
+     id="text27">Discover and mask</text>
+  <text
+     x="184"
+     y="425"
+     class="body"
+     fill="#993c1d"
+     id="text28">Model and curate repeats</text>
+  <text
+     x="184"
+     y="452"
+     class="body"
+     fill="#993c1d"
+     id="text29">Build a combined repeat library</text>
+  <text
+     x="184"
+     y="479"
+     class="body"
+     fill="#993c1d"
+     id="text30">Softmask the reference</text>
+  <text
+     x="184"
+     y="505"
+     class="small"
+     fill="#993c1d"
+     id="text31">RepeatModeler2 · Dfam</text>
+  <text
+     x="184"
+     y="524"
+     class="small"
+     fill="#993c1d"
+     id="text32">RepeatMasker</text>
+  <path
+     d="M320 445 H350"
+     class="flow"
+     id="path32" />
+  <rect
+     x="350"
+     y="357"
+     width="272"
+     height="177"
+     rx="10"
+     class="structural"
+     id="rect32" />
+  <text
+     x="486"
+     y="393"
+     class="heading"
+     fill="#3c3489"
+     id="text33">Predict genes</text>
+  <text
+     x="486"
+     y="431"
+     font-size="27"
+     font-weight="700"
+     text-anchor="middle"
+     fill="#534ab7"
+     id="text34">BRAKER3</text>
+  <text
+     x="486"
+     y="467"
+     class="body"
+     fill="#534ab7"
+     id="text35">RNA and/or protein evidence</text>
+  <text
+     x="486"
+     y="494"
+     class="body"
+     fill="#534ab7"
+     id="text36">or genome-only prediction</text>
+  <path
+     d="M622 445 H652"
+     class="flow"
+     id="path36" />
+  <rect
+     x="652"
+     y="357"
+     width="272"
+     height="177"
+     rx="10"
+     class="structural"
+     id="rect36" />
+  <text
+     x="788"
+     y="393"
+     class="heading"
+     fill="#3c3489"
+     id="text37">Refine and assess</text>
+  <text
+     x="788"
+     y="425"
+     class="body"
+     fill="#534ab7"
+     id="text38">Optional UTR refinement</text>
+  <text
+     x="788"
+     y="452"
+     class="body"
+     fill="#534ab7"
+     id="text39">RNA / protein support (AED)</text>
+  <text
+     x="788"
+     y="479"
+     class="body"
+     fill="#534ab7"
+     id="text40">Splice support and TE flags</text>
+  <text
+     x="788"
+     y="512"
+     class="small"
+     fill="#534ab7"
+     id="text41">InGenAnnot · Portcullis</text>
+  <path
+     d="M924 445 H954"
+     class="flow"
+     id="path41" />
+  <rect
+     x="954"
+     y="357"
+     width="272"
+     height="177"
+     rx="10"
+     class="structural"
+     id="rect41" />
+  <text
+     x="1090"
+     y="393"
+     class="heading"
+     fill="#3c3489"
+     id="text42">Select gene models</text>
+  <text
+     x="1090"
+     y="425"
+     class="body"
+     fill="#534ab7"
+     id="text43">Apply structural selection rules</text>
+  <text
+     x="1090"
+     y="452"
+     class="body"
+     fill="#534ab7"
+     id="text44">Optional evidence filters</text>
+  <text
+     x="1090"
+     y="479"
+     class="body"
+     fill="#534ab7"
+     id="text45">Assign final identifiers</text>
+  <text
+     x="1090"
+     y="512"
+     class="small"
+     fill="#534ab7"
+     id="text46">Retain decision audits and ID maps</text>
+  <path
+     d="M1226 445 H1256"
+     class="flow"
+     id="path46" />
+  <rect
+     x="1256"
+     y="357"
+     width="296"
+     height="177"
+     rx="10"
+     class="green"
+     id="rect46" />
+  <text
+     x="1404"
+     y="393"
+     class="heading"
+     fill="#27500a"
+     id="text47">Assign functions</text>
+  <text
+     x="1404"
+     y="425"
+     class="body"
+     fill="#3b6d11"
+     id="text48">Products, domains and pathways</text>
+  <text
+     x="1404"
+     y="452"
+     class="body"
+     fill="#3b6d11"
+     id="text49">Merge into coding annotations</text>
+  <text
+     x="1404"
+     y="487"
+     class="small"
+     fill="#3b6d11"
+     id="text50">InterProScan · eggNOG-mapper</text>
+  <text
+     x="1404"
+     y="512"
+     class="small"
+     fill="#3b6d11"
+     id="text51">DIAMOND · KofamScan · DeepSig</text>
   <!-- Parallel products and QC join the release; they are not serial prediction steps. -->
-  <path d="M184 534 V645" class="feed"/>
-  <text x="205" y="576" font-size="15" fill="#777670">Reference +</text>
-  <text x="205" y="598" font-size="15" fill="#777670">softmasked genome</text>
-  <rect x="48" y="620" width="574" height="17" rx="4" fill="#cecbf6"/>
-  <text x="335" y="633" class="band" fill="#3c3489">INDEPENDENT GENOME TRACKS</text>
-  <rect x="48" y="649" width="574" height="135" rx="10" class="structural"/>
-  <text x="335" y="683" class="heading" fill="#3c3489">Annotate and QC genome features</text>
-  <text x="335" y="715" class="body" fill="#534ab7">tRNAs · ncRNAs · telomeres · centromeric repeats</text>
-  <text x="335" y="747" class="small" fill="#534ab7">tRNAscan-SE · Infernal / Rfam · tidk · centroAnno</text>
-  <text x="335" y="770" class="small" fill="#534ab7">Runs alongside gene annotation</text>
-
-  <path d="M788 534 V602" class="feed"/>
-  <path d="M1090 534 V602" class="feed"/>
-  <rect x="652" y="577" width="574" height="17" rx="4" fill="#c0dd97"/>
-  <text x="939" y="590" class="band" fill="#27500a">GENE MODEL QUALITY CONTROL</text>
-  <rect x="652" y="606" width="574" height="115" rx="10" class="green"/>
-  <text x="939" y="640" class="heading" fill="#27500a">Compare before and after selection</text>
-  <text x="939" y="670" class="body" fill="#3b6d11">Completeness, orthology consistency and annotation statistics</text>
-  <text x="939" y="700" class="small" fill="#3b6d11">BUSCO · OMArk · AGAT · structural QC</text>
-
-  <path d="M1404 534 V641" class="flow"/>
-  <text x="1420" y="578" font-size="15" fill="#777670">Coding annotation</text>
-  <path d="M622 755 H1256" class="flow"/>
-  <text x="939" y="746" class="small" fill="#777670">Genome tracks + repeat annotations*</text>
-  <path d="M1188 721 V730 H1240 V691 H1256" class="feed"/>
-
-  <rect x="1256" y="645" width="296" height="163" rx="10" class="neutral"/>
-  <text x="1404" y="680" class="heading" fill="#444441">Release and report</text>
-  <text x="1404" y="713" class="body" fill="#5f5e5a">Integrated GFF3 and FASTAs</text>
-  <text x="1404" y="740" class="body" fill="#5f5e5a">Tables, ID maps and checksums</text>
-  <text x="1404" y="774" class="body" fill="#444441" font-weight="700">Unified annotation report</text>
-
-  <line x1="48" y1="837" x2="1552" y2="837" stroke="#e3e1d9"/>
-  <path d="M48 864 H94" class="flow"/>
-  <text x="107" y="870" font-size="15" fill="#66655f">Main flow / deliverables</text>
-  <path d="M333 864 H379" class="feed"/>
-  <text x="392" y="870" font-size="15" fill="#66655f">Evidence / parallel analysis / QC</text>
-  <text x="720" y="870" font-size="14" fill="#66655f">*Repeat annotations also feed release. Analyses follow enabled settings and available evidence.</text>
+  <path
+     d="M184 534 V645"
+     class="feed"
+     id="path51" />
+  <text
+     x="205"
+     y="576"
+     font-size="15"
+     fill="#777670"
+     id="text52">Reference +</text>
+  <text
+     x="205"
+     y="598"
+     font-size="15"
+     fill="#777670"
+     id="text53">softmasked genome</text>
+  <rect
+     x="48"
+     y="620"
+     width="574"
+     height="17"
+     rx="4"
+     fill="#cecbf6"
+     id="rect53" />
+  <text
+     x="335"
+     y="633"
+     class="band"
+     fill="#3c3489"
+     id="text54">INDEPENDENT GENOME TRACKS</text>
+  <rect
+     x="48"
+     y="649"
+     width="574"
+     height="135"
+     rx="10"
+     class="structural"
+     id="rect54" />
+  <text
+     x="335"
+     y="683"
+     class="heading"
+     fill="#3c3489"
+     id="text55">Annotate and QC genome features</text>
+  <text
+     x="335"
+     y="715"
+     class="body"
+     fill="#534ab7"
+     id="text56">tRNAs · ncRNAs · telomeres · centromeric repeats</text>
+  <text
+     x="335"
+     y="747"
+     class="small"
+     fill="#534ab7"
+     id="text57">tRNAscan-SE · Infernal / Rfam · tidk · centroAnno</text>
+  <text
+     x="335"
+     y="770"
+     class="small"
+     fill="#534ab7"
+     id="text58">Runs alongside gene annotation</text>
+  <path
+     d="M788 534 V602"
+     class="feed"
+     id="path58" />
+  <path
+     d="M1090 534 V602"
+     class="feed"
+     id="path59" />
+  <rect
+     x="652"
+     y="577"
+     width="574"
+     height="17"
+     rx="4"
+     fill="#c0dd97"
+     id="rect59" />
+  <text
+     x="939"
+     y="590"
+     class="band"
+     fill="#27500a"
+     id="text59">GENE MODEL QUALITY CONTROL</text>
+  <rect
+     x="652"
+     y="606"
+     width="574"
+     height="115"
+     rx="10"
+     class="green"
+     id="rect60" />
+  <text
+     x="939"
+     y="640"
+     class="heading"
+     fill="#27500a"
+     id="text60">Compare before and after selection</text>
+  <text
+     x="939"
+     y="670"
+     class="body"
+     fill="#3b6d11"
+     id="text61">Completeness, orthology consistency and annotation statistics</text>
+  <text
+     x="939"
+     y="700"
+     class="small"
+     fill="#3b6d11"
+     id="text62">BUSCO · OMArk · AGAT · structural QC</text>
+  <path
+     d="M1404 534 V641"
+     class="flow"
+     id="path62" />
+  <text
+     x="1420"
+     y="578"
+     font-size="15"
+     fill="#777670"
+     id="text63">Coding annotation</text>
+  <path
+     d="M622 755 H1256"
+     class="flow"
+     id="path63" />
+  <text
+     x="939"
+     y="746"
+     class="small"
+     fill="#777670"
+     id="text64">Genome tracks + repeat annotations*</text>
+  <path
+     d="M1188 721 V730 H1240 V691 H1256"
+     class="feed"
+     id="path64" />
+  <rect
+     x="1256"
+     y="645"
+     width="296"
+     height="163"
+     rx="10"
+     class="neutral"
+     id="rect64" />
+  <text
+     x="1404"
+     y="680"
+     class="heading"
+     fill="#444441"
+     id="text65">Release and report</text>
+  <text
+     x="1404"
+     y="713"
+     class="body"
+     fill="#5f5e5a"
+     id="text66">Integrated GFF3 and FASTAs</text>
+  <text
+     x="1404"
+     y="740"
+     class="body"
+     fill="#5f5e5a"
+     id="text67">Tables, ID maps and checksums</text>
+  <text
+     x="1404"
+     y="774"
+     class="body"
+     fill="#444441"
+     font-weight="700"
+     id="text68">Unified annotation report</text>
+  <line
+     x1="48"
+     y1="837"
+     x2="1552"
+     y2="837"
+     stroke="#e3e1d9"
+     id="line68" />
+  <path
+     d="M48 864 H94"
+     class="flow"
+     id="path68" />
+  <text
+     x="107"
+     y="870"
+     font-size="15"
+     fill="#66655f"
+     id="text69">Main flow / deliverables</text>
+  <path
+     d="M333 864 H379"
+     class="feed"
+     id="path69" />
+  <text
+     x="392"
+     y="870"
+     font-size="15"
+     fill="#66655f"
+     id="text70">Evidence / parallel analysis / QC</text>
+  <text
+     x="720"
+     y="870"
+     font-size="14"
+     fill="#66655f"
+     id="text71">*Repeat annotations also feed release. Analyses follow enabled settings and available evidence.</text>
 </svg>
