@@ -36,6 +36,19 @@ selected transcript. Product frequencies count coding genes.
 6. Functional products, eligibility and tool coverage.
 7. Methods, resolved settings, stage statuses and source reports.
 
+Completeness tables place metrics in rows, with **Before selection** and
+**Final selected** in adjacent columns. Missing measurements remain unavailable,
+not zero. The source completeness TSV retains its original long format.
+
+Selection tables show the rule, effective activation, threshold/criterion and
+action. An unset evidence threshold is inactive even when the stored default
+action is `remove`; the original settings remain linked. Human-readable labels
+identify protein sources and rule/track names while source IDs remain in
+provenance. tRNA loci, pseudogenes and exon records, and centromeric monomers/HOR
+records, are broken out without changing totals. Telomere tables use percentages,
+formatted integer distances and contig start/end labels; source GFF3 attributes
+retain their original representation.
+
 The inline structural figures are retention, completeness, separate AED and
 splice-support panels. New inline figures cover track filtering, selected telomere
 positions and functional coverage when applicable. Other structural and detailed
@@ -80,4 +93,4 @@ plot correctness was validated by the earlier structural-QC stage tests.
 
 After acceptance, resume the usual `main.nf` run. Review `annotation_report.md`
 and `reports/annotation_report_status.json`. Native cluster reporting acceptance
-and the full-genome report review remain pending.
+passed; the full-data report has been reviewed for the next formatting iteration.

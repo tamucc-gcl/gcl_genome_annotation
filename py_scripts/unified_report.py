@@ -29,6 +29,74 @@ def display(value):
 def md_table(headers, rows): return table(headers, [[display(v) for v in r] for r in rows])
 def tsv(path):
     with Path(path).open(encoding='utf-8') as h: return list(csv.DictReader(h, delimiter='\t'))
+
+def completeness_table(rows):
+    metrics = {}
+    for r in rows:
+        metric, phase = r['metric'], r['model_set']
+        if phase not in ('before', 'after'): raise ValueError('Unknown completeness model set: '+phase)
+        values = metrics.setdefault(metric, {})
+        if phase in values: raise ValueError('Duplicate completeness metric/model set: '+metric+'/'+phase)
+        values[phase] = int(float(r['value'])) if metric == 'busco_total' else float(r['value'])
+    result = []
+    for metric, values in metrics.items():
+        label = metric.replace('busco_', 'BUSCO ').replace('omark_', 'OMArk ').replace('_', ' ')
+        label += ' (orthogroups)' if metric == 'busco_total' else ' (%)'
+        result.append([label, values.get('before'), values.get('after')])
+    return md_table(['Metric', 'Before selection', 'Final selected'], result)
+
+TRACK_LABELS = dict(trnascan='tRNA', infernal='Rfam ncRNA', telomere='Telomeres', centromere='Centromeric repeats')
+REASON_LABELS = dict(single_exon_short_cds='Short single-exon CDS', short_gene_span='Short gene span',
+    all_introns_short='All introns below minimum length', high_rna_aed='RNA AED above threshold',
+    high_protein_aed='Protein AED above threshold', low_coding_junction_support='Coding junction support below threshold',
+    gene_repeat_association='Gene repeat association', low_native_identity='Native identity below threshold',
+    native_low_confidence_HOR='Native low-confidence HOR', native_lower_ranked_overlap='Lower-ranked overlapping match',
+    below_native_inclusion='Below native inclusion threshold', far_from_contig_end='Distant from contig end',
+    low_density='Motif density below threshold', native_tRNA_not_high_confidence='Outside native high-confidence tRNA set',
+    parent_rejected='Parent feature rejected')
+
+def reason_label(key): return REASON_LABELS.get(key, key.replace('_', ' '))
+
+def selection_rules(options):
+    rows = []
+    actions = dict(off='Not applied', flag='Flag only', remove='Remove')
+    def add(label, active, threshold, action):
+        rows.append([label, active, threshold, actions[action] if active else 'Not applied'])
+    for label, key, prefix in [('Short single-exon CDS','min_cds_length','CDS < '),
+                               ('Short gene span','min_gene_length','Span < '),
+                               ('All introns short','min_intron_length','All introns < ')]:
+        cutoff = options[key]; action = options['structural_action']
+        add(label, action != 'off' and cutoff > 0, prefix+fmt(cutoff)+' bp', action)
+    cutoff = options['max_aed']; source = options['aed_source']; action = options['aed_action']
+    label = ('RNA' if source == 'rna' else 'Protein')+' AED' if source in ('rna','protein') else 'AED'
+    add(label, cutoff is not None and action != 'off', 'AED > '+display(cutoff) if cutoff is not None else 'Not set', action)
+    cutoff = options['min_junction_fraction']; action = options['junction_action']
+    add('Coding junction support', cutoff is not None and action != 'off',
+        f'Pass fraction < {cutoff:.1%}' if cutoff is not None else 'Not set', action)
+    add('Gene repeat association', options['te_action'] != 'off', 'Assessed repeat-association flag', options['te_action'])
+    return md_table(['Rule','Active?','Threshold / criterion','Action'], rows)
+
+def protein_source_label(source):
+    request = source.get('request', {}); kind = request.get('kind')
+    if kind == 'orthodb': return 'OrthoDB'+(' '+request['clade'] if request.get('clade') else '')
+    if kind == 'ncbi': return 'NCBI'+(' '+request['accession'] if request.get('accession') else ' proteome')
+    if kind == 'local': return 'Local FASTA'+(' '+Path(request['local_path']).name if request.get('local_path') else '')
+    return kind or source['source_id']
+
+def track_breakdown(track, release):
+    rows = []
+    labels = dict(tRNA='tRNA loci', pseudogene='Pseudogene loci', exon='Exon records',
+                  satellite_DNA='Monomer records', repeat_region='HOR records')
+    for key in ('trnascan','centromere'):
+        state = track['tracks'][key]
+        if state['status'] != 'ready': continue
+        selected = release['tracks'][key]['feature_types']; raw = state.get('raw_feature_types')
+        kinds = set(selected) | set(raw or {})
+        order = [k for k in labels if k in kinds]+sorted(kinds-set(labels))
+        for kind in order:
+            rows.append([TRACK_LABELS[key],labels.get(kind,kind.replace('_',' ')),raw.get(kind,0) if raw is not None else None,selected.get(kind,0)])
+    return md_table(['Track','Feature class','Raw records','Selected records'],rows) if rows else ''
+
 def by_assembly(state, aid):
     rows = [r for r in state.get('assemblies', []) if r['assembly_id'] == aid]
     if len(rows) != 1: raise ValueError('Missing/duplicate assembly in stage report: '+aid)
@@ -125,7 +193,8 @@ def build(request, outdir):
                  ['RNA readsets',len(prepared.get('rna_readsets',[]))]]), '',
              'N50 uses the retained reference contig lengths. Protein evidence records are database sequences, not predicted genes. Paired RNA read units are pairs; alignment fractions use primary individual reads.', '']
         if proteins.get('sources'):
-            p += [md_table(['Protein source','Kind','Status','Protein records'],[[s['source_id'],s.get('request',{}).get('kind'),s['status'],s.get('protein_count')] for s in proteins['sources']]), '']
+            p += [md_table(['Protein source','Status','Protein records'],[[f'[{protein_source_label(s)}](protein_sources/{s["source_id"]}/source.json)',s['status'],s.get('protein_count')] for s in proteins['sources']]), '',
+                  'Source identifiers, acquisition requests and checksums are retained in the linked provenance.', '']
         ids = set(prepared.get('rna_readsets', []))
         read_units = {r['readset_id']:r for r in stages['rna','run'].get('readsets',[]) if r['readset_id'] in ids}
         mapping = [r for r in stages['rna_alignment','run'].get('readsets',[]) if r.get('assembly_id', r.get('strand',{}).get('assembly_id')) == aid]
@@ -140,15 +209,17 @@ def build(request, outdir):
                 ['Protein sequences preserved',utr.get('protein_sequences_unchanged')]]), '',
             'Before/after below means accepted post-UTR models before selection versus the selected final-ID set.', '',
             f'![Model retention](qc/structural/{aid}/plots/retention.png)', '',
-            'Selection rules and resolved thresholds:', '', md_table(['Setting','Value'],[[k,v] for k,v in sorted(selection['settings'].items())]), '',
-            md_table(['Exclusion rule','Excluded transcripts triggering rule'],sorted(selection.get('removal_reason_counts',{}).items())) if selection.get('removal_reason_counts') else 'No transcript exclusion rules were triggered.', '',
+            'Selection rules and resolved thresholds:', '', selection_rules(selection['settings']), '',
+            'Active describes rule configuration, not whether any models triggered it. Evidence-dependent rules skip unavailable/not-applicable assessments; assessment can be enabled while selection on that evidence is inactive.', '',
+            f'[Exact resolved selection settings](reports/annotation_report_data/selection.{aid}.json)', '',
+            md_table(['Exclusion rule','Excluded transcripts triggering rule'],[[reason_label(k),v] for k,v in sorted(selection.get('removal_reason_counts',{}).items())]) if selection.get('removal_reason_counts') else 'No transcript exclusion rules were triggered.', '',
             'One transcript can trigger multiple exclusion rules. Coding IDs and complete excluded-model decisions are available in the release ID maps.', '']
         p += [f'[Selection-decision figure](qc/structural/{aid}/plots/decisions.png)', '']
         completeness = tsv(qcfile('completeness_metrics.tsv'))
         for metric in ('busco_complete','busco_single','busco_duplicated','busco_fragmented','busco_missing','omark_consistent','omark_inconsistent','omark_contaminant','omark_unknown'):
             row[metric]=next((float(r['value']) for r in completeness if r['model_set']=='after' and r['metric']==metric),None)
         p += ['### Completeness and gene structure', '',
-              md_table(['Model set','Metric','Value'],[['Before selection' if r['model_set']=='before' else 'Final selected',r['metric'].replace('busco_','BUSCO ').replace('omark_','OMArk ').replace('_',' ')+(' (orthogroups)' if r['metric']=='busco_total' else ' (%)'),int(float(r['value'])) if r['metric']=='busco_total' else float(r['value'])] for r in completeness]) if completeness else 'BUSCO/OMArk metrics: not requested.', '',
+              completeness_table(completeness) if completeness else 'BUSCO/OMArk metrics: not requested.', '',
               'BUSCO and OMArk use one selected representative protein per coding gene. Percentages retain each tool’s native denominator; other isoforms are not independently classified.', '',
               f'![Completeness before and after selection](qc/structural/{aid}/plots/completeness.png)', '',
               f'[Gene/CDS structure distributions](qc/structural/{aid}/plots/structure.png) · [Intron/isoform distributions](qc/structural/{aid}/plots/complexity.png) · [AGAT and detailed structural QC](qc/structural/{aid}/README.md)', '']
@@ -169,10 +240,11 @@ def build(request, outdir):
                   ['Repeat interval-union coverage',f"{repeat['repeat_interval_union_bases']/bases:.2%}" if repeat.get('repeat_interval_union_bases') is not None else None],
                   ['Lowercase A/C/G/T bases',repeat.get('lowercase_acgt_bases')],['Repeat alignment records',repeat.get('repeat_alignment_records')]]), '',
               'Coverage is an interval union. Repeat-class coverage can overlap and must not be summed. RepeatMasker RNA-labelled repeats are not added to tRNAscan/Rfam gene counts.', '',
-              md_table(['Track','Status','Raw feature records','Selected feature records'],[[t,s['status'],s.get('raw_features'),s.get('features')] for t,s in track['tracks'].items()]), '']
+              md_table(['Track','Status','Raw feature records','Selected feature records'],[[TRACK_LABELS[t],s['status'],s.get('raw_features'),s.get('features')] for t,s in track['tracks'].items()]), '',
+              track_breakdown(track,release), '']
         reasons=[]
         for t,s in track['tracks'].items():
-            reasons += [[t,s.get('decision_unit'),k,n] for k,n in s.get('reasons',{}).items() if k not in ('passed','filter_disabled')]
+            reasons += [[TRACK_LABELS[t],s.get('decision_unit','').replace('_',' '),reason_label(k),n] for k,n in s.get('reasons',{}).items() if k not in ('passed','filter_disabled')]
         p += [md_table(['Track','Decision unit','Rejection reason','Count'],reasons) if reasons else 'No rejected feature/window decisions were recorded.', '',
               'Feature records can include exons and repeat fragments. Telomere decisions use candidate windows; selected regions merge adjacent qualifying windows. Centromeric satellite/HOR records are repeat predictions, not counts of functional centromeres.', '',
               f'[Raw calls, selected tracks, resolved filters and audits](genome_tracks/{aid}/README.md) · [Repeat preparation](reference_repeats/README.md)', '']
@@ -181,7 +253,7 @@ def build(request, outdir):
             fig,ax=plt.subplots(figsize=(8,3.8)); x=list(range(len(present)))
             ax.bar([i-.18 for i in x],[s['raw_features'] for t,s in present],.36,label='Raw feature records',color='#466A95')
             ax.bar([i+.18 for i in x],[s['features'] for t,s in present],.36,label='Selected feature records',color='#27856C')
-            ax.set_xticks(x,[t for t,s in present]); ax.set_yscale('symlog',linthresh=1); ax.set_ylabel('Feature records (symlog scale)'); ax.set_title(aid+' — genome-track filtering');ax.legend()
+            ax.set_xticks(x,[TRACK_LABELS[t] for t,s in present]); ax.set_yscale('symlog',linthresh=1); ax.set_ylabel('Feature records (symlog scale)'); ax.set_title(aid+' — genome-track filtering');ax.legend()
             p += [save(fig,aid,'track_filtering'), '', 'Bars count feature records, not loci; telomere raw and selected regions have different merging boundaries.', '']
         if track['tracks']['telomere']['status']=='ready':
             telo=payload(f'tracks/{aid}.telomere.gff3'); candidates=[]
@@ -189,7 +261,10 @@ def build(request, outdir):
                 if not line.strip() or line.startswith('#'):continue
                 c=line.split('\t'); a=dict(v.split('=',1) for v in c[8].split(';') if '=' in v)
                 candidates.append([c[0],int(c[3]),int(c[4]),a.get('motif_density'),a.get('end_distance'),a.get('position')])
-            p += [md_table(['Contig','Start','End','Motif density','End distance (bp)','Position'],candidates) if len(candidates)<=30 else f'{len(candidates):,} selected telomere regions; [full coordinates](release/{aid}/tracks/{aid}.telomere.gff3).', '']
+            positions=dict(five_prime='Contig start',three_prime='Contig end',spanning='Both ends',interstitial='Internal')
+            positions.update({'5_prime':'Contig start','3_prime':'Contig end'})
+            formatted=[[c[0],c[1],c[2],f'{float(c[3]):.1%}' if c[3] is not None else None,int(c[4]) if c[4] is not None else None,positions.get(c[5],c[5])] for c in candidates]
+            p += [md_table(['Contig','Start','End','Motif density','End distance (bp)','Position'],formatted) if len(candidates)<=30 else f'{len(candidates):,} selected telomere regions; [full coordinates](release/{aid}/tracks/{aid}.telomere.gff3).', '']
             if candidates and all(c[3] is not None and c[4] is not None for c in candidates):
                 fig,ax=plt.subplots(figsize=(7,3.8)); ax.scatter([int(c[4]) for c in candidates],[float(c[3])*100 for c in candidates],color='#27856C')
                 ax.set(xlabel='Nearest contig-end distance (bp)',ylabel='Exact-motif coverage (%)',ylim=(0,100),title=aid+' — selected telomere regions')
@@ -252,7 +327,7 @@ def build(request, outdir):
             ['Release packaging',release['status']]]), '',
             'Configured/resolved settings below describe the requested execution. They do not establish the release of an already-populated shared database; `CURRENT` is an acquisition setting. Native runtime/version records and source manifests remain linked with each stage.', '',
             md_table(['Per-assembly setting','Value'],[[k,json.dumps(v,sort_keys=True) if isinstance(v,(dict,list)) else v] for k,v in sorted(settings.items())]), '',
-            md_table(['Genome-track filter','Resolved policy'],[[t,json.dumps(s.get('filter_policy',{}),sort_keys=True)] for t,s in track['tracks'].items() if s['status']=='ready']) if any(s['status']=='ready' for s in track['tracks'].values()) else 'All optional genome tracks were disabled.', '',
+            md_table(['Genome-track filter','Resolved policy'],[[TRACK_LABELS[t],json.dumps(s.get('filter_policy',{}),sort_keys=True)] for t,s in track['tracks'].items() if s['status']=='ready']) if any(s['status']=='ready' for s in track['tracks'].values()) else 'All optional genome tracks were disabled.', '',
             f'[Prediction and native runtime logs](structural_annotation/README.md) · [UTR changes and checks](structural_annotation/utr/{aid}/README.md) · [Full structural QC and figures](qc/structural/{aid}/README.md)', '',
             '[Preflight and taxonomy provenance](preflight/README.md) · [Protein evidence sources](protein_evidence/README.md) · [RNA preparation](rna/README.md) · [RNA alignment](rna_alignment/README.md)', '',
             f'Reference identity: `{ref}`.', '']
