@@ -26,7 +26,16 @@ def display(value):
         if not math.isfinite(value): raise ValueError('Nonfinite report metric')
         return f'{value:.6g}'
     return escape(value)
-def md_table(headers, rows): return table(headers, [[display(v) for v in r] for r in rows])
+def md_table(headers, rows):
+    rows = list(rows)
+    numeric = re.compile(r'[+-]?[\d,]+(?:\.\d+)?(?:[eE][+-]?\d+)?%?')
+    alignments = []
+    for column in range(len(headers)):
+        values = [display(r[column]) for r in rows if r[column] is not None and r[column] != '.']
+        alignments.append('---:' if values and all(numeric.fullmatch(v) for v in values) else ':---')
+    lines = table(headers, [[display(v) for v in r] for r in rows]).splitlines()
+    lines[1] = '|'+'|'.join(alignments)+'|'
+    return '\n'.join(lines)+'\n'
 def tsv(path):
     with Path(path).open(encoding='utf-8') as h: return list(csv.DictReader(h, delimiter='\t'))
 
@@ -46,6 +55,35 @@ def completeness_table(rows):
     return md_table(['Metric', 'Before selection', 'Final selected'], result)
 
 TRACK_LABELS = dict(trnascan='tRNA', infernal='Rfam ncRNA', telomere='Telomeres', centromere='Centromeric repeats')
+TOOL_LABELS = dict(interproscan='InterProScan', eggnog='eggNOG-mapper', diamond='DIAMOND',
+                   kofamscan='KofamScan', deepsig='DeepSig')
+POLICY_LABELS = dict(enabled='Filtering enabled', high_confidence_hor='Require high-confidence HORs',
+    min_identity='Minimum identity', method='Method', remove_overlaps='Remove lower-ranked overlaps',
+    max_end_distance='Maximum contig-end distance (bp)', min_density='Minimum motif density',
+    motif='Telomere motif', raw_min_count='Minimum raw motif count per window', window='Window size (bp)',
+    cmscore='Minimum covariance model score', isoscore='Minimum isotype score',
+    ssscore='Minimum secondary structure score', tertiary_start='Tertiary filtering start score',
+    tertiary_max='Tertiary filtering maximum score')
+
+def setting_rows(settings, prefix=''):
+    rows = []
+    for key, value in sorted(settings.items()):
+        label = prefix+key.replace('_', ' ').capitalize()
+        if isinstance(value, dict): rows.extend(setting_rows(value, label+' / '))
+        else:
+            if isinstance(value, list): value = '; '.join(display(v) for v in value) or 'None configured'
+            rows.append([label, value])
+    return rows
+
+def track_policy_table(tracks):
+    rows = []
+    for track, state in tracks.items():
+        if state['status'] != 'ready': continue
+        for key, value in sorted(state.get('filter_policy', {}).items()):
+            if key in ('min_identity', 'min_density'): value = f'{float(value):.1%}'
+            if key == 'method' and value == 'native_inclusion_and_overlap': value = 'Native inclusion and overlap annotations'
+            rows.append([TRACK_LABELS[track], POLICY_LABELS.get(key,key.replace('_',' ').capitalize()),value])
+    return md_table(['Genome-track filter','Setting','Value'],rows) if rows else 'All optional genome tracks were disabled.'
 REASON_LABELS = dict(single_exon_short_cds='Short single-exon CDS', short_gene_span='Short gene span',
     all_introns_short='All introns below minimum length', high_rna_aed='RNA AED above threshold',
     high_protein_aed='Protein AED above threshold', low_coding_junction_support='Coding junction support below threshold',
@@ -273,7 +311,7 @@ def build(request, outdir):
         if release['functional_enabled']:
             functional=read(payload('provenance/functional_status.json'))
             p += [md_table(['Metric','Transcripts'],[['Named product',functional.get('named_transcripts')],['Hypothetical protein',functional.get('hypothetical_transcripts')]]), '',
-                  md_table(['Tool','Hit','No hit','Ineligible','Disabled'],[[t,*[s.get(k,0) for k in ('hit','no_hit','ineligible','disabled')]] for t,s in functional.get('tools',{}).items()]), '',
+                  md_table(['Tool','Hit','No hit','Ineligible','Disabled'],[[TOOL_LABELS.get(t,t),*[s.get(k,0) for k in ('hit','no_hit','ineligible','disabled')]] for t,s in functional.get('tools',{}).items()]), '',
                   'Coverage counts selected coding transcripts/proteins. Ineligible sequences remain in the release; disabled and no-hit results are distinct. OMArk classes apply only to assessed representatives.', '']
             tools=functional.get('tools',{})
             for tool,counts in tools.items():
@@ -286,7 +324,7 @@ def build(request, outdir):
                 for category,color in [('hit','#27856C'),('no_hit','#466A95'),('ineligible','#B89046'),('disabled','#AAAAAA')]:
                     values=[s.get(category,0) for s in tools.values()]
                     ax.barh(positions,values,left=left,color=color,label=category.replace('_',' '));left=[a+b for a,b in zip(left,values)]
-                ax.set_yticks(positions,list(tools));ax.set_xlabel('Selected coding transcripts');ax.set_title(aid+' — functional tool coverage');ax.xaxis.set_major_locator(MaxNLocator(integer=True));ax.legend(loc='upper center',bbox_to_anchor=(.5,-.15),ncol=4)
+                ax.set_yticks(positions,[TOOL_LABELS.get(t,t) for t in tools]);ax.set_xlabel('Selected coding transcripts');ax.set_title(aid+' — functional tool coverage');ax.xaxis.set_major_locator(MaxNLocator(integer=True));ax.legend(loc='upper center',bbox_to_anchor=(.5,-.15),ncol=4)
                 p += [save(fig,aid,'functional_coverage'), '']
             # Carry forward the original report's vocabulary/product detail plots.
             # Count each term at most once per selected transcript (no enrichment).
@@ -326,8 +364,9 @@ def build(request, outdir):
             ['Junction QC','enabled' if request.get('configuration',{}).get('run_junction_qc') is True else 'disabled' if request.get('configuration',{}).get('run_junction_qc') is False else 'not recorded'],
             ['Release packaging',release['status']]]), '',
             'Configured/resolved settings below describe the requested execution. They do not establish the release of an already-populated shared database; `CURRENT` is an acquisition setting. Native runtime/version records and source manifests remain linked with each stage.', '',
-            md_table(['Per-assembly setting','Value'],[[k,json.dumps(v,sort_keys=True) if isinstance(v,(dict,list)) else v] for k,v in sorted(settings.items())]), '',
-            md_table(['Genome-track filter','Resolved policy'],[[TRACK_LABELS[t],json.dumps(s.get('filter_policy',{}),sort_keys=True)] for t,s in track['tracks'].items() if s['status']=='ready']) if any(s['status']=='ready' for s in track['tracks'].values()) else 'All optional genome tracks were disabled.', '',
+            md_table(['Per-assembly setting','Value'],setting_rows(settings)), '',
+            track_policy_table(track['tracks']), '',
+            f'[Exact resolved assembly settings](reports/annotation_report_data/preflight.run.json) · [Exact genome-track filter policies](release/{aid}/provenance/genome_tracks_status.json)', '',
             f'[Prediction and native runtime logs](structural_annotation/README.md) · [UTR changes and checks](structural_annotation/utr/{aid}/README.md) · [Full structural QC and figures](qc/structural/{aid}/README.md)', '',
             '[Preflight and taxonomy provenance](preflight/README.md) · [Protein evidence sources](protein_evidence/README.md) · [RNA preparation](rna/README.md) · [RNA alignment](rna_alignment/README.md)', '',
             f'Reference identity: `{ref}`.', '']
@@ -339,7 +378,7 @@ def build(request, outdir):
         md_table(['Assembly','Evidence mode','Coding genes','Coding transcripts','Deliverables'],overview), '',
         '## Contents', '', *[f'- [Assembly {i}: {escape(a)}](#assembly-{i}-{re.sub(r"[^a-z0-9_-]", "", a.lower())})' for i,a in enumerate(expected,1)], '',
         'Results are reported per assembly. Missing/not-requested evidence remains distinct from zero or no hit. This report does not calculate a composite confidence score, apply additional filtering or provide tuning recommendations.', '']
-    text='\n'.join(header+parts+['## Run configuration', '', md_table(['Configured parameter','Value'],[[k,json.dumps(v,sort_keys=True) if isinstance(v,(dict,list)) else v] for k,v in sorted(request.get('configuration',{}).items())]), '',
+    text='\n'.join(header+parts+['## Run configuration', '', md_table(['Configured parameter','Value'],setting_rows(request.get('configuration',{}))), '',
         '[Machine-readable report status](reports/annotation_report_status.json) · [Assembly metrics](reports/annotation_metrics.tsv) · [Source stage manifests](reports/annotation_report_data/)', ''])
     (out/'annotation_report.md').write_text(text,encoding='utf-8')
     with (out/'annotation_metrics.tsv').open('w',newline='') as h:

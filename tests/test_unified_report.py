@@ -8,7 +8,7 @@ import unittest
 
 from test_annotation_release import release_fixture
 from package_annotation import package
-from unified_report import build
+from unified_report import build, md_table, setting_rows, track_policy_table
 from reference_repeats import sha
 
 
@@ -59,6 +59,24 @@ def report_fixture(root, mode='rna_protein', sources=None, functional=True):
     return dict(releases=releases,structural=structural,stages=stages,configuration=dict(rfam_version='CURRENT',run_aed=True,run_junction_qc=False))
 
 
+class ReportFormattingTests(unittest.TestCase):
+    def test_text_and_numeric_alignment(self):
+        text=md_table(['Tool','Count','Fraction','Status'],[
+            ['DIAMOND',1200,'75.0%','ready'],['DeepSig',None,None,'disabled']])
+        self.assertEqual(text.splitlines()[1],'|:---|---:|---:|:---|')
+        self.assertIn('| DIAMOND | 1,200 | 75.0% | ready |',text)
+
+    def test_readable_settings_preserve_disabled_policies(self):
+        self.assertEqual(setting_rows(dict(protein_fastas=[],accessions=['A','B'])),[
+            ['Accessions','A; B'],['Protein fastas','None configured']])
+        text=track_policy_table(dict(telomere=dict(status='ready',filter_policy=dict(
+            enabled=False,min_density=.5,max_end_distance=10000))))
+        self.assertIn('| Telomeres | Filtering enabled | no |',text)
+        self.assertIn('| Telomeres | Minimum motif density | 50.0% |',text)
+        self.assertIn('| Telomeres | Maximum contig-end distance (bp) | 10,000 |',text)
+        self.assertNotIn('{',text)
+
+
 @unittest.skipUnless(importlib.util.find_spec('matplotlib'),'Unified report plotting environment required')
 class UnifiedReportTests(unittest.TestCase):
     def test_four_modes_results_methods_only_and_assets(self):
@@ -72,6 +90,9 @@ class UnifiedReportTests(unittest.TestCase):
                 self.assertIn('| AED | no | Not set | Not applied |',text)
                 self.assertIn('| Coding junction support | no | Not set | Not applied |',text)
                 self.assertIn('| tRNA | tRNA loci |',text)
+                self.assertIn('| DIAMOND | 1 | 1 | 0 | 0 |',text)
+                self.assertIn('| InterProScan | 0 | 0 | 0 | 2 |',text)
+                self.assertIn('Exact genome-track filter policies',text)
                 self.assertNotIn('| single_exon_short_cds |',text)
                 self.assertNotIn('Tuning Recommendations',text);self.assertNotIn('consider tightening',text)
                 self.assertIn('Rfam',text);self.assertIn('acquisition setting',text)

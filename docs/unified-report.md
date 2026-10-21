@@ -5,6 +5,12 @@ assembly-specific subsections. Key figures are inline; detailed figures and tabl
 are linked. Content is restricted to results and methods: no tuning advice,
 interpretation, composite confidence score or pipeline-written HTML.
 
+Text columns are left-aligned and numeric columns right-aligned. Functional
+coverage tables and figures use standard tool names. Resolved filtering policies
+appear as individual settings rather than JSON cells, with percentages and base
+pair distances formatted for reading. Exact source settings remain available in
+the linked provenance manifests.
+
 Open `annotation_report.md` at the output root. Supporting outputs are:
 
 - `reports/annotation_metrics.tsv`: explicit per-assembly metrics and denominators.
