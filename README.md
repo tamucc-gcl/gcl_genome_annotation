@@ -5,6 +5,8 @@ workflow prepares references and evidence, predicts coding genes with BRAKER3,
 assesses and selects models, annotates their functions and independent genome
 tracks, and packages a validated release with a unified Markdown report.
 
+![](assets/genome_annotation_pipeline.png)
+
 ## Start here
 
 - [Run, configure and resume the pipeline](docs/running.md)
