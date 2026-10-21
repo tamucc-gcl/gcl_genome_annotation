@@ -18,7 +18,7 @@ workflow ANNOTATION_RELEASE {
         tuple(aid,folder,genome,masked,identity,repeats,repeatStatus,trackStatus,
             selected.findAll { it[0]==aid }.sort { it[1] }.collect { it[2] },params.run_functional_annotation,f[1],f[2],f[3],f[4])
     },['package_annotation.py','functional_report.py','functional_inputs.py','model_metrics.py','annotation_models.py',
-        'prepare_protein_evidence.py','reference_repeats.py'].collect { file("${projectDir}/py_scripts/${it}",checkIfExists:true) })
+        'prepare_protein_evidence.py','reference_repeats.py'].collect { file("${params.pipeline_root}/py_scripts/${it}",checkIfExists:true) })
     releases=PACKAGE_ANNOTATION_RELEASE.out.bundle.toList().map { it.sort { row -> row[0] } }
     // Do not silently advertise a partial release if a required join lost an assembly.
     ANNOTATION_RELEASE_INDEX(references.map { it[0] }.toList().map { it.sort() },releases.map { it.collect { row -> row[1] } })

@@ -24,19 +24,19 @@ workflow MODEL_ASSESSMENT {
 
     main:
     PREPARE_MODEL_METRICS(annotations,['model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
-        file("${projectDir}/py_scripts/${it}",checkIfExists:true)
+        file("${params.pipeline_root}/py_scripts/${it}",checkIfExists:true)
     })
     teReports = Channel.value([])
     if (params.run_te_flagging) {
         validateTeSettings(params.te_flag_overlap_frac, params.te_flag_evalue)
-        nativeHelpers = ['te_search.py','prepare_protein_evidence.py'].collect { file("${projectDir}/py_scripts/${it}",checkIfExists:true) }
+        nativeHelpers = ['te_search.py','prepare_protein_evidence.py'].collect { file("${params.pipeline_root}/py_scripts/${it}",checkIfExists:true) }
         BUILD_TE_REPEAT_DB(repeatRequests.map { aid,repeats,library -> tuple(aid,library) },nativeHelpers)
         SEARCH_TE_PROTEINS(annotations.map { aid,genome,gff,proteins,cds,validation,identity -> tuple(aid,proteins) }
             .join(BUILD_TE_REPEAT_DB.out.database),nativeHelpers)
         FLAG_TE_GENES(annotations.map { aid,genome,gff,proteins,cds,validation,identity -> tuple(aid,gff,identity) }
             .join(PREPARE_MODEL_METRICS.out.metrics).join(repeatRequests).join(SEARCH_TE_PROTEINS.out.search)
             .map { aid,gff,identity,metrics,regions,repeats,library,search -> tuple(aid,gff,metrics,regions,identity,repeats,search) },
-            ['te_evidence.py','prepare_protein_evidence.py'].collect { file("${projectDir}/py_scripts/${it}",checkIfExists:true) })
+            ['te_evidence.py','prepare_protein_evidence.py'].collect { file("${params.pipeline_root}/py_scripts/${it}",checkIfExists:true) })
         teReports = FLAG_TE_GENES.out.te_gene_report.join(FLAG_TE_GENES.out.status).toList()
     }
     optional = aedReports.toList().map { rows -> [rows] }
@@ -49,7 +49,7 @@ workflow MODEL_ASSESSMENT {
         if (params.run_junction_qc && !junction) error "Missing junction assessment for ${aid}"
         if (params.run_te_flagging && !te) error "Missing TE assessment for ${aid}"
         tuple(aid,metrics,aed ? [aed[1],aed[2]] : [],junction ? [junction[1],junction[2]] : [],te ? [te[1],te[2]] : [])
-    },['model_assessment.py','prepare_protein_evidence.py'].collect { file("${projectDir}/py_scripts/${it}",checkIfExists:true) })
+    },['model_assessment.py','prepare_protein_evidence.py'].collect { file("${params.pipeline_root}/py_scripts/${it}",checkIfExists:true) })
     emit:
     status = REPORT_MODEL_ASSESSMENT.out.status
     transcripts = REPORT_MODEL_ASSESSMENT.out.transcripts

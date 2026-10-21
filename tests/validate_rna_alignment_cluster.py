@@ -65,7 +65,7 @@ def run_case(root, inputs, name, sheet, expected, suffix='fresh', resume=False, 
     case.mkdir(exist_ok=True)
     output = case / 'results'
     command = ['nextflow', '-log', str(case / f'{suffix}.nextflow.log'), '-C', str(ROOT / 'nextflow.config'),
-               'run', str(ROOT / 'rna_alignment.nf'), '-profile', 'slurm', '-w', str(case / 'work'),
+               'run', str(ROOT / 'validation/entrypoints/rna_alignment.nf'), '-profile', 'slurm', '-w', str(case / 'work'),
                '--sample_sheet', str(inputs / sheet), '--rna_sheet', str(inputs / 'reads.csv'),
                '--rna_prepared_status', str(inputs / 'prepared.json'), '--rna_reference_dir', str(inputs / 'references'),
                '--taxid', '999', '--taxdump_dir', str(inputs / 'taxdump'), '--outdir', str(output),

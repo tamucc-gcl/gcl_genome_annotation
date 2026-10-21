@@ -1,9 +1,9 @@
 #!/usr/bin/env nextflow
 // Development pilot: reuse accepted predictions, RNA and BAMs; no BRAKER/repeats.
 nextflow.enable.dsl = 2
-include { PREPARE_UTR_INPUTS; RUN_UTR_REFINEMENT; FINALIZE_UTR_ANNOTATION; EXTRACT_UTR_SEQUENCES; VALIDATE_UTR_REFINEMENT } from './modules/utrRefinement.nf'
-include { ASSEMBLE_AED_RNA; MERGE_AED_RNA } from './modules/evidenceAed.nf'
-include { AGAT as UTR_AGAT } from './modules/agat.nf'
+include { PREPARE_UTR_INPUTS; RUN_UTR_REFINEMENT; FINALIZE_UTR_ANNOTATION; EXTRACT_UTR_SEQUENCES; VALIDATE_UTR_REFINEMENT } from '../../modules/utrRefinement.nf'
+include { ASSEMBLE_AED_RNA; MERGE_AED_RNA } from '../../modules/evidenceAed.nf'
+include { AGAT as UTR_AGAT } from '../../modules/agat.nf'
 
 workflow {
     def root = file(params.utr_inputs_root ?: params.outdir).toString()
@@ -11,7 +11,7 @@ workflow {
     def predictions = parse("${root}/structural_annotation/prediction_status.json")
     if (predictions.status != 'ready') error 'UTR refinement requires accepted BRAKER predictions'
     def helpers = ['utr_refinement.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
-        file("${projectDir}/py_scripts/${it}", checkIfExists: true)
+        file("${params.pipeline_root}/py_scripts/${it}", checkIfExists: true)
     }
     def base = Channel.fromList(predictions.assemblies).map { row ->
         def aid = row.assembly_id

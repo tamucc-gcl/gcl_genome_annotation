@@ -14,12 +14,12 @@ workflow FINAL_STRUCTURAL_ANNOTATION {
     RENAME_GENE_MODELS(selected.join(metadata).map { aid,folder,settings,genome,identity -> tuple(aid,folder,identity) },
         params.final_id_prefix ?: '',
         ['final_identifiers.py','model_selection.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
-            file("${projectDir}/py_scripts/${it}",checkIfExists:true)
+            file("${params.pipeline_root}/py_scripts/${it}",checkIfExists:true)
         })
     SELECTED_ANNOTATION_QC(metadata.join(RENAME_GENE_MODELS.out.bundle).map { aid,settings,genome,identity,folder ->
         tuple(aid,settings,genome,file("${folder}/${aid}.gff3"),file("${folder}/${aid}_proteins.fa"),file("${folder}/annotation_status.json"))
     },['identified_qc.py','annotation_baseline.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
-        file("${projectDir}/py_scripts/${it}",checkIfExists:true)
+        file("${params.pipeline_root}/py_scripts/${it}",checkIfExists:true)
     })
     afterQc = SELECTED_ANNOTATION_QC.out.agat.mix(SELECTED_ANNOTATION_QC.out.busco)
         .mix(SELECTED_ANNOTATION_QC.out.omark).mix(SELECTED_ANNOTATION_QC.out.omark_classes)
@@ -30,11 +30,11 @@ workflow FINAL_STRUCTURAL_ANNOTATION {
         aid,identified,selection,assessment,status,before,after ->
         tuple(aid,identified,selection,assessment,status,before.findAll { it[0]==aid }.collect { it[1] },after.findAll { it[0]==aid }.collect { it[1] })
     },['structural_report.py','qc_metrics.py','model_selection.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
-        file("${projectDir}/py_scripts/${it}",checkIfExists:true)
+        file("${params.pipeline_root}/py_scripts/${it}",checkIfExists:true)
     })
     reportRows = STRUCTURAL_QC.out.report.toList().map { rows -> rows.sort { it[0] } }
     STRUCTURAL_QC_INDEX(metadata.toList().map { it.collect { row -> row[0] }.sort() },reportRows.map { it.collect { row -> row[1] } },
-        file("${projectDir}/py_scripts/structural_report_index.py",checkIfExists:true))
+        file("${params.pipeline_root}/py_scripts/structural_report_index.py",checkIfExists:true))
     emit:
     annotation = RENAME_GENE_MODELS.out.bundle
     omark_classes = SELECTED_ANNOTATION_QC.out.omark_classes

@@ -15,7 +15,7 @@ workflow FUNCTIONAL_ANNOTATION {
     main:
     if ((params.n_chunks as int) < 1) error 'n_chunks must be positive'
     helpers = ['functional_inputs.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
-        file("${projectDir}/py_scripts/${it}",checkIfExists:true)
+        file("${params.pipeline_root}/py_scripts/${it}",checkIfExists:true)
     }
     PREPARE_FUNCTIONAL_INPUTS(jobs.map { aid,settings,folder -> tuple(aid,
         file("${folder}/${aid}_proteins.fa"),file("${folder}/${aid}.gff3"),
@@ -113,17 +113,17 @@ workflow FUNCTIONAL_ANNOTATION {
         tuple(aid,encoded,file("${folder}/transcript_assessment.tsv"),eligibility,*paths,omark ? omark[1] : [])
     }
     MERGE_FUNCTIONAL_ANNOTATIONS(mergeJobs,['merge_functional_annotations.py','functional_inputs.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
-        file("${projectDir}/py_scripts/${it}",checkIfExists:true)
+        file("${params.pipeline_root}/py_scripts/${it}",checkIfExists:true)
     })
     ANNOTATE_GFF3(jobs.join(MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv).map { aid,settings,folder,table ->
         tuple(aid,file("${folder}/${aid}.gff3"),[],[],[],[],[],table)
-    },file("${projectDir}/py_scripts/annotate_gff3.py",checkIfExists:true))
+    },file("${params.pipeline_root}/py_scripts/annotate_gff3.py",checkIfExists:true))
     REPORT_FUNCTIONAL_ANNOTATION(jobs.join(ANNOTATE_GFF3.out.annotated_gff3).join(MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv)
         .join(MERGE_FUNCTIONAL_ANNOTATIONS.out.status).join(PREPARE_FUNCTIONAL_INPUTS.out.prepared).map {
             aid,settings,folder,gff,table,status,proteins,eligibility,validation ->
             tuple(aid,file("${folder}/${aid}.gff3"),gff,table,status,eligibility)
         },['functional_report.py','functional_inputs.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
-            file("${projectDir}/py_scripts/${it}",checkIfExists:true)
+            file("${params.pipeline_root}/py_scripts/${it}",checkIfExists:true)
         })
     emit:
     annotation = ANNOTATE_GFF3.out.annotated_gff3

@@ -1,4 +1,4 @@
-# Source consolidation and remaining cleanup
+# Completed source and directory cleanup
 
 Updated after the 21 October 2026 source consolidation. Production commands and
 process names are retained where possible; no scientific scoring algorithm was
@@ -54,7 +54,7 @@ its native UTR and current per-transcript selection cases remain.
 
 ## Tests worth keeping
 
-Keep the active `test_*.py` suite, four `check_*.groovy` argument/routing tests,
+Keep the active `test_*.py` suite, five `check_*.groovy` argument/routing tests,
 native fixture workflows and stage validators. A working run does not protect
 against later edits, changed options, different evidence modes or tool updates.
 The remaining validators cover behavior the retired comparison did not replace.
@@ -68,247 +68,42 @@ provide shared fixture builders. They are active, not deletion candidates.
 Further extraction into support modules may be useful, but deleting them merely
 because they were written earlier would break retained regression coverage.
 
-## Remaining archival candidates
+## Directory cleanup
 
-The two old pipeline diagrams and five tracked scratch sketches/R checks remain
-flagged as `archive-obsolete-assets`. Four historical design/decision documents
-remain `archive-history`; they are clearly marked as historical and do not govern
-normal operation. These assets/documents were not deleted by source consolidation.
-The original/current audit remains a dated comparison record.
+`main.nf` is the only top-level Nextflow launcher. The 13 focused stage entries
+are retained in `validation/entrypoints/` because current validators use them.
+Their includes, shared helper/environment resolution, validator staging paths
+and documentation were updated together. `nextflow.config` derives the shared
+`pipeline_root` for production and nested launchers. Normal production commands
+remain unchanged; focused launches must select the root config explicitly.
 
-Ignored local scratch dependencies, source investigations, previews and logs are
-not release deliverables. They may be cleaned only when no active work uses them.
-The local `.nextflow/` and consuming-project work/cache are runtime state, not
-obsolete code. No recursive deletion, cache cleanup, database change or removal
-of project results is performed by this consolidation.
+Historical design records are retained under `docs/history/`, with links updated.
+They explain past decisions and are not current operating instructions.
 
-## Current file inventory
+The obsolete pipeline diagram PNG/SVG and five tracked scratch sketches/R checks
+were removed. Ignored scratch investigations, downloaded source archives, local
+runtime/dependency installations, generated previews, test logs and temporary
+cleanup scripts were also removed after verification. They are not pipeline
+dependencies or release deliverables. Python bytecode caches were removed.
 
-Tracked paths that still exist, plus new source/Markdown files, are listed below.
-Static references are direct source/config basename mentions or Python imports,
-with at most three shown. Comments/strings can count; dynamic references may be
-missed. This inventory is evidence for review, not an automatic deletion rule.
+Active modules, workflows, Python/Perl helpers, environments, fixtures and
+regression tests remain. No project results, Nextflow work/cache, shared database
+or cluster environment was removed. In particular, `.nextflow/` is runtime
+state and was left alone. Git history retains the deleted source material.
 
-| Path | Disposition | Static references (source/config only) |
-|---|---|---|
-| `.gitattributes` | keep-production-or-config | None found |
-| `.gitignore` | keep-production-or-config | None found |
-| `README.md` | keep-current-docs | `modules/annotationBaseline.nf`, `modules/annotationInputs.nf`, `modules/annotationRelease.nf`; +44 more |
-| `annotation_qc.nf` | keep-diagnostic-entry | `tests/validate_annotation_baseline_cluster.py` |
-| `assets/annotation_assemblies.example.csv` | keep-production-or-config | None found |
-| `assets/annotation_rna.example.csv` | keep-production-or-config | None found |
-| `assets/genome_annotation_pipeline.png` | archive-obsolete-assets | None found |
-| `assets/genome_annotation_pipeline.svg` | archive-obsolete-assets | None found |
-| `assets/orthodb_sources.json` | keep-production-or-config | `main.nf`, `protein_evidence.nf`, `tests/test_protein_evidence.py` |
-| `assets/taxonomy_rules.json` | keep-production-or-config | `annotation_qc.nf`, `braker_prediction.nf`, `main.nf`; +6 more |
-| `braker_prediction.nf` | keep-diagnostic-entry | `tests/validate_braker_cluster.py` |
-| `docs/aed-requirements.md` | archive-history | None found |
-| `docs/annotation-baseline.md` | keep-current-docs | None found |
-| `docs/annotation-release.md` | keep-current-docs | None found |
-| `docs/braker-prediction.md` | keep-current-docs | None found |
-| `docs/cleanup.md` | keep-current-docs | None found |
-| `docs/evidence-scoring-evaluation.md` | archive-history | None found |
-| `docs/evidence-scoring-plan.md` | archive-history | None found |
-| `docs/evidence-scoring.md` | keep-current-docs | None found |
-| `docs/final-structural-qc.md` | keep-current-docs | None found |
-| `docs/foundation-preflight.md` | keep-current-docs | None found |
-| `docs/functional-annotation.md` | keep-current-docs | None found |
-| `docs/genome-tracks.md` | keep-current-docs | None found |
-| `docs/index.md` | keep-current-docs | None found |
-| `docs/ingenannot.md` | keep-current-docs | None found |
-| `docs/junction-support.md` | keep-current-docs | None found |
-| `docs/model-assessment.md` | keep-current-docs | None found |
-| `docs/model-selection.md` | keep-current-docs | None found |
-| `docs/outputs.md` | keep-current-docs | None found |
-| `docs/protein-evidence.md` | keep-current-docs | None found |
-| `docs/reference-repeats.md` | keep-current-docs | None found |
-| `docs/rework-audit.md` | keep-current-docs | None found |
-| `docs/rework-decisions.md` | archive-history | None found |
-| `docs/rna-alignment.md` | keep-current-docs | None found |
-| `docs/rna-preparation.md` | keep-current-docs | None found |
-| `docs/running.md` | keep-current-docs | None found |
-| `docs/testing.md` | keep-current-docs | None found |
-| `docs/unified-report.md` | keep-current-docs | None found |
-| `docs/validation.md` | keep-current-docs | None found |
-| `environments/agat.yaml` | keep-production-or-config | `nextflow.config`, `tests/validate_utr_cluster.py` |
-| `environments/ingenannot.yaml` | keep-production-or-config | `nextflow.config`, `tests/validate_utr_cluster.py` |
-| `environments/miniprot.yaml` | keep-production-or-config | `nextflow.config` |
-| `environments/portcullis.yaml` | keep-production-or-config | `nextflow.config` |
-| `environments/terrier.yaml` | keep-production-or-config | `nextflow.config` |
-| `final_structural_qc.nf` | keep-diagnostic-entry | `tests/validate_final_structural_cluster.py` |
-| `functional_annotation.nf` | keep-diagnostic-entry | `tests/validate_functional_cluster.py` |
-| `junction_qc.nf` | keep-diagnostic-entry | `tests/validate_junctions_cluster.py` |
-| `main.nf` | keep-production-or-config | `functional_annotation.nf`, `nextflow.config`, `tests/validate_assessment_cluster.py`; +9 more |
-| `model_assessment.nf` | keep-diagnostic-entry | `tests/validate_assessment_cluster.py` |
-| `model_selection.nf` | keep-diagnostic-entry | `tests/validate_selection_cluster.py` |
-| `modules/agat.nf` | keep-production-or-config | `tests/validate_utr_cluster.py`, `utr_refinement.nf`, `workflows/annotationBaseline.nf` |
-| `modules/annotate_gff3.nf` | keep-production-or-config | `workflows/functionalAnnotation.nf` |
-| `modules/annotationBaseline.nf` | keep-production-or-config | `annotation_qc.nf`, `tests/final_structural_fixture.nf`, `workflows/annotationBaseline.nf`; +2 more |
-| `modules/annotationInputs.nf` | keep-production-or-config | `annotation_qc.nf`, `braker_prediction.nf`, `main.nf`; +5 more |
-| `modules/annotationRelease.nf` | keep-production-or-config | `main.nf`, `tests/check_annotation_release.groovy`, `tests/release_fixture.nf`; +2 more |
-| `modules/annotation_report.nf` | keep-production-or-config | `main.nf`, `tests/annotation_report_fixture.nf`, `tests/check_annotation_report.groovy` |
-| `modules/braker.nf` | keep-production-or-config | `braker_prediction.nf`, `main.nf` |
-| `modules/busco.nf` | keep-production-or-config | `workflows/annotationBaseline.nf` |
-| `modules/centromere.nf` | keep-production-or-config | `workflows/genomeTracks.nf` |
-| `modules/chunk_genome.nf` | keep-production-or-config | `workflows/infernalParallel.nf` |
-| `modules/chunk_proteins.nf` | keep-production-or-config | `workflows/functionalAnnotation.nf` |
-| `modules/classifyRepeats.nf` | keep-production-or-config | `main.nf`, `reference_repeats.nf` |
-| `modules/combineRepeatLibs.nf` | keep-production-or-config | `main.nf`, `reference_repeats.nf` |
-| `modules/connectedRnaAlignment.nf` | keep-production-or-config | `main.nf` |
-| `modules/curateDfam.nf` | keep-production-or-config | `main.nf`, `reference_repeats.nf` |
-| `modules/curateRepeats.nf` | keep-production-or-config | `main.nf`, `reference_repeats.nf` |
-| `modules/deepsig.nf` | keep-production-or-config | `workflows/functionalAnnotation.nf` |
-| `modules/diamond.nf` | keep-production-or-config | `workflows/functionalAnnotation.nf` |
-| `modules/eggnog.nf` | keep-production-or-config | `workflows/functionalAnnotation.nf` |
-| `modules/evidenceAed.nf` | keep-production-or-config | `tests/validate_utr_cluster.py`, `utr_refinement.nf`, `workflows/annotationPostprocessing.nf` |
-| `modules/filterAssembly.nf` | keep-production-or-config | `main.nf`, `reference_repeats.nf` |
-| `modules/filterGeneModels.nf` | keep-production-or-config | `workflows/modelSelection.nf` |
-| `modules/filterRepeatLibrary.nf` | keep-production-or-config | `main.nf`, `reference_repeats.nf` |
-| `modules/finalAnnotation.nf` | keep-production-or-config | `workflows/annotationPostprocessing.nf` |
-| `modules/flagTeGenes.nf` | keep-production-or-config | `workflows/modelAssessment.nf` |
-| `modules/functionalAnnotation.nf` | keep-production-or-config | `functional_annotation.nf`, `main.nf`, `tests/functional_fixture.nf`; +1 more |
-| `modules/genomeTracks.nf` | keep-production-or-config | `main.nf`, `tests/check_genome_track_arguments.groovy`, `tests/genome_tracks_fixture.nf`; +1 more |
-| `modules/infernal.nf` | keep-production-or-config | `workflows/genomeTracks.nf`, `workflows/infernalParallel.nf` |
-| `modules/ingenannotAed.nf` | keep-production-or-config | `tests/check_ingenannot_arguments.groovy`, `workflows/annotationPostprocessing.nf` |
-| `modules/interproscan.nf` | keep-production-or-config | `workflows/functionalAnnotation.nf` |
-| `modules/junctionSupport.nf` | keep-production-or-config | `junction_qc.nf`, `workflows/annotationPostprocessing.nf`, `workflows/junctionSupport.nf` |
-| `modules/kofamscan.nf` | keep-production-or-config | `workflows/functionalAnnotation.nf` |
-| `modules/mergeRmResults.nf` | keep-production-or-config | `workflows/repeatMaskParallel.nf` |
-| `modules/merge_functional_annotations.nf` | keep-production-or-config | `workflows/functionalAnnotation.nf` |
-| `modules/modelAssessment.nf` | keep-production-or-config | `model_assessment.nf`, `workflows/annotationPostprocessing.nf`, `workflows/modelAssessment.nf` |
-| `modules/omark.nf` | keep-production-or-config | `workflows/annotationBaseline.nf` |
-| `modules/prepRmBatches.nf` | keep-production-or-config | `workflows/repeatMaskParallel.nf` |
-| `modules/proteinEvidence.nf` | keep-production-or-config | `main.nf`, `protein_evidence.nf` |
-| `modules/reclassifyRepeats.nf` | keep-production-or-config | `main.nf`, `reference_repeats.nf` |
-| `modules/referenceRepeats.nf` | keep-production-or-config | `main.nf`, `reference_repeats.nf` |
-| `modules/renameGeneModels.nf` | keep-production-or-config | `workflows/finalStructuralAnnotation.nf` |
-| `modules/repeatMaskBatch.nf` | keep-production-or-config | `workflows/repeatMaskParallel.nf` |
-| `modules/repeatModel.nf` | keep-production-or-config | `main.nf`, `reference_repeats.nf` |
-| `modules/rnaAlignment.nf` | keep-production-or-config | `main.nf`, `rna_alignment.nf` |
-| `modules/rnaPreparation.nf` | keep-production-or-config | `main.nf`, `rna_preparation.nf` |
-| `modules/structural_qc.nf` | keep-production-or-config | `tests/validate_final_structural_cluster.py`, `workflows/finalStructuralAnnotation.nf` |
-| `modules/telomere.nf` | keep-production-or-config | `workflows/genomeTracks.nf` |
-| `modules/trna-scan.nf` | keep-production-or-config | `workflows/genomeTracks.nf` |
-| `modules/utrRefinement.nf` | keep-production-or-config | `tests/test_utr_refinement.py`, `tests/validate_utr_cluster.py`, `utr_refinement.nf`; +1 more |
-| `nextflow.config` | keep-production-or-config | `tests/validate_annotation_baseline_cluster.py`, `tests/validate_assessment_cluster.py`, `tests/validate_braker_cluster.py`; +14 more |
-| `perl_scripts/infernal-tblout2gff.pl` | keep-production-or-config | `modules/infernal.nf` |
-| `preflight.nf` | keep-diagnostic-entry | `tests/validate_preflight_cluster.py` |
-| `protein_evidence.nf` | keep-diagnostic-entry | `tests/validate_protein_cluster.py` |
-| `py_scripts/annotate_gff3.py` | keep-production-or-config | `modules/annotate_gff3.nf`, `tests/test_functional_annotation.py`, `workflows/functionalAnnotation.nf` |
-| `py_scripts/annotation_baseline.py` | keep-production-or-config | `annotation_qc.nf`, `modules/annotationBaseline.nf`, `py_scripts/identified_qc.py`; +5 more |
-| `py_scripts/annotation_models.py` | keep-production-or-config | `py_scripts/final_identifiers.py`, `py_scripts/ingenannot_aed.py`, `py_scripts/junction_support.py`; +20 more |
-| `py_scripts/braker_prediction.py` | keep-production-or-config | `braker_prediction.nf`, `main.nf`, `modules/braker.nf`; +1 more |
-| `py_scripts/build_coord_map.py` | keep-production-or-config | `tests/test_reference_repeats.py`, `workflows/repeatMaskParallel.nf` |
-| `py_scripts/filter_genome_tracks.py` | keep-production-or-config | `modules/genomeTracks.nf`, `tests/test_genome_track_filters.py`, `workflows/genomeTracks.nf` |
-| `py_scripts/final_annotation.py` | keep-production-or-config | `modules/finalAnnotation.nf`, `tests/test_final_annotation.py`, `tests/test_ingenannot_aed.py`; +2 more |
-| `py_scripts/final_annotation_inputs.py` | keep-production-or-config | `modules/finalAnnotation.nf`, `tests/test_final_annotation.py`, `workflows/annotationPostprocessing.nf` |
-| `py_scripts/final_identifiers.py` | keep-production-or-config | `modules/renameGeneModels.nf`, `tests/test_final_structural.py`, `workflows/finalStructuralAnnotation.nf` |
-| `py_scripts/functional_inputs.py` | keep-production-or-config | `modules/functionalAnnotation.nf`, `py_scripts/functional_report.py`, `py_scripts/merge_functional_annotations.py`; +4 more |
-| `py_scripts/functional_report.py` | keep-production-or-config | `modules/functionalAnnotation.nf`, `py_scripts/package_annotation.py`, `tests/test_functional_annotation.py`; +3 more |
-| `py_scripts/generate_annotation_report.py` | keep-production-or-config | `main.nf`, `modules/annotation_report.nf`, `py_scripts/unified_report.py`; +1 more |
-| `py_scripts/genome_tracks.py` | keep-production-or-config | `modules/centromere.nf`, `modules/genomeTracks.nf`, `modules/telomere.nf`; +5 more |
-| `py_scripts/identified_qc.py` | keep-production-or-config | `nextflow.config`, `tests/test_final_structural.py`, `workflows/finalStructuralAnnotation.nf` |
-| `py_scripts/ingenannot_aed.py` | keep-production-or-config | `py_scripts/final_annotation.py`, `workflows/annotationPostprocessing.nf` |
-| `py_scripts/ingenannot_inputs.py` | keep-production-or-config | `modules/ingenannotAed.nf`, `tests/annotation_fixtures.py`, `tests/test_final_annotation.py`; +2 more |
-| `py_scripts/junction_support.py` | keep-production-or-config | `modules/junctionSupport.nf`, `tests/test_junction_support.py`, `tests/validate_junctions_cluster.py`; +1 more |
-| `py_scripts/merge_functional_annotations.py` | keep-production-or-config | `modules/merge_functional_annotations.nf`, `tests/test_functional_annotation.py`, `workflows/functionalAnnotation.nf` |
-| `py_scripts/model_assessment.py` | keep-production-or-config | `modules/modelAssessment.nf`, `tests/test_final_structural.py`, `tests/test_model_assessment.py`; +3 more |
-| `py_scripts/model_metrics.py` | keep-production-or-config | `modules/modelAssessment.nf`, `py_scripts/final_identifiers.py`, `py_scripts/functional_inputs.py`; +14 more |
-| `py_scripts/model_selection.py` | keep-production-or-config | `modules/filterGeneModels.nf`, `py_scripts/final_identifiers.py`, `py_scripts/structural_report.py`; +6 more |
-| `py_scripts/package_annotation.py` | keep-production-or-config | `modules/annotationRelease.nf`, `tests/test_annotation_release.py`, `tests/test_unified_report.py`; +1 more |
-| `py_scripts/portcullis_inputs.py` | keep-production-or-config | `modules/junctionSupport.nf`, `py_scripts/junction_support.py`, `tests/test_junction_support.py`; +1 more |
-| `py_scripts/prepare_protein_evidence.py` | keep-production-or-config | `annotation_qc.nf`, `braker_prediction.nf`, `main.nf`; +48 more |
-| `py_scripts/prepare_rna.py` | keep-production-or-config | `main.nf`, `py_scripts/rna_alignment.py`, `rna_alignment.nf`; +4 more |
-| `py_scripts/qc_metrics.py` | keep-production-or-config | `py_scripts/structural_report.py`, `workflows/finalStructuralAnnotation.nf` |
-| `py_scripts/reference_repeats.py` | keep-production-or-config | `annotation_qc.nf`, `braker_prediction.nf`, `main.nf`; +40 more |
-| `py_scripts/report_braker.py` | keep-production-or-config | `braker_prediction.nf`, `main.nf`, `tests/test_braker_prediction.py` |
-| `py_scripts/report_genome_tracks.py` | keep-production-or-config | `modules/genomeTracks.nf`, `tests/test_genome_tracks.py`, `tests/validate_genome_tracks_cluster.py`; +1 more |
-| `py_scripts/report_protein_evidence.py` | keep-production-or-config | `main.nf`, `protein_evidence.nf`, `tests/test_protein_evidence.py` |
-| `py_scripts/report_reference_repeats.py` | keep-production-or-config | `main.nf`, `reference_repeats.nf`, `tests/test_reference_repeats.py` |
-| `py_scripts/report_rna_alignment.py` | keep-production-or-config | `main.nf`, `modules/rnaAlignment.nf`, `rna_alignment.nf`; +1 more |
-| `py_scripts/report_rna_preparation.py` | keep-production-or-config | `main.nf`, `rna_preparation.nf`, `tests/test_rna_preparation.py` |
-| `py_scripts/resolve_annotation_inputs.py` | keep-production-or-config | `annotation_qc.nf`, `braker_prediction.nf`, `main.nf`; +6 more |
-| `py_scripts/rna_alignment.py` | keep-production-or-config | `main.nf`, `modules/rnaAlignment.nf`, `py_scripts/report_rna_alignment.py`; +2 more |
-| `py_scripts/run_terrier.py` | keep-production-or-config | `main.nf`, `reference_repeats.nf` |
-| `py_scripts/structural_report.py` | keep-production-or-config | `modules/structural_qc.nf`, `tests/test_final_structural.py`, `tests/validate_final_structural_cluster.py`; +1 more |
-| `py_scripts/structural_report_index.py` | keep-production-or-config | `modules/structural_qc.nf`, `tests/test_final_structural.py`, `workflows/finalStructuralAnnotation.nf` |
-| `py_scripts/te_evidence.py` | keep-production-or-config | `modules/flagTeGenes.nf`, `tests/test_model_assessment.py`, `workflows/modelAssessment.nf` |
-| `py_scripts/te_search.py` | keep-production-or-config | `modules/flagTeGenes.nf`, `tests/test_model_assessment.py`, `workflows/modelAssessment.nf` |
-| `py_scripts/unified_report.py` | keep-production-or-config | `main.nf`, `py_scripts/generate_annotation_report.py`, `tests/annotation_report_fixture.nf`; +2 more |
-| `py_scripts/utr_refinement.py` | keep-production-or-config | `modules/utrRefinement.nf`, `tests/test_utr_refinement.py`, `tests/utr_label_checks.py`; +3 more |
-| `py_scripts/verify_coord_map.py` | keep-production-or-config | `tests/test_reference_repeats.py`, `workflows/repeatMaskParallel.nf` |
-| `reference_repeats.nf` | keep-diagnostic-entry | `tests/test_reference_repeats.py`, `tests/validate_reference_repeats_cluster.py` |
-| `rna_alignment.nf` | keep-diagnostic-entry | `tests/validate_rna_alignment_cluster.py` |
-| `rna_preparation.nf` | keep-diagnostic-entry | `tests/validate_rna_cluster.py` |
-| `scratch/annotation pipeline sketch.txt` | archive-obsolete-assets | None found |
-| `scratch/check_annotation_outputs_match.R` | archive-obsolete-assets | None found |
-| `scratch/implementation steps 2.25.26.txt` | archive-obsolete-assets | None found |
-| `scratch/plot_annotations.R` | archive-obsolete-assets | None found |
-| `scratch/where to go from braker.md` | archive-obsolete-assets | None found |
-| `tests/README.md` | keep-tests | `modules/annotationBaseline.nf`, `modules/annotationInputs.nf`, `modules/annotationRelease.nf`; +44 more |
-| `tests/annotation_fixtures.py` | keep-tests | `tests/test_annotation_models.py`, `tests/test_final_annotation.py`, `tests/test_ingenannot_aed.py` |
-| `tests/annotation_report_fixture.nf` | keep-tests | `tests/check_annotation_report.groovy`, `tests/validate_report_cluster.py` |
-| `tests/check_annotation_release.groovy` | keep-tests | None found |
-| `tests/check_annotation_report.groovy` | keep-tests | None found |
-| `tests/check_genome_track_arguments.groovy` | keep-tests | None found |
-| `tests/check_ingenannot_arguments.groovy` | keep-tests | None found |
-| `tests/final_structural_fixture.nf` | keep-tests | `tests/validate_final_structural_cluster.py` |
-| `tests/functional_fixture.nf` | keep-tests | `tests/validate_functional_cluster.py` |
-| `tests/genome_tracks_fixture.nf` | keep-tests | `tests/validate_genome_tracks_cluster.py` |
-| `tests/postprocessing_fixture.nf` | keep-tests | `tests/validate_postprocessing_cluster.py` |
-| `tests/release_fixture.nf` | keep-tests | `tests/check_annotation_release.groovy`, `tests/validate_release_cluster.py` |
-| `tests/test_annotation_baseline.py` | keep-tests | None found |
-| `tests/test_annotation_inputs.py` | keep-tests | `tests/validate_preflight_cluster.py` |
-| `tests/test_annotation_models.py` | keep-tests | None found |
-| `tests/test_annotation_release.py` | keep-tests | `tests/test_unified_report.py`, `tests/validate_release_cluster.py` |
-| `tests/test_braker_prediction.py` | keep-tests | None found |
-| `tests/test_final_annotation.py` | keep-tests | None found |
-| `tests/test_final_structural.py` | keep-tests | `tests/test_annotation_release.py` |
-| `tests/test_functional_annotation.py` | keep-tests | `tests/validate_functional_cluster.py` |
-| `tests/test_genome_track_filters.py` | keep-tests | None found |
-| `tests/test_genome_tracks.py` | keep-tests | None found |
-| `tests/test_ingenannot_aed.py` | keep-tests | None found |
-| `tests/test_junction_support.py` | keep-tests | None found |
-| `tests/test_model_assessment.py` | keep-tests | `tests/test_model_selection.py`, `tests/validate_assessment_cluster.py` |
-| `tests/test_model_selection.py` | keep-tests | `tests/test_final_structural.py`, `tests/test_utr_refinement.py`, `tests/validate_selection_cluster.py` |
-| `tests/test_protein_evidence.py` | keep-tests | None found |
-| `tests/test_reference_repeats.py` | keep-tests | None found |
-| `tests/test_rna_alignment.py` | keep-tests | None found |
-| `tests/test_rna_preparation.py` | keep-tests | None found |
-| `tests/test_unified_report.py` | keep-tests | `tests/validate_report_cluster.py` |
-| `tests/test_utr_refinement.py` | keep-tests | None found |
-| `tests/utr_fixture_bams.nf` | keep-tests | `tests/validate_junctions_cluster.py`, `tests/validate_postprocessing_cluster.py`, `tests/validate_utr_cluster.py` |
-| `tests/utr_label_checks.py` | keep-tests | `tests/test_utr_refinement.py` |
-| `tests/validate_annotation_baseline_cluster.py` | keep-tests | None found |
-| `tests/validate_assessment_cluster.py` | keep-tests | `tests/test_model_assessment.py` |
-| `tests/validate_braker_cluster.py` | keep-tests | None found |
-| `tests/validate_final_structural_cluster.py` | keep-tests | None found |
-| `tests/validate_functional_cluster.py` | keep-tests | `tests/test_functional_annotation.py` |
-| `tests/validate_genome_tracks_cluster.py` | keep-tests | `tests/test_genome_tracks.py` |
-| `tests/validate_junctions_cluster.py` | keep-tests | `tests/test_junction_support.py` |
-| `tests/validate_postprocessing_cluster.py` | keep-tests | `tests/postprocessing_fixture.nf` |
-| `tests/validate_preflight_cluster.py` | keep-tests | `tests/validate_annotation_baseline_cluster.py`, `tests/validate_braker_cluster.py`, `tests/validate_protein_cluster.py`; +3 more |
-| `tests/validate_protein_cluster.py` | keep-tests | None found |
-| `tests/validate_reference_repeats_cluster.py` | keep-tests | None found |
-| `tests/validate_release_cluster.py` | keep-tests | `tests/validate_report_cluster.py` |
-| `tests/validate_report_cluster.py` | keep-tests | None found |
-| `tests/validate_rna_alignment_cluster.py` | keep-tests | `tests/validate_braker_cluster.py` |
-| `tests/validate_rna_cluster.py` | keep-tests | None found |
-| `tests/validate_selection_cluster.py` | keep-tests | `tests/validate_final_structural_cluster.py` |
-| `tests/validate_utr_cluster.py` | keep-tests | `tests/validate_assessment_cluster.py`, `tests/validate_final_structural_cluster.py`, `tests/validate_functional_cluster.py`; +5 more |
-| `utr_refinement.nf` | keep-diagnostic-entry | `tests/validate_utr_cluster.py` |
-| `workflows/annotationBaseline.nf` | keep-production-or-config | `annotation_qc.nf`, `tests/final_structural_fixture.nf`, `workflows/annotationPostprocessing.nf`; +1 more |
-| `workflows/annotationPostprocessing.nf` | keep-production-or-config | `main.nf`, `tests/postprocessing_fixture.nf` |
-| `workflows/annotationRelease.nf` | keep-production-or-config | `main.nf`, `tests/check_annotation_release.groovy`, `tests/release_fixture.nf`; +1 more |
-| `workflows/finalStructuralAnnotation.nf` | keep-production-or-config | `final_structural_qc.nf`, `tests/final_structural_fixture.nf`, `workflows/annotationPostprocessing.nf` |
-| `workflows/functionalAnnotation.nf` | keep-production-or-config | `functional_annotation.nf`, `main.nf`, `tests/functional_fixture.nf` |
-| `workflows/genomeTracks.nf` | keep-production-or-config | `main.nf`, `tests/check_genome_track_arguments.groovy`, `tests/genome_tracks_fixture.nf` |
-| `workflows/infernalParallel.nf` | keep-production-or-config | `workflows/genomeTracks.nf` |
-| `workflows/junctionSupport.nf` | keep-production-or-config | `junction_qc.nf`, `workflows/annotationPostprocessing.nf` |
-| `workflows/modelAssessment.nf` | keep-production-or-config | `model_assessment.nf`, `workflows/annotationPostprocessing.nf` |
-| `workflows/modelSelection.nf` | keep-production-or-config | `model_selection.nf`, `workflows/annotationPostprocessing.nf` |
-| `workflows/repeatMaskParallel.nf` | keep-production-or-config | `main.nf`, `reference_repeats.nf` |
+## Verification
 
-Inventory totals: archive-history=4, archive-obsolete-assets=7, keep-current-docs=25, keep-diagnostic-entry=13, keep-production-or-config=117, keep-tests=51.
+Before this directory cleanup, the supplied
+`postprocessing_consolidation_01` cluster acceptance passed unit tests, main
+syntax, fresh, resume, report-change and disabled cases using tiny real tools.
+After relocating entry points, local checks passed all 196 Python regressions,
+81 Nextflow script/module parses, five Groovy argument/routing/path checks,
+validator launch/copy paths and repository Markdown links. Scientific commands
+and process names were not changed by the relocation.
 
-See [testing](testing.md), [current guides](index.md), and [validation limits](validation.md).
+These checks do not execute relocated launchers under Linux/Slurm. Run the
+relevant stage validator there before depending on a focused launch. Keep using
+normal `main.nf -resume` for production; no manual cache invalidation is needed.
+
+See [testing](testing.md), [current guides](index.md), and
+[validation limits](validation.md).

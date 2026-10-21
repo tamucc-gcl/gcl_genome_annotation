@@ -3,7 +3,7 @@
 `ANNOTATION_BASELINE` reuses AGAT, BUSCO and OMArk to assess accepted annotations.
 In `main.nf`, unfiltered QC follows UTR validation under `qc/final/`; selected
 final-ID QC follows selection under `qc/selected/`. Original BRAKER results remain
-preserved. The focused `annotation_qc.nf` entry instead assesses raw accepted
+preserved. The focused `validation/entrypoints/annotation_qc.nf` entry instead assesses raw accepted
 BRAKER output under `qc/baseline/` and stops without prediction or filtering.
 
 ## Populations and tools

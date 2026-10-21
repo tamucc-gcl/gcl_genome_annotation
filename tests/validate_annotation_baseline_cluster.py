@@ -64,7 +64,7 @@ def run_case(root, suffix, sheet='baseline.csv', resume=False, blocked=False):
     folder = root / 'fixtures'
     output = case / 'results'
     command = ['nextflow', '-log', str(case / f'{suffix}.nextflow.log'), '-C', str(ROOT / 'nextflow.config'),
-               'run', str(ROOT / 'annotation_qc.nf'), '-profile', 'slurm', '-w', str(case / 'work'),
+               'run', str(ROOT / 'validation/entrypoints/annotation_qc.nf'), '-profile', 'slurm', '-w', str(case / 'work'),
                '--sample_sheet', str(folder / sheet), '--taxid', '999', '--taxdump_dir', str(folder / 'taxdump'),
                '--baseline_inputs_root', str(folder / 'accepted'), '--outdir', str(output)]
     if resume:

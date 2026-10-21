@@ -1,11 +1,11 @@
 # MAKER-matched AED requirements
 
 **Historical record — not current operating instructions.** Retained for the
-decision trail and flagged for archival in [cleanup](cleanup.md). Statements
+decision trail and flagged for archival in [cleanup](../cleanup.md). Statements
 below about pending stages, proposed MAKER compatibility, old AED/filter behavior
 or pilot totals describe their original dates. The current implementation is
-documented in [the guide index](index.md), [native AED](evidence-scoring.md),
-[selection](model-selection.md) and [validation scope](validation.md). In a
+documented in [the guide index](../index.md), [native AED](../evidence-scoring.md),
+[selection](../model-selection.md) and [validation scope](../validation.md). In a
 conflict, use those current guides and root configuration; do not run historical
 plans as additional pipeline steps.
 
@@ -18,7 +18,7 @@ AED filtering disabled.
 Subsequent user clarification: exact MAKER equivalence is not required if a good
 peer-reviewed tool can be used directly. InGenAnnot is now the selected candidate;
 native RNA/protein scores are benchmarked against the current method and combined
-AED is deferred. See [the active InGenAnnot plan](ingenannot.md). The specification
+AED is deferred. See [the active InGenAnnot plan](../ingenannot.md). The specification
 below remains a reference/audit document, not authorization to continue a MAKER
 port as the primary approach.
 

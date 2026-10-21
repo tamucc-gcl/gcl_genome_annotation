@@ -17,9 +17,9 @@ workflow REPEAT_MASK_PARALLEL {
     main:
 
     // At the top of the workflow, create channels for the scripts
-    ch_build_script = file("${projectDir}/py_scripts/build_coord_map.py", checkIfExists: true)
-    ch_verify_script = file("${projectDir}/py_scripts/verify_coord_map.py", checkIfExists: true)
-    ch_integrity_script = file("${projectDir}/py_scripts/reference_repeats.py", checkIfExists: true)
+    ch_build_script = file("${params.pipeline_root}/py_scripts/build_coord_map.py", checkIfExists: true)
+    ch_verify_script = file("${params.pipeline_root}/py_scripts/verify_coord_map.py", checkIfExists: true)
+    ch_integrity_script = file("${params.pipeline_root}/py_scripts/reference_repeats.py", checkIfExists: true)
 
     // ── Split input channel ──────────────────────────────────────────────────
     ch_assemblies = ch_mask_input.map { id, assembly, repeats -> tuple(id, assembly) }

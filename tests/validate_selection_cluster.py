@@ -41,7 +41,7 @@ def fixtures(root):
 def run_case(root,name,resume=False):
     case=root/'connected';case.mkdir(exist_ok=True);pipeline=root/'pipeline'
     command=['nextflow','-log',str(case/f'{name}.nextflow.log'),'-C',str(pipeline/'nextflow.config'),
-        'run',str(pipeline/'model_selection.nf'),'-profile','slurm','-w',str(case/'work'),
+        'run',str(pipeline/'validation/entrypoints/model_selection.nf'),'-profile','slurm','-w',str(case/'work'),
         '--selection_inputs_root',str(root/'accepted'),'--outdir',str(case/'results')]
     if resume:command.append('-resume')
     if name=='threshold_change':command+=['--filter_min_cds_length','50']
@@ -101,7 +101,9 @@ def main():
                 if not source.is_file() or '__pycache__' in source.parts:continue
                 dest=pipeline/source.relative_to(ROOT);dest.parent.mkdir(parents=True,exist_ok=True)
                 if not dest.exists() or source.read_bytes()!=dest.read_bytes():shutil.copy2(source,dest)
-        for name in ('main.nf','model_selection.nf','nextflow.config'):shutil.copy2(ROOT/name,pipeline/name)
+        for name in ('main.nf','validation/entrypoints/model_selection.nf','nextflow.config'):
+            (pipeline/name).parent.mkdir(parents=True,exist_ok=True)
+            shutil.copy2(ROOT/name,pipeline/name)
         probe=subprocess.run(['nextflow','-C',str(pipeline/'nextflow.config'),'run',str(pipeline/'main.nf')],cwd=pipeline,capture_output=True,text=True)
         (root/'main_syntax.console.log').write_text(probe.stdout+probe.stderr)
         if probe.returncode==0 or 'Provide --sample_sheet' not in probe.stdout+probe.stderr:raise RuntimeError('main syntax/input guard failed\n'+(probe.stdout+probe.stderr)[-6000:])

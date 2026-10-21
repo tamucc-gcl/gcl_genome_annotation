@@ -95,7 +95,9 @@ def main():
                 if not source.is_file() or '__pycache__' in source.parts:continue
                 dest=pipeline/source.relative_to(ROOT);dest.parent.mkdir(parents=True,exist_ok=True)
                 if not dest.exists() or source.read_bytes()!=dest.read_bytes():shutil.copy2(source,dest)
-        for name in ('main.nf','final_structural_qc.nf','nextflow.config'):shutil.copy2(ROOT/name,pipeline/name)
+        for name in ('main.nf','validation/entrypoints/final_structural_qc.nf','nextflow.config'):
+            (pipeline/name).parent.mkdir(parents=True,exist_ok=True)
+            shutil.copy2(ROOT/name,pipeline/name)
         shutil.copy2(ROOT/'tests/final_structural_fixture.nf',pipeline/'structural_acceptance.nf')
         probe=subprocess.run(['nextflow','-C',str(pipeline/'nextflow.config'),'run',str(pipeline/'main.nf')],cwd=pipeline,capture_output=True,text=True)
         (root/'main_syntax.console.log').write_text(probe.stdout+probe.stderr)

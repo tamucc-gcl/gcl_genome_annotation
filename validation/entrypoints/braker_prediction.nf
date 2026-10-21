@@ -1,8 +1,8 @@
 #!/usr/bin/env nextflow
 // Development entry: accepted real outputs -> BRAKER3, without repeats/remapping.
 nextflow.enable.dsl = 2
-include { RESOLVE_ANNOTATION_INPUTS; ASSERT_ANNOTATION_INPUTS } from './modules/annotationInputs.nf'
-include { PLAN_BRAKER_INPUTS; VALIDATE_BRAKER_INPUTS; CHECK_BRAKER_SOFTWARE; BRAKER; VALIDATE_BRAKER_OUTPUTS; REPORT_BRAKER; ASSERT_BRAKER } from './modules/braker.nf'
+include { RESOLVE_ANNOTATION_INPUTS; ASSERT_ANNOTATION_INPUTS } from '../../modules/annotationInputs.nf'
+include { PLAN_BRAKER_INPUTS; VALIDATE_BRAKER_INPUTS; CHECK_BRAKER_SOFTWARE; BRAKER; VALIDATE_BRAKER_OUTPUTS; REPORT_BRAKER; ASSERT_BRAKER } from '../../modules/braker.nf'
 
 workflow {
     if (!params.sample_sheet) error 'Provide --sample_sheet'
@@ -14,10 +14,10 @@ workflow {
         params: params.collectEntries { key, value -> [key.toString(), value] }]
     def root = file(params.braker_inputs_root ?: params.outdir).toString()
     def helpers = ['braker_prediction.py', 'reference_repeats.py', 'prepare_protein_evidence.py'].collect {
-        file("${projectDir}/py_scripts/${it}", checkIfExists: true)
+        file("${params.pipeline_root}/py_scripts/${it}", checkIfExists: true)
     }
-    RESOLVE_ANNOTATION_INPUTS(encode(request), file("${projectDir}/py_scripts/resolve_annotation_inputs.py"),
-        file("${projectDir}/assets/taxonomy_rules.json"))
+    RESOLVE_ANNOTATION_INPUTS(encode(request), file("${params.pipeline_root}/py_scripts/resolve_annotation_inputs.py"),
+        file("${params.pipeline_root}/assets/taxonomy_rules.json"))
     ASSERT_ANNOTATION_INPUTS(RESOLVE_ANNOTATION_INPUTS.out.bundle)
     def accepted = RESOLVE_ANNOTATION_INPUTS.out.bundle.combine(ASSERT_ANNOTATION_INPUTS.out).map { bundle, passed -> bundle }
     def optionalStatus = { relative ->
@@ -50,6 +50,6 @@ workflow {
         CHECK_BRAKER_SOFTWARE.out.runtime.map { aid, folder -> file("${folder}/inputs.json") }.toList(),
         params.braker_check_only,
         file("${params.outdir}/structural_annotation").toAbsolutePath().relativize(file("${root}/rna_alignment/multiqc/multiqc_report.html").toAbsolutePath()).toString(),
-        file("${projectDir}/py_scripts/report_braker.py"))
+        file("${params.pipeline_root}/py_scripts/report_braker.py"))
     ASSERT_BRAKER(REPORT_BRAKER.out.status)
 }

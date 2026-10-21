@@ -2,7 +2,7 @@
 
 `main.nf` connects normalized references, Dfam/de novo repeat preparation,
 parallel masking and integrity validation to alignment/prediction. The focused
-`reference_repeats.nf` entry stops after the reference/repeat report. Both reuse
+`validation/entrypoints/reference_repeats.nf` entry stops after the reference/repeat report. Both reuse
 the original scientific modules with corrected contracts and native caching.
 
 ## Reference contract

@@ -1,11 +1,11 @@
 # Evidence scoring, filtering and optional refinement plan
 
 **Historical record — not current operating instructions.** Retained for the
-decision trail and flagged for archival in [cleanup](cleanup.md). Statements
+decision trail and flagged for archival in [cleanup](../cleanup.md). Statements
 below about pending stages, proposed MAKER compatibility, old AED/filter behavior
 or pilot totals describe their original dates. The current implementation is
-documented in [the guide index](index.md), [native AED](evidence-scoring.md),
-[selection](model-selection.md) and [validation scope](validation.md). In a
+documented in [the guide index](../index.md), [native AED](../evidence-scoring.md),
+[selection](../model-selection.md) and [validation scope](../validation.md). In a
 conflict, use those current guides and root configuration; do not run historical
 plans as additional pipeline steps.
 
@@ -13,7 +13,7 @@ plans as additional pipeline steps.
 
 Current milestone: steps 1–3 below passed cluster and real-data acceptance.
 Step 4 is now connected using the existing five functional tools and merge/GFF
-modules; [functional cluster acceptance and the full database pilot](functional-annotation.md)
+modules; [functional cluster acceptance and the full database pilot](../functional-annotation.md)
 are next. Other genome tracks and unified reporting remain subsequent work.
 
 This section supersedes conflicting choices in the historical snapshot below.
@@ -70,7 +70,7 @@ A coding-model-changing refinement would require separate before/after validatio
 sequence extraction, evidence reassessment and QC before promotion.
 
 Implementation update (19 October): model assessment and TE flags passed cluster
-acceptance and the real-data pilot, and were accepted. [Model selection](model-selection.md)
+acceptance and the real-data pilot, and were accepted. [Model selection](../model-selection.md)
 now adapts the existing filter with per-transcript decisions, isoform rescue and
 synchronized retained/excluded coding sets. Local tests and Nextflow parsing pass;
 cluster selection acceptance and the full-data selection pilot subsequently passed
@@ -78,7 +78,7 @@ cluster selection acceptance and the full-data selection pilot subsequently pass
 remain opt-in; TE association is flag-only by default.
 
 Final identifiers, selected-set AGAT/BUSCO/OMArk and the full structural QC report
-are now connected; see [scope, maps and acceptance](final-structural-qc.md).
+are now connected; see [scope, maps and acceptance](../final-structural-qc.md).
 Local contracts and Nextflow 23.10.1 parsing pass. Native before/after AGAT cluster
 acceptance and the real selected-set BUSCO/OMArk/report pilot are next. Structural
 report figures are now implemented; the later unified report will connect them
@@ -115,7 +115,7 @@ without invalidating mapping, repeats, prediction, evidence analysis or searches
 Planning snapshot: 13 October 2026. The user accepted the proposed order, specified
 MAKER-compatible AED and selected PASA/EviAnn for optional refinement evaluation.
 This records the agreed plan. The initial standalone nucleotide scoring pilot is
-now implemented; see [implementation and acceptance scope](evidence-scoring.md).
+now implemented; see [implementation and acceptance scope](../evidence-scoring.md).
 The remaining filters, evidence assessments and refinement are planned behavior.
 Start from the pre-rework modules and the accepted flounder predictions/QC.
 The final AED output must use every available supplied evidence type. Transcript

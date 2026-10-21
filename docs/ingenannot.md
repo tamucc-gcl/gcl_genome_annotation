@@ -76,7 +76,7 @@ is distinct from the library-strand restriction above. The connected four-mode
 postprocessing fixture and real UTR/AED pilot were reviewed separately. Targeted
 RNA support checks do not prove every transcript boundary/coding assignment.
 
-`utr_refinement.nf` reads accepted published inputs via `utr_inputs_root` and
+`validation/entrypoints/utr_refinement.nf` reads accepted published inputs via `utr_inputs_root` and
 stops after validation and standalone UTR AGAT. Main uses native channels and
 does not require that invocation. The completed benchmark entry was removed;
 its production preparation/run/validation code is consolidated in

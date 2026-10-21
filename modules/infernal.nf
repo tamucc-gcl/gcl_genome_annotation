@@ -41,7 +41,7 @@ process INFERNAL {
         ${rfam_database}/Rfam.cm \
         ${masked_chunk} > ${assembly_id}.${chunk_id}_rfam.cmscan
 
-    perl ${projectDir}/perl_scripts/infernal-tblout2gff.pl \
+    perl ${params.pipeline_root}/perl_scripts/infernal-tblout2gff.pl \
         --fmt2 --all \
         --cmscan ${assembly_id}.${chunk_id}_rfam.tblout > ${assembly_id}.${chunk_id}_rfam.gff3
     """

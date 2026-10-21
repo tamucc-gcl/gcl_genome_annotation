@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 // Development/pilot entry. Normal main.nf passes native task outputs directly.
 nextflow.enable.dsl = 2
-include { FUNCTIONAL_ANNOTATION } from './workflows/functionalAnnotation.nf'
+include { FUNCTIONAL_ANNOTATION } from '../../workflows/functionalAnnotation.nf'
 
 workflow {
     if (!params.functional_inputs_root) error 'Provide --functional_inputs_root with accepted final identified outputs'

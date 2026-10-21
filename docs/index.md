@@ -33,11 +33,11 @@ resources. Historical plans are clearly separated from current instructions.
 
 ## Maintenance and history
 
-[Cleanup decisions and file inventory](cleanup.md) record completed source consolidation
-and remaining archival candidates. [The original/current audit](rework-audit.md) records the comparison
+[Completed cleanup record](cleanup.md) record completed source consolidation
+and the retained validation layout. [The original/current audit](rework-audit.md) records the comparison
 at its stated commit and subsequent sequence-export follow-up.
 
 The following are historical decision/design records, not instructions to run a
-second workflow: [rework decisions](rework-decisions.md), [old continuation plan](evidence-scoring-plan.md),
-[MAKER compatibility proposal](aed-requirements.md), and [custom-score evaluation](evidence-scoring-evaluation.md).
+second workflow: [rework decisions](history/rework-decisions.md), [old continuation plan](history/evidence-scoring-plan.md),
+[MAKER compatibility proposal](history/aed-requirements.md), and [custom-score evaluation](history/evidence-scoring-evaluation.md).
 The implemented method is native InGenAnnot with separate RNA/protein AED.

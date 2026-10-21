@@ -27,7 +27,7 @@ workflow JUNCTION_SUPPORT {
             tuple(aid,row.readset_id,request,strand,orientation,genome,identity,bams[i],indices[i])
         }
     },['portcullis_inputs.py','reference_repeats.py','prepare_protein_evidence.py'].collect {
-        file("${projectDir}/py_scripts/${it}", checkIfExists:true)
+        file("${params.pipeline_root}/py_scripts/${it}", checkIfExists:true)
     })
     // Optional evidence must not drop RNA-free assemblies in an inner join.
     nativeRows = RUN_PORTCULLIS.out.junctions.toList().map { rows -> [rows] }
@@ -38,7 +38,7 @@ workflow JUNCTION_SUPPORT {
         def request = groovy.json.JsonOutput.toJson([assembly_id:aid,readsets:readsets]).getBytes('UTF-8').encodeBase64().toString()
         tuple(aid,request,gff,validation,identity,selected.collect { it[2] })
     },['junction_support.py','portcullis_inputs.py','annotation_models.py','reference_repeats.py','prepare_protein_evidence.py'].collect {
-        file("${projectDir}/py_scripts/${it}", checkIfExists:true)
+        file("${params.pipeline_root}/py_scripts/${it}", checkIfExists:true)
     })
     emit:
     status = REPORT_JUNCTION_SUPPORT.out.status

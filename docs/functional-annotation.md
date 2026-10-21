@@ -55,7 +55,7 @@ and native merged tool results. Functional data feed the combined release and
 unified report. Original identified coding sequences remain unchanged.
 Changing a search setting reruns that tool and merge/descendants; report-only
 changes reuse searches. A changed selected set or final ID prefix can correctly
-invalidate functional queries. `functional_annotation.nf` is a focused entry
+invalidate functional queries. `validation/entrypoints/functional_annotation.nf` is a focused entry
 reading completed identified/preflight/OMArk outputs via `functional_inputs_root`.
 
 ```bash

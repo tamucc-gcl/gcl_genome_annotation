@@ -20,7 +20,7 @@ def run_case(folder, fixture_dir, name, sheet, expected, source_count, resume=Fa
     output.mkdir(exist_ok=True)
     suffix = 'added_assembly' if added else ('resume' if resume else 'fresh')
     command = ['nextflow', '-log', str(case / (suffix + '.nextflow.log')),
-        '-C', str(ROOT / 'nextflow.config'), 'run', str(ROOT / 'protein_evidence.nf'),
+        '-C', str(ROOT / 'nextflow.config'), 'run', str(ROOT / 'validation/entrypoints/protein_evidence.nf'),
         '-profile', 'slurm', '-w', str(case / 'work'), '--sample_sheet', str(fixture_dir / sheet),
         '--taxid', '999', '--taxdump_dir', str(fixture_dir / 'taxdump'), '--outdir', str(output)]
     command += ['--protein_source_store', str(folder / 'project_source_store')]

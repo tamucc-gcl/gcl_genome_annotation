@@ -61,7 +61,7 @@ def execute(command,cwd,log):
 
 def run_case(root,name,resume=False,enabled=True):
     case=root/'pilot';case.mkdir(exist_ok=True); pipeline=root/'pipeline'
-    command=['nextflow','-log',str(case/f'{name}.nextflow.log'),'-C',str(pipeline/'nextflow.config'),'run',str(pipeline/'utr_refinement.nf'),
+    command=['nextflow','-log',str(case/f'{name}.nextflow.log'),'-C',str(pipeline/'nextflow.config'),'run',str(pipeline/'validation/entrypoints/utr_refinement.nf'),
         '-profile','slurm','-w',str(case/'work'),'--utr_inputs_root',str(root/'accepted'),'--outdir',str(case/'results'),
         '--utr_ranking_cpus','2','--utr_ranking_memory','4 GB','--utr_refine',str(enabled).lower()]
     if resume: command.append('-resume')
@@ -102,7 +102,7 @@ def main():
         if tests.returncode: raise RuntimeError('Python tests failed; inspect unit_tests.log')
         summary['checks'].append(dict(case='unit_tests',passed=True))
         if not a.resume: fixtures(root)
-        files=['nextflow.config','utr_refinement.nf','modules/utrRefinement.nf','modules/evidenceAed.nf','modules/agat.nf',
+        files=['nextflow.config','validation/entrypoints/utr_refinement.nf','modules/utrRefinement.nf','modules/evidenceAed.nf','modules/agat.nf',
             'environments/ingenannot.yaml','environments/agat.yaml','py_scripts/utr_refinement.py','py_scripts/annotation_models.py',
             'py_scripts/prepare_protein_evidence.py','py_scripts/reference_repeats.py']
         for relative in files:

@@ -1,8 +1,8 @@
 #!/usr/bin/env nextflow
 // Development entry: accepted selected reads + normalized references -> BRAKER BAMs.
 nextflow.enable.dsl = 2
-include { RESOLVE_ANNOTATION_INPUTS; ASSERT_ANNOTATION_INPUTS } from './modules/annotationInputs.nf'
-include { PLAN_RNA_ALIGNMENT; INDEX_RNA_REFERENCE; ALIGN_RNA_READSET; QC_RNA_ALIGNMENT; RESOLVE_RNA_STRAND; REPORT_RNA_ALIGNMENT; ASSERT_RNA_ALIGNMENT } from './modules/rnaAlignment.nf'
+include { RESOLVE_ANNOTATION_INPUTS; ASSERT_ANNOTATION_INPUTS } from '../../modules/annotationInputs.nf'
+include { PLAN_RNA_ALIGNMENT; INDEX_RNA_REFERENCE; ALIGN_RNA_READSET; QC_RNA_ALIGNMENT; RESOLVE_RNA_STRAND; REPORT_RNA_ALIGNMENT; ASSERT_RNA_ALIGNMENT } from '../../modules/rnaAlignment.nf'
 
 workflow {
     if (!params.sample_sheet) error 'Provide --sample_sheet'
@@ -10,9 +10,9 @@ workflow {
     def request = [launch_dir: launchDir.toString(), sample_sheet: params.sample_sheet.toString(),
         rna_sheet: params.rna_sheet?.toString(), taxdump_dir: params.taxdump_dir?.toString(),
         params: params.collectEntries { key, value -> [key.toString(), value] }]
-    def helper = file("${projectDir}/py_scripts/rna_alignment.py", checkIfExists: true)
-    def helpers = [helper, file("${projectDir}/py_scripts/reference_repeats.py", checkIfExists: true)]
-    def readHelpers = [helper, file("${projectDir}/py_scripts/prepare_rna.py", checkIfExists: true)]
+    def helper = file("${params.pipeline_root}/py_scripts/rna_alignment.py", checkIfExists: true)
+    def helpers = [helper, file("${params.pipeline_root}/py_scripts/reference_repeats.py", checkIfExists: true)]
+    def readHelpers = [helper, file("${params.pipeline_root}/py_scripts/prepare_rna.py", checkIfExists: true)]
     def prepared = file(params.rna_prepared_status ?: "${params.outdir}/rna/rna_status.json", checkIfExists: true)
     def referenceDir = file(params.rna_reference_dir ?: "${params.outdir}/filtered_assemblies").toString()
     if ((params.rna_min_intron as int) < 1 || (params.rna_max_intron as int) < (params.rna_min_intron as int))
@@ -21,8 +21,8 @@ workflow {
         error 'RNA strand MAPQ must be between 0 and 255'
     if ((params.rna_alignment_cpus as int) < 3 || (params.rna_alignment_threads as int) < 1)
         error 'RNA alignment needs at least 3 allocated CPUs and a positive mapper thread count'
-    RESOLVE_ANNOTATION_INPUTS(encode(request), file("${projectDir}/py_scripts/resolve_annotation_inputs.py"),
-        file("${projectDir}/assets/taxonomy_rules.json"))
+    RESOLVE_ANNOTATION_INPUTS(encode(request), file("${params.pipeline_root}/py_scripts/resolve_annotation_inputs.py"),
+        file("${params.pipeline_root}/assets/taxonomy_rules.json"))
     ASSERT_ANNOTATION_INPUTS(RESOLVE_ANNOTATION_INPUTS.out.bundle)
     PLAN_RNA_ALIGNMENT(RESOLVE_ANNOTATION_INPUTS.out.bundle, ASSERT_ANNOTATION_INPUTS.out, prepared,
         encode([reference_dir: referenceDir, strand_policy: [min_informative: params.rna_strand_min_informative,
@@ -70,6 +70,6 @@ workflow {
     REPORT_RNA_ALIGNMENT(PLAN_RNA_ALIGNMENT.out.plan,
         QC_RNA_ALIGNMENT.out.qc.map { aid, rid, folder -> file("${folder}/alignment.json", checkIfExists: true) }.toList(),
         RESOLVE_RNA_STRAND.out.strand.map { aid, rid, path -> path }.toList(), bams, alignmentLogs,
-        [helper, file("${projectDir}/py_scripts/report_rna_alignment.py", checkIfExists: true)])
+        [helper, file("${params.pipeline_root}/py_scripts/report_rna_alignment.py", checkIfExists: true)])
     ASSERT_RNA_ALIGNMENT(REPORT_RNA_ALIGNMENT.out.status)
 }

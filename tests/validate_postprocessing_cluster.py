@@ -111,7 +111,9 @@ def main():
                 if not source.is_file() or '__pycache__' in source.parts:continue
                 dest=pipeline/source.relative_to(ROOT);dest.parent.mkdir(parents=True,exist_ok=True)
                 if not dest.exists() or source.read_bytes()!=dest.read_bytes():shutil.copy2(source,dest)
-        for name in ('main.nf','nextflow.config'):shutil.copy2(ROOT/name,pipeline/name)
+        for name in ('main.nf','nextflow.config'):
+            (pipeline/name).parent.mkdir(parents=True,exist_ok=True)
+            shutil.copy2(ROOT/name,pipeline/name)
         shutil.copy2(ROOT/'tests/postprocessing_fixture.nf',pipeline/'postprocessing_fixture.nf')
         # No sample sheet: main must compile and reach its explicit input guard, without submitting work.
         probe=subprocess.run(['nextflow','-C',str(pipeline/'nextflow.config'),'run',str(pipeline/'main.nf')],cwd=pipeline,capture_output=True,text=True)

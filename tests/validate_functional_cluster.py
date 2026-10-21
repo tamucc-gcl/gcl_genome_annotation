@@ -100,7 +100,9 @@ def main():
                 if not source.is_file() or '__pycache__' in source.parts:continue
                 dest=pipeline/source.relative_to(ROOT);dest.parent.mkdir(parents=True,exist_ok=True)
                 if not dest.exists() or source.read_bytes()!=dest.read_bytes():shutil.copy2(source,dest)
-        for name in ('main.nf','functional_annotation.nf','nextflow.config'):shutil.copy2(ROOT/name,pipeline/name)
+        for name in ('main.nf','validation/entrypoints/functional_annotation.nf','nextflow.config'):
+            (pipeline/name).parent.mkdir(parents=True,exist_ok=True)
+            shutil.copy2(ROOT/name,pipeline/name)
         shutil.copy2(ROOT/'tests/functional_fixture.nf',pipeline/'functional_acceptance.nf')
         with (pipeline/'nextflow.config').open('a') as handle:
             handle.write("\nprocess {\n withLabel: diamond { cpus=2; memory='4 GB'; time='1h' }\n withLabel: chunk_proteins { cpus=1; memory='2 GB'; time='1h' }\n}\n")

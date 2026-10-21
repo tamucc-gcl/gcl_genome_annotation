@@ -20,8 +20,8 @@ workflow GENOME_TRACKS {
     [params.trna_filter_cmscore,params.trna_filter_ssscore,params.trna_filter_isoscore,params.trna_filter_tertiary_start,params.trna_filter_tertiary_max].each { value ->
         if (!Double.isFinite(value as double) || (value as double)< -1) error 'Invalid native tRNA confidence cutoff'
     }
-    helpers = ['genome_tracks.py','reference_repeats.py'].collect { file("${projectDir}/py_scripts/${it}",checkIfExists:true) }
-    reportHelpers = helpers + [file("${projectDir}/py_scripts/report_genome_tracks.py",checkIfExists:true)]
+    helpers = ['genome_tracks.py','reference_repeats.py'].collect { file("${params.pipeline_root}/py_scripts/${it}",checkIfExists:true) }
+    reportHelpers = helpers + [file("${params.pipeline_root}/py_scripts/report_genome_tracks.py",checkIfExists:true)]
     tRNASCAN(jobs.filter { it[1].run_trnascan }.map { aid,settings,genome,identity -> tuple(aid,genome) })
     HIGH_CONFIDENCE_TRNA(tRNASCAN.out.confidence_inputs.filter { params.trna_filter })
     infernalRequests = jobs.filter { it[1].run_infernal }.join(masked).map { aid,settings,genome,identity,softmasked -> tuple(aid,softmasked) }
@@ -61,7 +61,7 @@ workflow GENOME_TRACKS {
             if (track=='telomere') policy.motif=motif
             tuple(aid,track,gff,status,identity,policy,policy.enabled ? rows.findAll { it[0]==aid && it[1]==track }.collect { it[2] } : [])
         }
-    FILTER_GENOME_TRACK(filtering,[file("${projectDir}/py_scripts/filter_genome_tracks.py",checkIfExists:true)]+helpers)
+    FILTER_GENOME_TRACK(filtering,[file("${params.pipeline_root}/py_scripts/filter_genome_tracks.py",checkIfExists:true)]+helpers)
     completed = FILTER_GENOME_TRACK.out.filtered.map { aid,track,gff,status,decisions -> tuple(aid,status) }.toList()
     REPORT_GENOME_TRACKS(jobs.combine(completed.map { rows -> [rows] }).map { aid,settings,genome,identity,rows ->
         def policy = settings.findAll { key,value -> key in ['run_trnascan','run_infernal','run_telomere','run_centromere','telomere_motif'] }

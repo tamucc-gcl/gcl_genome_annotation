@@ -3,7 +3,7 @@
 The integrated workflow maps accepted selected reads to normalized unmasked
 references using HISAT2 2.2.1 and samtools 1.21. BAMs remain separate by assembly
 and readset, including lanes of the same library. There is no pipeline BAM merge.
-`rna_alignment.nf` is a diagnostic entry using completed preparation/reference
+`validation/entrypoints/rna_alignment.nf` is a diagnostic entry using completed preparation/reference
 outputs; it stops before BRAKER. Main uses native task channels throughout.
 
 HISAT2 uses `--dta`, a fixed seed, strand-neutral mapping and explicit read-group

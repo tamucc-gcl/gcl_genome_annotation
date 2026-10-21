@@ -43,7 +43,7 @@ def run_case(root, inputs, name, sheet, expected, suffix='fresh', resume=False, 
     output = case / 'results'
     output.mkdir(exist_ok=True)
     command = ['nextflow', '-log', str(case / f'{suffix}.nextflow.log'), '-C', str(ROOT / 'nextflow.config'),
-               'run', str(ROOT / 'reference_repeats.nf'), '-profile', 'slurm', '-w', str(case / 'work'),
+               'run', str(ROOT / 'validation/entrypoints/reference_repeats.nf'), '-profile', 'slurm', '-w', str(case / 'work'),
                '--sample_sheet', str(inputs / sheet), '--taxid', '999',
                '--taxdump_dir', str(inputs / 'taxdump'), '--outdir', str(output),
                '--repeat_library', str(inputs / library), '--repeat_mask_benchmark', 'true',

@@ -25,7 +25,7 @@ class ReferenceRepeatsTests(unittest.TestCase):
 
     def test_embedded_scripts_escape_literal_dollars_for_groovy(self):
         # Python/shell quoting does not suppress interpolation in a Groovy GString.
-        pending, seen = [ROOT / 'reference_repeats.nf'], set()
+        pending, seen = [ROOT / 'validation/entrypoints/reference_repeats.nf'], set()
         while pending:
             path = pending.pop().resolve()
             if path in seen:

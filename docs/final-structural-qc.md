@@ -127,7 +127,7 @@ execution was reviewed separately using the existing databases.
 Recovery uses the same test directory and `--resume`.
 
 Normal execution uses `main.nf` with `-resume`. A development-only
-`final_structural_qc.nf` entry can instead read accepted published selection,
+`validation/entrypoints/final_structural_qc.nf` entry can instead read accepted published selection,
 preflight and before-QC outputs via `--structural_inputs_root "${outdir}"`, without
 relaunching earlier scientific stages. Keep the same entry/work directory for
 cache comparisons.

@@ -1,7 +1,7 @@
 # RNA preparation and QC
 
 `main.nf` prepares each requested readset once before reference-specific mapping.
-`rna_preparation.nf` is the focused preparation entry. Local reads remain declared
+`validation/entrypoints/rna_preparation.nf` is the focused preparation entry. Local reads remain declared
 path inputs; accession inputs are acquired with SRA Toolkit. Nextflow manages
 staging/scratch, without helper-created passthrough links or copies.
 

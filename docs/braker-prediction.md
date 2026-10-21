@@ -43,7 +43,7 @@ readiness. Input/runtime records are under `braker_inputs/` and `braker_runtime/
 logs, training parameters and `braker_run/`. Optional UTR work never overwrites
 these predictions.
 
-`braker_prediction.nf` is a diagnostic entry that reads accepted reference/repeat,
+`validation/entrypoints/braker_prediction.nf` is a diagnostic entry that reads accepted reference/repeat,
 protein and alignment reports under outdir, or `braker_inputs_root`. It stops at
 prediction/reporting; it does not execute the rest of main. Unused evidence
 reports can be absent. `braker_check_only=true` requests actual software checks

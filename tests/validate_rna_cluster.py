@@ -19,7 +19,7 @@ def run_case(root, inputs, name, sheet, expected, resume=False, fraction=None, p
     output.mkdir(exist_ok=True)
     suffix = 'subset_change' if fraction else ('resume' if resume else 'fresh')
     command = ['nextflow', '-log', str(case / f'{suffix}.nextflow.log'), '-C', str(ROOT / 'nextflow.config'),
-               'run', str(ROOT / 'rna_preparation.nf'), '-profile', 'slurm', '-w', str(case / 'work'),
+               'run', str(ROOT / 'validation/entrypoints/rna_preparation.nf'), '-profile', 'slurm', '-w', str(case / 'work'),
                '--sample_sheet', str(inputs / sheet), '--rna_sheet', str(inputs / 'reads.csv'),
                '--taxid', '999', '--taxdump_dir', str(inputs / 'taxdump'), '--outdir', str(output)]
     if resume:

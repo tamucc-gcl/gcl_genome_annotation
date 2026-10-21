@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 // QC-only entry: accepted final models and existing alignments; no prediction.
 nextflow.enable.dsl = 2
-include { JUNCTION_SUPPORT } from './workflows/junctionSupport.nf'
+include { JUNCTION_SUPPORT } from '../../workflows/junctionSupport.nf'
 
 workflow {
     def root = file(params.junction_inputs_root ?: params.outdir).toString()

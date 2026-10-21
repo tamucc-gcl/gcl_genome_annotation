@@ -16,7 +16,7 @@ workflow MODEL_SELECTION {
     ]).bytes.encodeBase64().toString()
     FILTER_GENE_MODELS(annotations.join(assessments),selectionSettings,
         ['model_selection.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
-            file("${projectDir}/py_scripts/${it}",checkIfExists:true)
+            file("${params.pipeline_root}/py_scripts/${it}",checkIfExists:true)
         })
     emit:
     annotation = FILTER_GENE_MODELS.out.bundle

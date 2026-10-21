@@ -14,7 +14,7 @@ def preamble='import static nextflow.Nextflow.tuple\ndef file(Map opts,String pa
 [true,false].each { enabled ->
     def captured=[]
     def binding=new Binding([
-        params:[run_functional_annotation:enabled],projectDir:'.',
+        params:[run_functional_annotation:enabled,pipeline_root:'.'],projectDir:'.',
         references:Channel.fromList(refs),
         identified:Channel.fromList(['A','B'].collect { tuple(it,Paths.get(it+'/identified')) }),
         trackStatuses:Channel.fromList(['B','A'].collect { tuple(it,Paths.get(it+'.tracks.json')) }),

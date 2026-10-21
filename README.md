@@ -42,6 +42,11 @@ RNA. Disable unused analyses/evidence explicitly; omitting a database path does
 not disable its analysis. See the running guide for existing database layouts,
 mode selection, dependencies and resource controls.
 
+The production entry is `main.nf`. Focused stage launchers are kept under
+`validation/entrypoints/` for diagnostics and regression testing; see the
+[testing guide](docs/testing.md). Development scratch material is not required
+for running the pipeline.
+
 ## Workflow
 
 | Order / branch | Work |
@@ -111,4 +116,4 @@ checks, software readiness and biological validation; it is not a guarantee for
 every taxon or evidence combination.
 
 [Original/current audit](docs/rework-audit.md) and [cleanup inventory](docs/cleanup.md)
-record intentional changes, completed source consolidation and remaining archival candidates.
+record intentional changes, completed source consolidation and the retained validation layout.

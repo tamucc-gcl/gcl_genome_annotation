@@ -1,8 +1,8 @@
 #!/usr/bin/env nextflow
 // Development entry: QC of accepted predictions, without repeating earlier stages.
 nextflow.enable.dsl = 2
-include { RESOLVE_ANNOTATION_INPUTS; ASSERT_ANNOTATION_INPUTS } from './modules/annotationInputs.nf'
-include { ANNOTATION_BASELINE } from './workflows/annotationBaseline.nf'
+include { RESOLVE_ANNOTATION_INPUTS; ASSERT_ANNOTATION_INPUTS } from '../../modules/annotationInputs.nf'
+include { ANNOTATION_BASELINE } from '../../workflows/annotationBaseline.nf'
 
 workflow {
     if (!params.sample_sheet) error 'Provide --sample_sheet'
@@ -11,8 +11,8 @@ workflow {
     def request = [launch_dir: launchDir.toString(), sample_sheet: params.sample_sheet.toString(),
         rna_sheet: params.rna_sheet?.toString(), taxdump_dir: params.taxdump_dir?.toString(),
         params: params.collectEntries { key, value -> [key.toString(), value] }]
-    RESOLVE_ANNOTATION_INPUTS(encode(request), file("${projectDir}/py_scripts/resolve_annotation_inputs.py"),
-        file("${projectDir}/assets/taxonomy_rules.json"))
+    RESOLVE_ANNOTATION_INPUTS(encode(request), file("${params.pipeline_root}/py_scripts/resolve_annotation_inputs.py"),
+        file("${params.pipeline_root}/assets/taxonomy_rules.json"))
     ASSERT_ANNOTATION_INPUTS(RESOLVE_ANNOTATION_INPUTS.out.bundle)
     def accepted = RESOLVE_ANNOTATION_INPUTS.out.bundle.combine(ASSERT_ANNOTATION_INPUTS.out)
     def models = accepted.flatMap { folder, passed ->
@@ -33,6 +33,6 @@ workflow {
         }
     }
     ANNOTATION_BASELINE(models, ['annotation_baseline.py', 'prepare_protein_evidence.py', 'reference_repeats.py'].collect {
-        file("${projectDir}/py_scripts/${it}", checkIfExists: true)
+        file("${params.pipeline_root}/py_scripts/${it}", checkIfExists: true)
     })
 }

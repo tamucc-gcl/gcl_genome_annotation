@@ -1,11 +1,11 @@
 # Rework requirements: end-to-end use and baseline filtering
 
 **Historical record — not current operating instructions.** Retained for the
-decision trail and flagged for archival in [cleanup](cleanup.md). Statements
+decision trail and flagged for archival in [cleanup](../cleanup.md). Statements
 below about pending stages, proposed MAKER compatibility, old AED/filter behavior
 or pilot totals describe their original dates. The current implementation is
-documented in [the guide index](index.md), [native AED](evidence-scoring.md),
-[selection](model-selection.md) and [validation scope](validation.md). In a
+documented in [the guide index](../index.md), [native AED](../evidence-scoring.md),
+[selection](../model-selection.md) and [validation scope](../validation.md). In a
 conflict, use those current guides and root configuration; do not run historical
 plans as additional pipeline steps.
 
@@ -89,7 +89,7 @@ summaries are published under `genome_tracks/<assembly_id>`. Source inspection
 required corrections to tRNAscan options, tidk window-end interpretation and
 centroAnno 1.0.2's assembly flag/inclusive end coordinates. Native cluster acceptance
 and the real-genome pilot remain pending; final combined-track packaging/unified
-reporting follow that acceptance. See [scope and test command](genome-tracks.md).
+reporting follow that acceptance. See [scope and test command](../genome-tracks.md).
 
 The user supplied successful full-data functional outputs: all five tools
 completed on 45,060 transcripts and 21,378 genes. The supplied merged-table
@@ -119,7 +119,7 @@ The user authorized reconnecting functional searches and merging/GFF decoration.
 The existing five search modules and product hierarchy now consume identified
 models. Accepted structural/AED/junction/TE fields are joined, all transcripts
 remain represented, and eligibility/no-hit/disabled states are explicit.
-See [functional scope and acceptance](functional-annotation.md). Local Python
+See [functional scope and acceptance](../functional-annotation.md). Local Python
 checks and Nextflow 23.10.1 parsing pass; cluster acceptance and the full database
 pilot are pending. Other genome tracks, unified reporting and end-to-end cleanup
 remain subsequent increments. Historical entries below describe earlier milestones.
@@ -138,7 +138,7 @@ This supplements the successful real-data preflight. Read contents, source
 acquisition and biological stages remain outside this acceptance scope.
 
 Protein-source preparation is now implemented as a separate entry point, with
-synthetic cluster acceptance passed on 9 October 2026 (user-supplied acceptance.json). See [protein evidence](protein-evidence.md) for tests
+synthetic cluster acceptance passed on 9 October 2026 (user-supplied acceptance.json). See [protein evidence](../protein-evidence.md) for tests
 and the real-download pilot. The real protein pilot and stored-source rerun passed on 9 October 2026. Next: RNA
 preparation, reference/repeat integrity, four-route prediction, model/evidence assessment, final filtering
 and functional/release integration. The native resume dependency checks remain

@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 // Assessment-only entry: accepted model/evidence outputs; no prediction or filtering.
 nextflow.enable.dsl = 2
-include { MODEL_ASSESSMENT } from './workflows/modelAssessment.nf'
+include { MODEL_ASSESSMENT } from '../../workflows/modelAssessment.nf'
 
 workflow {
     def root = file(params.assessment_inputs_root ?: params.outdir).toString()

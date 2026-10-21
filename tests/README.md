@@ -21,3 +21,8 @@ See [the consolidation record](../docs/cleanup.md).
 
 Native cluster acceptance uses synthetic inputs and is not proof of full
 real-data training in every evidence mode. See [validation limits](../docs/validation.md).
+
+Focused stage launchers live in [validation/entrypoints](../validation/entrypoints).
+The validators use those paths and preserve their layout in staged fixtures.
+`check_validation_entries.groovy` checks root configuration resolution, includes
+and staged helper/environment paths for production and focused launchers.

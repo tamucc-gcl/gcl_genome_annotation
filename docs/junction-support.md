@@ -98,7 +98,7 @@ with `--resume`. Tiny native fallback acceptance does not validate full-scale
 random-forest behavior; the real-data pilot was reviewed separately as noted below.
 
 After acceptance, the usual `main.nf -resume` command includes this QC. To pilot
-only junction QC against existing accepted outputs, substitute `junction_qc.nf`
+only junction QC against existing accepted outputs, substitute `validation/entrypoints/junction_qc.nf`
 for `main.nf` and add `--junction_inputs_root "${outdir}"`; retain the same root
 configuration, profile and work directory. This entry reads published final
 annotation and prediction metadata, while integrated main uses native channels.

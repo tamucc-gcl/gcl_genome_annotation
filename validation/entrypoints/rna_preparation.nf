@@ -1,8 +1,8 @@
 #!/usr/bin/env nextflow
 // Input preflight + assembly-independent RNA preparation; stops before alignment/repeats.
 nextflow.enable.dsl = 2
-include { RESOLVE_ANNOTATION_INPUTS; ASSERT_ANNOTATION_INPUTS } from './modules/annotationInputs.nf'
-include { PLAN_RNA_PREPARATION; ACQUIRE_RNA_READSET; QC_RNA_RAW; TRIM_RNA_READSET; QC_RNA_PROCESSED; SUBSET_RNA_READSET; REPORT_RNA_PREPARATION; ASSERT_RNA_PREPARATION } from './modules/rnaPreparation.nf'
+include { RESOLVE_ANNOTATION_INPUTS; ASSERT_ANNOTATION_INPUTS } from '../../modules/annotationInputs.nf'
+include { PLAN_RNA_PREPARATION; ACQUIRE_RNA_READSET; QC_RNA_RAW; TRIM_RNA_READSET; QC_RNA_PROCESSED; SUBSET_RNA_READSET; REPORT_RNA_PREPARATION; ASSERT_RNA_PREPARATION } from '../../modules/rnaPreparation.nf'
 
 workflow {
     if (!params.sample_sheet) error 'Provide --sample_sheet'
@@ -10,9 +10,9 @@ workflow {
     def request = [launch_dir: launchDir.toString(), sample_sheet: params.sample_sheet.toString(),
         rna_sheet: params.rna_sheet?.toString(), taxdump_dir: params.taxdump_dir?.toString(),
         params: params.collectEntries { key, value -> [key.toString(), value] }]
-    def helper = file("${projectDir}/py_scripts/prepare_rna.py", checkIfExists: true)
-    RESOLVE_ANNOTATION_INPUTS(encode(request), file("${projectDir}/py_scripts/resolve_annotation_inputs.py"),
-        file("${projectDir}/assets/taxonomy_rules.json"))
+    def helper = file("${params.pipeline_root}/py_scripts/prepare_rna.py", checkIfExists: true)
+    RESOLVE_ANNOTATION_INPUTS(encode(request), file("${params.pipeline_root}/py_scripts/resolve_annotation_inputs.py"),
+        file("${params.pipeline_root}/assets/taxonomy_rules.json"))
     ASSERT_ANNOTATION_INPUTS(RESOLVE_ANNOTATION_INPUTS.out.bundle)
     PLAN_RNA_PREPARATION(RESOLVE_ANNOTATION_INPUTS.out.bundle, ASSERT_ANNOTATION_INPUTS.out,
         encode([quality: params.rna_trim_quality, window: params.rna_trim_window,
@@ -79,6 +79,6 @@ workflow {
         report.exists() ? [report] : []
     }.toList()
     REPORT_RNA_PREPARATION(PLAN_RNA_PREPARATION.out.bundle, finalResults, readPaths, rawQcResults, processedQcResults, fastpReports,
-        file("${projectDir}/py_scripts/report_rna_preparation.py"))
+        file("${params.pipeline_root}/py_scripts/report_rna_preparation.py"))
     ASSERT_RNA_PREPARATION(REPORT_RNA_PREPARATION.out.status)
 }

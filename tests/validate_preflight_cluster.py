@@ -56,7 +56,7 @@ def run_case(name, sheet, rna, expected_status, expected_states, folder, tax):
     output = case / 'results'
     output.mkdir()
     command = ['nextflow', '-log', str(case / 'nextflow.log'),
-        '-C', str(ROOT / 'nextflow.config'), 'run', str(ROOT / 'preflight.nf'),
+        '-C', str(ROOT / 'nextflow.config'), 'run', str(ROOT / 'validation/entrypoints/preflight.nf'),
         '-profile', 'slurm', '-w', str(case / 'work'),
         '--sample_sheet', str(sheet), '--rna_sheet', str(rna),
         '--taxid', '999', '--taxdump_dir', str(tax), '--outdir', str(output),

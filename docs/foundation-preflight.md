@@ -1,6 +1,6 @@
 # Input sheets and taxonomy
 
-`main.nf` starts with the input/taxonomy preflight. `preflight.nf` exposes the
+`main.nf` starts with the input/taxonomy preflight. `validation/entrypoints/preflight.nf` exposes the
 same resolution independently and stops before acquisition or annotation.
 Examples are [assembly CSV](../assets/annotation_assemblies.example.csv) and
 [RNA CSV](../assets/annotation_rna.example.csv). Copy and edit them in the

@@ -92,7 +92,7 @@ and report/overlap-only cache reuse. It does not run prediction, repeat discover
 mapping, InGenAnnot or Portcullis. Recovery uses the same directory plus `--resume`.
 
 After cluster acceptance, use the usual main sbatch with `-resume`. An assessment-only
-`model_assessment.nf` entry also reads accepted published outputs with
+`validation/entrypoints/model_assessment.nf` entry also reads accepted published outputs with
 `--assessment_inputs_root "${outdir}"`; it requires enabled AED/junction reports.
 The standalone entry finds the published pre-filter repeat library or accepts
 `--assessment_repeat_library`. Missing enabled inputs are errors, never silently

@@ -36,9 +36,12 @@ Source consolidation passed 196 retained Python regressions, parsing of 63
 Nextflow scripts/modules plus the root config, and four native-runtime
 argument/routing checks. Retained interval/model helper functions were compared
 with the pre-cleanup source and have identical Python ASTs. These local checks
-do not replace Linux scientific-tool execution of the renamed module and
-simplified preparation tuple. Use the connected postprocessing acceptance in
-[the testing guide](testing.md) before the next full-data continuation.
+were followed by supplied cluster acceptance for `postprocessing_consolidation_01`:
+unit tests, main syntax, fresh, resume, report-change and disabled cases all passed
+with actual tiny UTR/gffread/AGAT/miniprot/native AED across four evidence modes.
+The subsequent relocation of focused entries passed local parsing, root-path and
+caller checks; cluster execution of those relocated launchers remains to be checked.
+See [the testing guide](testing.md).
 
 1. Run the updated release acceptance for selected transcript/tRNA export and
    recheck exported payload checksums on the cluster.

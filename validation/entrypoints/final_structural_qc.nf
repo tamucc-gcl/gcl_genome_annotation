@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 // Development entry: completed selection, accepted before-QC and native post-filter QC.
 nextflow.enable.dsl = 2
-include { FINAL_STRUCTURAL_ANNOTATION } from './workflows/finalStructuralAnnotation.nf'
+include { FINAL_STRUCTURAL_ANNOTATION } from '../../workflows/finalStructuralAnnotation.nf'
 
 workflow {
     def root = file(params.structural_inputs_root ?: params.outdir).toString()

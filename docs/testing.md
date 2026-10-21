@@ -65,12 +65,12 @@ and the retained production score/invariance tests. Shared model/native-score
 fixtures are in `annotation_fixtures.py`, rather than imported from a benchmark
 test class. See [consolidation record](cleanup.md).
 
-The four `check_*.groovy` files test production argument construction/routing
+The five `check_*.groovy` files test production argument construction/routing
 with a Nextflow runtime. Keep them alongside native validators. Every current
 `*_fixture.nf` and `utr_fixture_bams.nf` supports an active stage validator.
 Those tiny workflows are tests, not extra production pipelines.
 
-## Focused root entry points
+## Focused validation entry points
 
 These are retained diagnostic/test interfaces, not required manual checkpoints.
 Published-input readers validate source identities and require backing inputs
@@ -78,38 +78,50 @@ to exist. Switching entries or workflow scopes can change cache identities.
 
 | Entry | Stops after / accepted-input purpose |
 |---|---|
-| `preflight.nf` | Sheet/taxonomy resolution |
-| `protein_evidence.nf` | Protein preparation |
-| `rna_preparation.nf` | RNA preparation |
-| `reference_repeats.nf` | Reference/repeat preparation |
-| `rna_alignment.nf` | Mapping/QC using accepted reads/reference |
-| `braker_prediction.nf` | Prediction using accepted preparation/alignment |
-| `annotation_qc.nf` | Raw BRAKER QC |
-| `utr_refinement.nf` | UTR refinement and standalone QC |
-| `junction_qc.nf` | Model junction assessment |
-| `model_assessment.nf` | Assessment using completed scientific results |
-| `model_selection.nf` | Selection using accepted assessment |
-| `final_structural_qc.nf` | Final IDs and selected QC |
-| `functional_annotation.nf` | Functional annotation using accepted identified models |
+| `validation/entrypoints/preflight.nf` | Sheet/taxonomy resolution |
+| `validation/entrypoints/protein_evidence.nf` | Protein preparation |
+| `validation/entrypoints/rna_preparation.nf` | RNA preparation |
+| `validation/entrypoints/reference_repeats.nf` | Reference/repeat preparation |
+| `validation/entrypoints/rna_alignment.nf` | Mapping/QC using accepted reads/reference |
+| `validation/entrypoints/braker_prediction.nf` | Prediction using accepted preparation/alignment |
+| `validation/entrypoints/annotation_qc.nf` | Raw BRAKER QC |
+| `validation/entrypoints/utr_refinement.nf` | UTR refinement and standalone QC |
+| `validation/entrypoints/junction_qc.nf` | Model junction assessment |
+| `validation/entrypoints/model_assessment.nf` | Assessment using completed scientific results |
+| `validation/entrypoints/model_selection.nf` | Selection using accepted assessment |
+| `validation/entrypoints/final_structural_qc.nf` | Final IDs and selected QC |
+| `validation/entrypoints/functional_annotation.nf` | Functional annotation using accepted identified models |
 
-The custom scoring and benchmark root entries are retired. Moving retained
-diagnostic entries under a development directory is a possible
-later reorganization, not a safe rename alone: includes, `projectDir`, helper
-paths, docs and validators must change together. Those retained diagnostic entries
-were not relocated. Remaining proposed archives are listed separately. Keep actual project work, reports and environments separate
-from pipeline source; never remove active cache solely to tidy the checkout.
+`main.nf` is the only top-level Nextflow entry. Focused launchers live in
+`validation/entrypoints/` and use the root configuration explicitly. The shared
+`pipeline_root` default resolves helpers and Conda definitions from the checkout
+for both layouts; do not override it during normal use.
 
-## Source-consolidation regression
+```bash
+nextflow -C gcl_genome_annotation/nextflow.config \
+  run gcl_genome_annotation/validation/entrypoints/rna_alignment.nf \
+  -profile slurm -resume --sample_sheet data/annotation_assemblies.csv \
+  --outdir results/genome_annotation
+```
+
+Supply the usual evidence, taxonomy and database options for that stage. Stage
+validators already use the relocated paths. Scientific modules remain shared
+with `main.nf`; no alternate implementation was introduced.
+
+## Regression after maintenance
 
 After syncing the cleanup, use a new directory for the native connected check:
 
 ```bash
 python gcl_genome_annotation/tests/validate_postprocessing_cluster.py \
-  --outdir testing/postprocessing_consolidation_01
+  --outdir testing/postprocessing_cleanup_01
 ```
 
 This exercises the renamed native AED module and simplified evidence-preparation
-tuple. Then use normal main resume. Process names and scientific commands remain
+tuple. The supplied cluster acceptance passed fresh, resume, report-change and
+disabled cases after that consolidation. Following the entry-point relocation,
+rerun the affected stage validator on Linux before relying on its launch path;
+local parsing/configuration checks do not execute cluster tools. Then use normal main resume. Process names and scientific commands remain
 stable, but renamed staged helper files change some hashes: a one-time rerun of
 affected UTR/AED/assessment/QC descendants is possible. Do not assume this cleanup
 is report-only or force old cache hits for changed helper identities. Mapping,

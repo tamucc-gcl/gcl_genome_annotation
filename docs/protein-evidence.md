@@ -1,7 +1,7 @@
 # Prediction protein evidence
 
 `main.nf` validates, acquires and combines prediction protein evidence per assembly.
-`protein_evidence.nf` runs the same preparation independently and stops before
+`validation/entrypoints/protein_evidence.nf` runs the same preparation independently and stops before
 RNA processing, repeats or prediction. Functional-search databases are separate
 from these prediction evidence FASTAs.
 

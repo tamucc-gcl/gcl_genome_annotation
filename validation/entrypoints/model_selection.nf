@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 // Selection-only development entry; accepted assessment and models, no scientific searches.
 nextflow.enable.dsl = 2
-include { MODEL_SELECTION } from './workflows/modelSelection.nf'
+include { MODEL_SELECTION } from '../../workflows/modelSelection.nf'
 
 workflow {
     def root = file(params.selection_inputs_root ?: params.outdir).toString()

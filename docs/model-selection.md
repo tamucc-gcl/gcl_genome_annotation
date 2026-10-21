@@ -102,7 +102,7 @@ retained sets, and exact rule boundaries. Recovery uses the same directory plus
 `--resume`.
 
 After acceptance, run the normal main sbatch with `-resume`. A development-only
-`model_selection.nf` entry can consume existing accepted files through
+`validation/entrypoints/model_selection.nf` entry can consume existing accepted files through
 `--selection_inputs_root "${outdir}"` without launching scientific preparation.
 Use the same entry and work directory for cache comparisons. Selection settings
 are inputs only to the selection task, so threshold changes do not change

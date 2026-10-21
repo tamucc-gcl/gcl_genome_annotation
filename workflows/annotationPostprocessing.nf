@@ -25,10 +25,10 @@ workflow ANNOTATION_POSTPROCESSING {
     if (params.ingenannot_rna_penalty < 0 || params.ingenannot_rna_penalty > 1)
         error 'ingenannot_rna_penalty must be between 0 and 1'
     utrHelpers = ['utr_refinement.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
-        file("${projectDir}/py_scripts/${it}", checkIfExists: true)
+        file("${params.pipeline_root}/py_scripts/${it}", checkIfExists: true)
     }
     finalHelpers = ['final_annotation.py','ingenannot_aed.py','ingenannot_inputs.py','annotation_models.py','prepare_protein_evidence.py'].collect {
-        file("${projectDir}/py_scripts/${it}", checkIfExists: true)
+        file("${params.pipeline_root}/py_scripts/${it}", checkIfExists: true)
     }
     rnaJobs = jobs.map { aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices ->
         if (!aid || !prediction || !(mode in ['rna_protein','rna','protein','ab_initio']))
@@ -75,7 +75,7 @@ workflow ANNOTATION_POSTPROCESSING {
             file(suffix == 'gff3' ? "${prediction}/${aid}.gff3" : "${prediction}/${aid}_${suffix}", checkIfExists: true)
         },validation,gff,utrStatus)
     },['final_annotation_inputs.py','prepare_protein_evidence.py'].collect {
-        file("${projectDir}/py_scripts/${it}", checkIfExists: true)
+        file("${params.pipeline_root}/py_scripts/${it}", checkIfExists: true)
     })
     junctionReports = Channel.empty()
     aedReports = Channel.empty()
@@ -97,14 +97,14 @@ workflow ANNOTATION_POSTPROCESSING {
             aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices,folder ->
             tuple(aid,settings,genome,file("${folder}/${aid}.gff3"),file("${folder}/${aid}_proteins.fa"),file("${folder}/annotation_status.json"))
         },['annotation_baseline.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
-            file("${projectDir}/py_scripts/${it}", checkIfExists: true)
+            file("${params.pipeline_root}/py_scripts/${it}", checkIfExists: true)
         })
         beforeQc = FINAL_ANNOTATION_QC.out.agat.mix(FINAL_ANNOTATION_QC.out.busco).mix(FINAL_ANNOTATION_QC.out.omark)
             .mix(FINAL_ANNOTATION_QC.out.selections.map { aid,folder -> tuple(aid,file("${folder}/selection.json")) })
     }
     if (params.run_aed) {
         ALIGN_AED_PROTEINS(proteinRequests,['prepare_protein_evidence.py','reference_repeats.py'].collect {
-            file("${projectDir}/py_scripts/${it}", checkIfExists: true)
+            file("${params.pipeline_root}/py_scripts/${it}", checkIfExists: true)
         })
         proteinSources = ALIGN_AED_PROTEINS.out.alignment.toList().map { rows -> [rows] }
         aedRequests = jobs.join(FINALIZE_ANNOTATION.out.bundle).join(rnaSources).combine(proteinSources).map {
@@ -114,7 +114,7 @@ workflow ANNOTATION_POSTPROCESSING {
             tuple(aid,file("${folder}/${aid}.gff3"),file("${folder}/annotation_status.json"),rna,match ? [match[1]] : [])
         }
         PREPARE_INGENANNOT_EVIDENCE(aedRequests,['ingenannot_inputs.py','prepare_protein_evidence.py'].collect {
-            file("${projectDir}/py_scripts/${it}", checkIfExists: true)
+            file("${params.pipeline_root}/py_scripts/${it}", checkIfExists: true)
         })
         aedReady = aedRequests.map { aid,gff,validation,rna,protein -> tuple(aid,gff) }
             .join(PREPARE_INGENANNOT_EVIDENCE.out.evidence)

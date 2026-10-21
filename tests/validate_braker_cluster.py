@@ -40,8 +40,8 @@ def fixtures(folder):
 
 
 def run_case(root, inputs, entry, suffix, resume=False, genome_only=False):
-    case = root / (('genome_only_connected' if entry == 'main.nf' else 'genome_only_prediction') if genome_only
-                   else ('connected' if entry == 'main.nf' else 'prediction_only'))
+    case = root / (('genome_only_connected' if Path(entry).name == 'main.nf' else 'genome_only_prediction') if genome_only
+                   else ('connected' if Path(entry).name == 'main.nf' else 'prediction_only'))
     case.mkdir(exist_ok=True)
     output = case / 'results'
     command = ['nextflow', '-log', str(case / f'{suffix}.nextflow.log'), '-C', str(ROOT / 'nextflow.config'),
@@ -109,7 +109,7 @@ def run_case(root, inputs, entry, suffix, resume=False, genome_only=False):
         assert len(tasks) == len(expected_modes)
         if resume and suffix != 'recover':
             assert all(r['status'] == 'CACHED' for r in tasks), f'{name} not cached. Task cache details: {cache_details}'
-    if entry == 'main.nf':
+    if Path(entry).name == 'main.nf':
         alignments = [r for r in trace if r['name'].startswith('ALIGN_RNA_READSET')]
         assert len(alignments) == (0 if genome_only else 5)
         if resume and suffix != 'recover':
@@ -151,9 +151,9 @@ def main():
         summary['checks'].append(run_case(root, inputs, 'main.nf', 'resume', True))
         # Recovery may reach this entry for the first time. Its cache is separate
         # from main.nf; only the following unchanged run must be fully cached.
-        summary['checks'].append(run_case(root, inputs, 'braker_prediction.nf',
+        summary['checks'].append(run_case(root, inputs, 'validation/entrypoints/braker_prediction.nf',
                                          'recover' if args.resume else 'fresh', args.resume))
-        summary['checks'].append(run_case(root, inputs, 'braker_prediction.nf', 'resume', True))
+        summary['checks'].append(run_case(root, inputs, 'validation/entrypoints/braker_prediction.nf', 'resume', True))
         summary['checks'].append(run_case(root, inputs, 'main.nf', 'recover' if args.resume else 'fresh', args.resume, genome_only=True))
         summary['checks'].append(run_case(root, inputs, 'main.nf', 'resume', True, genome_only=True))
         # Use only reference outputs, without fabricating optional evidence reports.
@@ -163,8 +163,8 @@ def main():
             bare.mkdir()
             for folder in ('reference_repeats', 'filtered_assemblies', 'repeats'):
                 shutil.copytree(root / 'genome_only_connected/results' / folder, bare / folder)
-        summary['checks'].append(run_case(root, inputs, 'braker_prediction.nf', 'recover' if args.resume else 'fresh', args.resume, genome_only=True))
-        summary['checks'].append(run_case(root, inputs, 'braker_prediction.nf', 'resume', True, genome_only=True))
+        summary['checks'].append(run_case(root, inputs, 'validation/entrypoints/braker_prediction.nf', 'recover' if args.resume else 'fresh', args.resume, genome_only=True))
+        summary['checks'].append(run_case(root, inputs, 'validation/entrypoints/braker_prediction.nf', 'resume', True, genome_only=True))
         summary['status'] = 'passed'
     except (AssertionError, ValueError, OSError, RuntimeError) as exc:
         summary['error'] = str(exc)

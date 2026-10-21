@@ -1,17 +1,17 @@
 #!/usr/bin/env nextflow
 // Input preflight + normalized reference/repeats; stops before RNA alignment/prediction.
 nextflow.enable.dsl = 2
-include { RESOLVE_ANNOTATION_INPUTS; ASSERT_ANNOTATION_INPUTS } from './modules/annotationInputs.nf'
-include { FILTER_ASSEMBLY } from './modules/filterAssembly.nf'
-include { CURATE_DFAM } from './modules/curateDfam.nf'
-include { REPEAT_MODEL } from './modules/repeatModel.nf'
-include { CURATE_REPEATS } from './modules/curateRepeats.nf'
-include { CLASSIFY_REPEATS } from './modules/classifyRepeats.nf'
-include { RECLASSIFY_REPEATS } from './modules/reclassifyRepeats.nf'
-include { EXTRACT_REPEAT_PEPS; INDEX_REPEAT_PEPS; FILTER_REPEAT_LIBRARY } from './modules/filterRepeatLibrary.nf'
-include { COMBINE_REPEAT_LIBS } from './modules/combineRepeatLibs.nf'
-include { REPEAT_MASK_PARALLEL; REPEAT_MASK_PARALLEL as UNSPLIT_MASK_BENCHMARK } from './workflows/repeatMaskParallel.nf'
-include { AUDIT_REPEAT_LIBRARY; VALIDATE_REFERENCE_REPEATS; COMPARE_REPEAT_MASKS; REPORT_REFERENCE_REPEATS; ASSERT_REFERENCE_REPEATS } from './modules/referenceRepeats.nf'
+include { RESOLVE_ANNOTATION_INPUTS; ASSERT_ANNOTATION_INPUTS } from '../../modules/annotationInputs.nf'
+include { FILTER_ASSEMBLY } from '../../modules/filterAssembly.nf'
+include { CURATE_DFAM } from '../../modules/curateDfam.nf'
+include { REPEAT_MODEL } from '../../modules/repeatModel.nf'
+include { CURATE_REPEATS } from '../../modules/curateRepeats.nf'
+include { CLASSIFY_REPEATS } from '../../modules/classifyRepeats.nf'
+include { RECLASSIFY_REPEATS } from '../../modules/reclassifyRepeats.nf'
+include { EXTRACT_REPEAT_PEPS; INDEX_REPEAT_PEPS; FILTER_REPEAT_LIBRARY } from '../../modules/filterRepeatLibrary.nf'
+include { COMBINE_REPEAT_LIBS } from '../../modules/combineRepeatLibs.nf'
+include { REPEAT_MASK_PARALLEL; REPEAT_MASK_PARALLEL as UNSPLIT_MASK_BENCHMARK } from '../../workflows/repeatMaskParallel.nf'
+include { AUDIT_REPEAT_LIBRARY; VALIDATE_REFERENCE_REPEATS; COMPARE_REPEAT_MASKS; REPORT_REFERENCE_REPEATS; ASSERT_REFERENCE_REPEATS } from '../../modules/referenceRepeats.nf'
 
 workflow {
     if (!params.sample_sheet) error 'Provide --sample_sheet'
@@ -22,12 +22,12 @@ workflow {
     def parse = { path -> new groovy.json.JsonSlurper().parse(new File(path.toString())) }
     def taxonKey = { taxa -> 'taxon_' + java.security.MessageDigest.getInstance('SHA-256')
         .digest(taxa.toString().getBytes('UTF-8')).encodeHex().toString().substring(0, 20) }
-    def helper = file("${projectDir}/py_scripts/reference_repeats.py", checkIfExists: true)
+    def helper = file("${params.pipeline_root}/py_scripts/reference_repeats.py", checkIfExists: true)
     def request = [launch_dir: launchDir.toString(), sample_sheet: params.sample_sheet.toString(),
         rna_sheet: params.rna_sheet?.toString(), taxdump_dir: params.taxdump_dir?.toString(),
         params: params.collectEntries { key, value -> [key.toString(), value] }]
-    RESOLVE_ANNOTATION_INPUTS(encode(request), file("${projectDir}/py_scripts/resolve_annotation_inputs.py"),
-        file("${projectDir}/assets/taxonomy_rules.json"))
+    RESOLVE_ANNOTATION_INPUTS(encode(request), file("${params.pipeline_root}/py_scripts/resolve_annotation_inputs.py"),
+        file("${params.pipeline_root}/assets/taxonomy_rules.json"))
     ASSERT_ANNOTATION_INPUTS(RESOLVE_ANNOTATION_INPUTS.out.bundle)
     // Assertion dependency ensures no scientific work starts on an incomplete input contract.
     def assemblies = RESOLVE_ANNOTATION_INPUTS.out.bundle.combine(ASSERT_ANNOTATION_INPUTS.out).flatMap { folder, passed ->
@@ -74,7 +74,7 @@ workflow {
         CLASSIFY_REPEATS(CURATE_REPEATS.out.clustered_repeats)
         def classified
         if (params.repeat_reclassify) {
-            RECLASSIFY_REPEATS(CLASSIFY_REPEATS.out.curated_repeats, file("${projectDir}/py_scripts/run_terrier.py"))
+            RECLASSIFY_REPEATS(CLASSIFY_REPEATS.out.curated_repeats, file("${params.pipeline_root}/py_scripts/run_terrier.py"))
             classified = RECLASSIFY_REPEATS.out.reclassified_lib
         } else {
             classified = CLASSIFY_REPEATS.out.curated_repeats
@@ -124,6 +124,6 @@ workflow {
     REPORT_REFERENCE_REPEATS(RESOLVE_ANNOTATION_INPUTS.out.bundle, references.map { it[1] }.toList(),
         AUDIT_REPEAT_LIBRARY.out.status.map { it[1] }.toList(), VALIDATE_REFERENCE_REPEATS.out.status.map { it[1] }.toList(),
         benchmarkChecks,
-        file("${projectDir}/py_scripts/report_reference_repeats.py"))
+        file("${params.pipeline_root}/py_scripts/report_reference_repeats.py"))
     ASSERT_REFERENCE_REPEATS(REPORT_REFERENCE_REPEATS.out.status, benchmarkChecks)
 }
