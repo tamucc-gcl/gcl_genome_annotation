@@ -12,6 +12,8 @@ import traceback
 from validate_utr_cluster import ROOT, dump, execute
 from test_annotation_release import release_fixture
 from reference_repeats import sha
+from model_metrics import sequences
+from evidence_aed import models
 
 
 def fixtures(root):
@@ -66,6 +68,18 @@ def run_case(root,name,resume):
         assert state['status']=='ready' and state['assembly_id']==aid,state
         assert state['functional_enabled']==(name!='functional_disabled'),state
         for file,metadata in state['outputs'].items():assert sha(folder/file)==metadata['sha256'],file
+        lengths={r['id']:r['length'] for r in json.loads((folder/'provenance/reference.json').read_text())['contigs']}
+        assert set(sequences(folder/f'{aid}_transcripts.fa'))==set(models(folder/f'{aid}.coding.gff3',lengths))
+        if aid=='A':
+            # Older --resume fixtures contain the original plus-strand tRNA only.
+            n=state['tracks']['trnascan']['feature_types'].get('tRNA',0)
+            expected={'A.trna':'A'*21}
+            if n==2:expected['A.trna.minus']='T'*17
+            assert sequences(folder/f'{aid}_tRNA.fa')==expected
+            assert state['sequence_counts']==dict(transcripts=2,trna=n)
+        else:
+            assert not (folder/f'{aid}_tRNA.fa').exists()
+            assert state['sequence_counts']==dict(transcripts=2)
         assert state['disabled_tracks']==(['centromere'] if aid=='A' else ['trnascan','infernal','telomere','centromere']),state
         assert not list(folder.glob('*.html'))
     index=json.loads((release/'release_index.json').read_text())
@@ -77,7 +91,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--outdir',required=True);p.add_argument('--resume',action='store_true');a=p.parse_args()
     root=Path(a.outdir).resolve();root.mkdir(parents=True,exist_ok=True)
     if any(root.iterdir()) and not a.resume:p.error('--outdir must be empty or use --resume')
-    summary=dict(status='failed',checks=[],scope='Actual Nextflow release packaging; two accepted synthetic assemblies, selected/disabled/empty tracks, functional on/off, complete coding/track ID maps, checksums, parent/reference checks, resume and index-only cache. No mapping, repeats, prediction or functional searches; full-genome release pilot pending.')
+    summary=dict(status='failed',checks=[],scope='Actual Nextflow release packaging; selected final-ID transcript/tRNA FASTAs, two accepted synthetic assemblies, selected/disabled/empty tracks, functional on/off, complete coding/track ID maps, checksums, parent/reference checks, resume and index-only cache. No mapping, repeats, prediction or functional searches; full-genome sequence-export pilot pending.')
     try:
         execute([sys.executable,'-m','unittest','discover','-s',str(ROOT/'tests'),'-p','test_*.py'],ROOT,root/'unit_tests.log')
         summary['checks'].append(dict(case='unit_tests',passed=True))

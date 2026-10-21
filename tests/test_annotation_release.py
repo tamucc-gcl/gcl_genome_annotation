@@ -6,7 +6,8 @@ import tempfile
 import unittest
 
 from test_final_structural import accepted
-from package_annotation import package, gff_records
+from package_annotation import package, gff_records, extract_spliced, trna_models
+from model_metrics import sequences
 from reference_repeats import sha
 
 
@@ -21,7 +22,10 @@ def release_fixture(root):
     for t in ('trnascan','infernal','telomere','centromere'):
         if t == 'centromere': states[t] = dict(status='disabled'); continue
         p = root/f'A.{t}.gff3'; tracks.append(str(p))
-        text = {'trnascan':'chr1\ttRNAscan\texon\t10\t30\t.\t+\t.\tID=A.trna.exon;Parent=A.trna\nchr1\ttRNAscan\ttRNA\t10\t30\t.\t+\t.\tID=A.trna\n',
+        text = {'trnascan':'chr1\ttRNAscan\texon\t10\t30\t.\t+\t.\tID=A.trna.exon;Parent=A.trna\nchr1\ttRNAscan\ttRNA\t10\t30\t.\t+\t.\tID=A.trna\n'
+                'chr1\ttRNAscan\ttRNA\t40\t70\t.\t-\t.\tID=A.trna.minus\n'
+                'chr1\ttRNAscan\texon\t40\t45\t.\t-\t.\tID=A.trna.minus.e1;Parent=A.trna.minus\n'
+                'chr1\ttRNAscan\texon\t60\t70\t.\t-\t.\tID=A.trna.minus.e2;Parent=A.trna.minus\n',
                 'infernal':'', 'telomere':'chr1\ttidk\ttelomeric_repeat\t1\t10\t.\t-\t.\tID=A.telomere1\n'}[t]
         p.write_text('##gff-version 3\n'+text)
         states[t] = dict(status='ready',reference_identity=ref,features=len(text.splitlines()),gff3_sha256=sha(p))
@@ -47,6 +51,11 @@ class AnnotationReleaseTests(unittest.TestCase):
         out = self.root/'release'; result = package(self.request,out)
         self.assertEqual(result['genes'],1); self.assertEqual(result['coding_transcripts'],2)
         self.assertEqual(result['disabled_tracks'],['centromere'])
+        self.assertEqual(result['sequence_counts'],dict(transcripts=2,trna=2))
+        self.assertEqual(set(sequences(out/'A_transcripts.fa')),{'A_g1.t1','A_g1.t2'})
+        self.assertEqual(sequences(out/'A_tRNA.fa'),{'A.trna':'A'*21,'A.trna.minus':'T'*17})
+        for suffix in ('proteins','cds'):
+            self.assertEqual(sha(out/f'A_{suffix}.fa'),sha(Path(self.request['identified'])/f'A_{suffix}.fa'))
         text = (out/'A.gff3').read_text()
         self.assertIn('ID=A.repeat.repeat1;Target=external_repeat',text)
         self.assertLess(text.index('ID=A.trna\n'), text.index('ID=A.trna.exon;'))
@@ -66,6 +75,39 @@ class AnnotationReleaseTests(unittest.TestCase):
         state = package(r,self.root/'release')
         self.assertFalse(state['functional_enabled']); self.assertEqual(len(state['disabled_tracks']),4)
         self.assertFalse((self.root/'release/tables/functional_annotations.tsv').exists())
+        self.assertEqual(state['sequence_counts'],dict(transcripts=2))
+        self.assertFalse((self.root/'release/A_tRNA.fa').exists())
+
+    def test_enabled_empty_trna_exports_empty_fasta(self):
+        r=self.request;p=Path(r['tracks'][0]);p.write_text('##gff-version 3\n')
+        s=Path(r['track_status']);state=json.loads(s.read_text())
+        state['tracks']['trnascan'].update(features=0,gff3_sha256=sha(p));s.write_text(json.dumps(state))
+        state=package(r,self.root/'empty')
+        self.assertEqual(state['sequence_counts']['trna'],0)
+        self.assertEqual((self.root/'empty/A_tRNA.fa').read_text(),'')
+        self.assertIn('A_tRNA.fa',state['outputs'])
+
+    def test_splicing_utr_both_strands_and_shared_exons(self):
+        genome=self.root/'sequence.fa';genome.write_text('>chrX\naaCGTACCGGTT\n')
+        targets={'plus':dict(seq='chrX',strand='+',start=0,end=12,exons=[(0,3),(8,12)]),
+                 'minus':dict(seq='chrX',strand='-',start=0,end=12,exons=[(8,12),(0,3)])}
+        destination=self.root/'tx.fa'
+        extract_spliced(genome,[('transcripts',targets,destination)])
+        # Exons are exported whole, including untranslated sequence; no CDS clipping.
+        self.assertEqual(sequences(destination),dict(plus='AACGGTT',minus='AACCGTT'))
+        rows=[(['chrX','native','tRNA','1','12','.','-','.',''],dict(ID='t')),
+              (['chrX','native','exon','1','3','.','-','.',''],dict(ID='e1',Parent='t')),
+              (['chrX','native','exon','9','12','.','-','.',''],dict(ID='e2',Parent='t'))]
+        t=trna_models(rows)
+        extract_spliced(genome,[('trna',t,destination)])
+        self.assertEqual(sequences(destination),dict(t='AACCGTT'))
+        # Native single-exon tRNAs may be represented by their feature span alone.
+        t=trna_models(rows[:1]);extract_spliced(genome,[('trna',t,destination)])
+        self.assertEqual(sequences(destination),dict(t='AACCGGTACGTT'))
+        targets['plus']['exons']=[(0,4),(3,6)]
+        with self.assertRaisesRegex(ValueError,'overlapping'):extract_spliced(genome,[('transcripts',targets,destination)])
+        targets['plus']['exons']=[(0,3)];targets['plus']['strand']='.'
+        with self.assertRaisesRegex(ValueError,'resolved strand'):extract_spliced(genome,[('transcripts',targets,destination)])
 
     def test_changed_track_and_missing_enabled_track_block(self):
         r = copy.deepcopy(self.request); r['tracks'] = r['tracks'][:-1]

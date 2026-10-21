@@ -13,7 +13,7 @@ import shutil
 from urllib.parse import quote, unquote
 
 from reference_repeats import fasta, sha, dump
-from model_metrics import sequences
+from model_metrics import sequences, revcomp
 from evidence_aed import models
 from functional_report import geometry
 
@@ -90,6 +90,52 @@ def write_gff(path, rows, lengths):
         for fid in order: emit(fid)
 
 
+def trna_models(rows):
+    # Reuse the original extractor's exon-splicing/span-fallback behavior, but
+    # use explicit tRNA IDs/parents rather than a particular source or gene tree.
+    targets = {}
+    for c, a in rows:
+        if c[2] != 'tRNA': continue
+        if a['ID'] in targets: raise ValueError('Duplicate tRNA sequence ID: '+a['ID'])
+        targets[a['ID']] = dict(seq=c[0], strand=c[6], start=int(c[3])-1, end=int(c[4]), exons=[])
+    for c, a in rows:
+        if c[2] != 'exon': continue
+        for parent in a.get('Parent', '').split(','):
+            if parent in targets: targets[parent]['exons'].append((int(c[3])-1, int(c[4])))
+    for m in targets.values():
+        if not m['exons']: m['exons'] = [(m['start'], m['end'])]
+    return targets
+
+
+def extract_spliced(genome, groups):
+    """Extract final-ID exon sequences in one reference pass (one contig in memory)."""
+    wanted = {}; results = {}
+    for label, targets, destination in groups:
+        results[label] = {}
+        for tid, model in targets.items():
+            blocks = sorted(set(model['exons']))
+            if model['strand'] not in ('+', '-') or not blocks:
+                raise ValueError('Sequence export needs resolved strand/exons: '+tid)
+            if any(s < model['start'] or e > model['end'] or s >= e for s,e in blocks) or any(l[1] > r[0] for l,r in zip(blocks,blocks[1:])):
+                raise ValueError('Invalid/overlapping sequence export exons: '+tid)
+            wanted.setdefault(model['seq'], []).append((label, tid, model['strand'], blocks))
+    for header, sequence in fasta(genome):
+        for label, tid, strand, blocks in wanted.pop(header.split()[0], []):
+            if blocks[-1][1] > len(sequence): raise ValueError('Sequence export outside reference: '+tid)
+            spliced = ''.join(sequence[s:e] for s,e in blocks).upper()
+            results[label][tid] = revcomp(spliced) if strand == '-' else spliced
+    if wanted: raise ValueError('Sequence export contig missing from reference')
+    counts = {}
+    for label, targets, destination in groups:
+        if set(results[label]) != set(targets): raise ValueError('Sequence export IDs differ: '+label)
+        with Path(destination).open('w') as handle:
+            for tid, sequence in sorted(results[label].items()):
+                handle.write('>'+tid+'\n')
+                for start in range(0,len(sequence),60): handle.write(sequence[start:start+60]+'\n')
+        counts[label] = len(targets)
+    return counts
+
+
 def package(request, outdir):
     aid = request['aid']
     if not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]*', aid): raise ValueError('Invalid release assembly ID')
@@ -158,7 +204,7 @@ def package(request, outdir):
     if request['functional_enabled']:
         for key, dest in [('table', 'functional_annotations.tsv'), ('genes', 'gene_product_summary.tsv')]: copy(functional[key], 'tables/'+dest)
         copy(functional['status'], 'provenance/functional_status.json')
-    owners = {}; counts = {}
+    owners = {}; counts = {}; selected_trnas = None
     combined = out/f'{aid}.gff3'
     write_gff(combined, [], lengths)
     map_handle = (out/'id_maps/track_id_map.tsv').open('w', newline='')
@@ -184,6 +230,7 @@ def package(request, outdir):
             else:
                 (out/'tracks').mkdir(exist_ok=True); target = out/f'tracks/{aid}.{track}.gff3'
             write_gff(target, rows, lengths)
+            if track == 'trnascan': selected_trnas = trna_models(rows)
             # Each track is already validated, with disjoint IDs across tracks.
             # Stream the validated payloads rather than retaining the entire genome twice.
             with combined.open('a') as destination, target.open() as source_handle:
@@ -193,13 +240,18 @@ def package(request, outdir):
             gc.collect()
     finally:
         map_handle.close()
+    exports = [('transcripts', tx, out/f'{aid}_transcripts.fa')]
+    if selected_trnas is not None: exports.append(('trna', selected_trnas, out/f'{aid}_tRNA.fa'))
+    sequence_counts = extract_spliced(request['genome'], exports)
     lines = [f'# Annotation release: {aid}', '', 'Status: **ready**', '',
         f'Protein-coding genes: {len(genes):,}. Coding transcripts: {len(tx):,}. Functional annotation: {"included" if request["functional_enabled"] else "disabled"}.', '',
         f'- [Combined annotation]({aid}.gff3): coding models, repeats and enabled selected genome tracks.',
-        f'- [Coding annotation]({aid}.coding.gff3), [proteins]({aid}_proteins.fa), [CDS]({aid}_cds.fa).',
+        f'- [Coding annotation]({aid}.coding.gff3), [proteins]({aid}_proteins.fa), [CDS]({aid}_cds.fa), [spliced transcripts]({aid}_transcripts.fa).',
         f'- [Reference]({aid}.reference.fa), [softmasked reference]({aid}.softmasked.fa).',
         '- [Complete gene ID map](id_maps/gene_id_map.tsv), [transcript ID map](id_maps/transcript_id_map.tsv), [feature ID map](id_maps/feature_id_map.tsv), [track ID map](id_maps/track_id_map.tsv).',
         '- [Transcript assessment](tables/transcript_assessment.tsv).', '']
+    if selected_trnas is not None: lines += [f'[Selected spliced tRNAs]({aid}_tRNA.fa): {len(selected_trnas):,} sequences.', '']
+    lines += ['Transcript sequences join the final selected exons, including accepted UTRs. tRNA sequences join annotated exons, or use the tRNA span when no exons are present. Both exports use the unmasked reference, transcript orientation and final feature IDs; headers contain identifiers only. Disabled tRNA tracks have no sequence deliverable; enabled no-hit tracks have an empty FASTA.', '']
     if request['functional_enabled']: lines += ['[Functional annotations](tables/functional_annotations.tsv) · [Gene products](tables/gene_product_summary.tsv)', '']
     lines += ['| Track | Status | Feature records | File |', '|---|---|---:|---|']
     for t in ('repeats',)+TRACKS:
@@ -218,7 +270,7 @@ def package(request, outdir):
     for path in sorted(out.rglob('*')):
         if path.is_file(): outputs[path.relative_to(out).as_posix()] = dict(sha256=sha(path), bytes=path.stat().st_size)
     state = dict(schema_version=1, stage='annotation_release', status='ready', assembly_id=aid, reference_identity=ref,
-        genes=len(genes), coding_transcripts=len(tx), functional_enabled=request['functional_enabled'], tracks=counts,
+        genes=len(genes), coding_transcripts=len(tx), sequence_counts=sequence_counts, functional_enabled=request['functional_enabled'], tracks=counts,
         disabled_tracks=[t for t in TRACKS if t not in counts], source_sha256=inputs, outputs=outputs,
         scope='Validated final deliverables; no model changes, new filtering or searches')
     dump(out/'release_status.json', state)
