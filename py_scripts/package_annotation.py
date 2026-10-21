@@ -14,7 +14,7 @@ from urllib.parse import quote, unquote
 
 from reference_repeats import fasta, sha, dump
 from model_metrics import sequences, revcomp
-from evidence_aed import models
+from annotation_models import models
 from functional_report import geometry
 
 

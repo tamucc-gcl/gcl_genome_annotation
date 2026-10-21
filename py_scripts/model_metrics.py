@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 from urllib.parse import quote
 
-from evidence_aed import models, features, merged
+from annotation_models import models, features, merged
 from prepare_protein_evidence import records, checksum
 from reference_repeats import fasta
 

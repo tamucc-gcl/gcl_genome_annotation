@@ -11,8 +11,10 @@ the current output layout, not as an independent validation of every source file
 Follow-up: final selected transcript and tRNA sequence export is now implemented
 in release packaging, with local checks for both strands, exon splicing, selected
 IDs, disabled/no-hit tRNA tracks and checksums. The inventory below records the
-gap as found at the audited commit. Cluster acceptance of this addition remains
-to be run; see [release packaging](annotation-release.md).
+gap as found at the audited commit. The supplied real-data release manifest now records 45,060 transcripts and
+1,547 selected tRNAs with checksum entries. Separate updated cluster acceptance
+and independent payload re-verification remain unconfirmed; see
+[release packaging](annotation-release.md) and [validation scope](validation.md).
 
 ## Overall result
 
@@ -21,10 +23,11 @@ current pipeline. Most original scientific tools are reused, while orchestration
 validation and several helpers have changed substantially. Retaining a module
 name does not mean its implementation or scientific results are identical.
 
-The main remaining output-parity gap is final sequence export: selected,
-final-ID spliced transcripts and selected tRNAs are not included in the release.
-Documentation and obsolete development paths also need a cleanup pass.
-No production code or default was changed as part of this audit.
+At the audited commit, final selected transcript and tRNA export was the main
+output-parity gap. That export is now implemented as described above. The stage
+comparison and follow-up inventory below retain the findings at the audit's
+baseline; [cleanup](cleanup.md) tracks current file dispositions. The audit itself
+did not change scientific behavior or defaults.
 
 ## Stage comparison
 
@@ -90,7 +93,7 @@ No production code or default was changed as part of this audit.
   can remain after settings change; they do not become current results merely
   because they still exist on disk.
 
-## Concrete follow-up work
+## Follow-up findings at the audited baseline
 
 ### 1. Finish final sequence export
 
@@ -153,6 +156,8 @@ genetic codes rather than silently treating them as the standard code. Such
 limits belong in the supported-scope documentation, not in claims of universal
 organism support.
 
-No new scientific tools, filters, confidence scores or output deletions are
-proposed by this audit. The immediate implementation priority is restoring final
-sequence-export parity, followed by documentation and the agreed regression pass.
+No new scientific tools, filters, confidence scores or output deletions were
+proposed by the audit. Its sequence-export gap has since been addressed. The
+current [cleanup inventory](cleanup.md) and [validation record](validation.md)
+describe completed source consolidation, remaining archival candidates and
+regression work. Old filenames in the dated audit table refer to its baseline.

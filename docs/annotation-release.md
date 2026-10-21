@@ -1,6 +1,6 @@
 # Final annotation packaging
 
-`main.nf` now finishes by packaging accepted identified models, optional functional
+`main.nf` packages accepted identified models, optional functional
 decoration, RepeatMasker annotations and enabled **selected** genome tracks.
 It consumes native task outputs, not asynchronous `publishDir` files. It performs
 no searches, model selection, renaming of coding models or new scientific filtering.
@@ -94,4 +94,8 @@ with the same directory after a failure.
 Then resume the usual `main.nf` run. New packaging tasks should run while existing
 scientific tasks remain cached. Review `release/README.md` and each assembly's
 `release_status.json` before exporting the release. Cluster packaging acceptance
-and the full-genome release review passed; the user verified all payload checksums.
+and the original full-genome release review passed; all original payload checksums
+were verified. The subsequent real sequence-export manifest is ready with 45,060
+transcripts and 1,547 selected tRNAs. The updated export has 225 passing local
+tests; its separate cluster acceptance summary/checksum rerun has not been
+supplied. See [validation record](validation.md).

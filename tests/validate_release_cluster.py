@@ -13,7 +13,7 @@ from validate_utr_cluster import ROOT, dump, execute
 from test_annotation_release import release_fixture
 from reference_repeats import sha
 from model_metrics import sequences
-from evidence_aed import models
+from annotation_models import models
 
 
 def fixtures(root):

@@ -13,7 +13,7 @@ from final_annotation import aed
 from final_annotation_inputs import finalize
 from ingenannot_inputs import check
 from prepare_protein_evidence import checksum
-import test_ingenannot_benchmark as benchmark_tests
+from annotation_fixtures import native_aed_fixture
 
 
 class FinalAnnotationContracts(unittest.TestCase):
@@ -21,7 +21,7 @@ class FinalAnnotationContracts(unittest.TestCase):
         for strand in ('+','-'):
             with self.subTest(strand=strand),tempfile.TemporaryDirectory() as tmp:
                 root=Path(tmp)
-                gff,v,c,identity,baseline,native=benchmark_tests.NativeBenchmarkContracts().fixtures(root)
+                gff,v,identity,native=native_aed_fixture(root)
                 for path in (gff,native):
                     path.write_text(path.read_text().replace('\t+\t','\t'+strand+'\t'))
                 accepted=json.loads((root/'inputs.json').read_text())
@@ -41,7 +41,7 @@ class FinalAnnotationContracts(unittest.TestCase):
     def test_identical_exon_coverage_with_changed_segmentation_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
-            gff,v,c,identity,baseline,native=benchmark_tests.NativeBenchmarkContracts().fixtures(root)
+            gff,v,identity,native=native_aed_fixture(root)
             exon=next(line for line in native.read_text().splitlines() if '\texon\t' in line)
             fields=exon.split('\t');middle=(int(fields[3])+int(fields[4]))//2
             left=fields.copy();left[4]=str(middle)
@@ -53,7 +53,7 @@ class FinalAnnotationContracts(unittest.TestCase):
     def test_duplicate_cds_records_remain_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
-            gff,v,c,identity,baseline,native=benchmark_tests.NativeBenchmarkContracts().fixtures(root)
+            gff,v,identity,native=native_aed_fixture(root)
             cds=next(line for line in native.read_text().splitlines() if '\tCDS\t' in line)
             native.write_text(native.read_text()+cds+'\n')
             with self.assertRaisesRegex(ValueError,'changed model structure'):
@@ -61,7 +61,7 @@ class FinalAnnotationContracts(unittest.TestCase):
 
     def test_final_handoff_retains_coding_files_and_blocks_mutated_sources(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp);gff,v,current,identity,baseline,native=benchmark_tests.NativeBenchmarkContracts().fixtures(root)
+            root=Path(tmp);gff,v,identity,native=native_aed_fixture(root)
             (root/'A.gff3').write_bytes(gff.read_bytes())
             proteins=root/'A_proteins.fa';proteins.write_text('>t1\nMK\n')
             cds=root/'A_cds.fa';cds.write_text('>t1\nATGAAA\n')
@@ -81,10 +81,10 @@ class FinalAnnotationContracts(unittest.TestCase):
                 '--prediction',str(root),'--validation',str(v),'--gff',str(gff),'--utr-status',str(utr),'--outdir',str(root/'independent_result')]
             executed=subprocess.run(command,capture_output=True,text=True)
             self.assertEqual(executed.returncode,0,executed.stderr)
-            self.assertEqual(check(root/'final/A.gff3',root/'final/annotation_status.json',None,
+            self.assertEqual(check(root/'final/A.gff3',root/'final/annotation_status.json',
                 root/'rna.gtf',root/'protein.gff',root/'production_inputs.json')['status'],'ready')
             with self.assertRaisesRegex(ValueError,'availability'):
-                check(root/'final/A.gff3',root/'final/annotation_status.json',None,None,root/'protein.gff',root/'bad.json')
+                check(root/'final/A.gff3',root/'final/annotation_status.json',None,root/'protein.gff',root/'bad.json')
             proteins.write_text('>t1\nCHANGED\n')
             with self.assertRaisesRegex(ValueError,'coding sequences changed'):
                 finalize('A',root,v,gff,utr,root/'bad',mode='rna_protein')
@@ -92,11 +92,11 @@ class FinalAnnotationContracts(unittest.TestCase):
     def test_native_final_scores_handle_all_evidence_modes_without_aliases(self):
         for rna,protein in ((True,True),(True,False),(False,True),(False,False)):
             with self.subTest(rna=rna,protein=protein),tempfile.TemporaryDirectory() as tmp:
-                root=Path(tmp);gff,v,c,identity,baseline,native=benchmark_tests.NativeBenchmarkContracts().fixtures(root,rna,protein)
+                root=Path(tmp);gff,v,identity,native=native_aed_fixture(root,rna,protein)
                 state=json.loads(v.read_text());state.update(stage='final_annotation',
                     mode='rna_protein' if rna and protein else 'rna' if rna else 'protein' if protein else 'ab_initio')
                 v.write_text(json.dumps(state))
-                check(gff,v,None,root/'rna.gtf' if rna else None,root/'protein.gff' if protein else None,root/'inputs.json')
+                check(gff,v,root/'rna.gtf' if rna else None,root/'protein.gff' if protein else None,root/'inputs.json')
                 result=aed(gff,native,identity,root/'inputs.json',True,.25,root/'final')
                 with (root/'final/aed_scores.tsv').open() as handle:row=next(csv.DictReader(handle,delimiter='\t'))
                 self.assertEqual(row['rna_aed'],'0.3' if rna else '.')

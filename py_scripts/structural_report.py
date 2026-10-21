@@ -13,7 +13,7 @@ import re
 import shutil
 import statistics
 
-from collect_annotation_metrics import parse_busco,parse_omark
+from qc_metrics import parse_busco,parse_omark
 from model_selection import table,write_table
 from prepare_protein_evidence import checksum
 

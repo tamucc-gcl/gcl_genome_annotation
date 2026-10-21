@@ -9,7 +9,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'py_scripts'))
 from model_selection import select, settings, table, write_table
 from model_assessment import report
 from model_metrics import prepare, sequences
-from evidence_aed import models
+from annotation_models import models
 from prepare_protein_evidence import checksum
 from test_model_assessment import fixtures
 

@@ -4,9 +4,9 @@
 existing `FILTER_GENE_MODELS` module and its three structural cutoffs. Original
 BRAKER outputs, accepted unfiltered models, AED and junction reports are preserved.
 Identifiers, coordinates, phases and coding sequences are not changed by selection.
-Final renaming and selected-set QC now follow selection; see
+Final renaming and selected-set QC follow selection; see
 [final identifiers and structural QC](final-structural-qc.md). Functional annotation
-remains a subsequent increment.
+follows selected IDs/QC and is connected to release packaging.
 
 ## Rules and defaults
 

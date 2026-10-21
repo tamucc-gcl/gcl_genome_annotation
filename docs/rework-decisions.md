@@ -1,5 +1,14 @@
 # Rework requirements: end-to-end use and baseline filtering
 
+**Historical record — not current operating instructions.** Retained for the
+decision trail and flagged for archival in [cleanup](cleanup.md). Statements
+below about pending stages, proposed MAKER compatibility, old AED/filter behavior
+or pilot totals describe their original dates. The current implementation is
+documented in [the guide index](index.md), [native AED](evidence-scoring.md),
+[selection](model-selection.md) and [validation scope](validation.md). In a
+conflict, use those current guides and root configuration; do not run historical
+plans as additional pipeline steps.
+
 Accepted 9 October 2026. This repository-local addendum supersedes conflicting
 checkpoint and default model-filter policies in the 25 September consolidated
 build specification. The synced planning documents remain read-only references.

@@ -15,7 +15,7 @@ workflow MODEL_SELECTION {
         te_action:params.filter_te_action
     ]).bytes.encodeBase64().toString()
     FILTER_GENE_MODELS(annotations.join(assessments),selectionSettings,
-        ['model_selection.py','model_metrics.py','evidence_aed.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
+        ['model_selection.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
             file("${projectDir}/py_scripts/${it}",checkIfExists:true)
         })
     emit:

@@ -13,9 +13,8 @@ import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'py_scripts'))
 from utr_refinement import finalize, validate, dump, prepare, boundary_label_completions, coding_overlap_warnings
 from prepare_protein_evidence import checksum
-from gene_model_aed import gene_scores
-from evidence_aed import models
-from inspect_utr_labels import inspect as inspect_labels
+from annotation_models import models
+from utr_label_checks import inspect as inspect_labels
 
 
 class UtrContracts(unittest.TestCase):
@@ -232,17 +231,7 @@ class OptionalAedFilterContracts(unittest.TestCase):
                 self.assertTrue({'rna_aed','protein_aed'}<=set(fields))
                 self.assertEqual({r['gene_id'] for r in rows},expected)
 
-    def test_disabled_filter_does_not_require_evidence(self):
-        self.assertEqual(gene_scores('does-not-exist',None,None,{'g1'}),{})
 
-    def test_sources_are_separate_and_missing_source_is_an_error(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            p=Path(tmp)/'scores.tsv'; p.write_text('gene_id\ttranscript_id\trna_aed\tprotein_aed\ng1\tt1\t0.9\t0\ng1\tt2\t0.5\t0.2\n')
-            self.assertEqual(gene_scores(p,'rna',.7,{'g1'}),{'g1':.5})
-            self.assertEqual(gene_scores(p,'protein',0,{'g1'}),{'g1':0})
-            with self.assertRaisesRegex(ValueError,'filter_aed_source'): gene_scores(p,None,.7,{'g1'})
-            p.write_text(p.read_text().replace('\t0.9\t','\t.\t'))
-            with self.assertRaisesRegex(ValueError,'unavailable'): gene_scores(p,'rna',.7,{'g1'})
 
 
 if __name__=='__main__': unittest.main()

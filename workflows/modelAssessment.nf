@@ -23,7 +23,7 @@ workflow MODEL_ASSESSMENT {
     junctionReports // aid, transcript support, status
 
     main:
-    PREPARE_MODEL_METRICS(annotations,['model_metrics.py','evidence_aed.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
+    PREPARE_MODEL_METRICS(annotations,['model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
         file("${projectDir}/py_scripts/${it}",checkIfExists:true)
     })
     teReports = Channel.value([])

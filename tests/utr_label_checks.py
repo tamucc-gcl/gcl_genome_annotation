@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Inspect all native UTR label disagreements without rerunning refinement."""
-import argparse
+"""UTR boundary-label regression helpers using native exon/CDS geometry."""
 import json
 from pathlib import Path
 import sys
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'py_scripts'))
-from evidence_aed import features, merged, overlap_length
+from annotation_models import features, merged, overlap_length
 from utr_refinement import subtract
 
 
@@ -65,10 +64,3 @@ def inspect(original,native,identity,output):
     return result
 
 
-if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--inputs-root',required=True);p.add_argument('--assembly-id',required=True);p.add_argument('--output',required=True)
-    a=p.parse_args();root=Path(a.inputs_root);aid=a.assembly_id
-    inspect(root/f'structural_annotation/braker/{aid}/{aid}.gff3',
-        root/f'structural_annotation/utr/{aid}/native/native.gff3',
-        root/f'filtered_assemblies/{aid}/{aid}.contigs.json',a.output)

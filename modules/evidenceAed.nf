@@ -1,7 +1,7 @@
-// Existing miniprot alignment command separated from the legacy scoring process.
+// RNA/protein alignment evidence shared by UTR refinement and native AED.
 process ALIGN_AED_PROTEINS {
     tag "${aid}"
-    label 'computeAed'
+    label 'protein_evidence_alignment'
     publishDir "${params.outdir}/structural_annotation/evidence_aed/${aid}/protein_alignment", mode: params.publish_dir_mode
     input:
     tuple val(aid), path(genome), path(proteins), path(identity), path(provenance)
@@ -61,42 +61,5 @@ process MERGE_AED_RNA {
     """
     set -euo pipefail
     stringtie --merge -o transcripts_merged.gtf ${arguments}
-    """
-}
-
-process NORMALIZE_AED_EVIDENCE {
-    tag "${aid}"
-    label 'aed_python'
-    input:
-    tuple val(aid), path(identity), path(rna, stageAs: 'rna/*'), path(protein, stageAs: 'protein/*')
-    path helpers
-    output:
-    tuple val(aid), path('evidence'), emit: evidence
-    script:
-    def asList = { v -> v instanceof Collection ? v : [v] }
-    def r = asList(rna)
-    def p = asList(protein)
-    def options = (r ? "--rna '${r[0]}'" : '') + ' ' + (p ? "--protein '${p[0]}'" : '')
-    """
-    python evidence_aed.py normalize --identity '${identity}' ${options} --outdir evidence
-    """
-}
-
-process SCORE_EVIDENCE_AED {
-    tag "${aid}"
-    label 'aed_python'
-    publishDir "${params.outdir}/structural_annotation/evidence_aed/${aid}", mode: 'copy', overwrite: true
-    input:
-    tuple val(aid), path(models), path(identity), path(evidence), path(validation)
-    path helpers
-    output:
-    tuple val(aid), path('aed_scores.tsv'), emit: scores
-    tuple val(aid), path('aed_status.json'), emit: status
-    tuple val(aid), path('README.md'), emit: report
-    tuple val(aid), path('aed_diagnostics.tsv'), emit: diagnostics
-    script:
-    """
-    python evidence_aed_selection.py --models '${models}' --identity '${identity}' \
-        --normalized '${evidence}' --validation '${validation}' --outdir .
     """
 }

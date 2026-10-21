@@ -14,7 +14,7 @@ workflow FUNCTIONAL_ANNOTATION {
     omarkClasses // optional aid, native selected-representative .ump
     main:
     if ((params.n_chunks as int) < 1) error 'n_chunks must be positive'
-    helpers = ['functional_inputs.py','model_metrics.py','evidence_aed.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
+    helpers = ['functional_inputs.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
         file("${projectDir}/py_scripts/${it}",checkIfExists:true)
     }
     PREPARE_FUNCTIONAL_INPUTS(jobs.map { aid,settings,folder -> tuple(aid,
@@ -112,7 +112,7 @@ workflow FUNCTIONAL_ANNOTATION {
         def encoded = groovy.json.JsonOutput.toJson(provenance).getBytes('UTF-8').encodeBase64().toString()
         tuple(aid,encoded,file("${folder}/transcript_assessment.tsv"),eligibility,*paths,omark ? omark[1] : [])
     }
-    MERGE_FUNCTIONAL_ANNOTATIONS(mergeJobs,['merge_functional_annotations.py','functional_inputs.py','model_metrics.py','evidence_aed.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
+    MERGE_FUNCTIONAL_ANNOTATIONS(mergeJobs,['merge_functional_annotations.py','functional_inputs.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
         file("${projectDir}/py_scripts/${it}",checkIfExists:true)
     })
     ANNOTATE_GFF3(jobs.join(MERGE_FUNCTIONAL_ANNOTATIONS.out.merged_tsv).map { aid,settings,folder,table ->
@@ -122,7 +122,7 @@ workflow FUNCTIONAL_ANNOTATION {
         .join(MERGE_FUNCTIONAL_ANNOTATIONS.out.status).join(PREPARE_FUNCTIONAL_INPUTS.out.prepared).map {
             aid,settings,folder,gff,table,status,proteins,eligibility,validation ->
             tuple(aid,file("${folder}/${aid}.gff3"),gff,table,status,eligibility)
-        },['functional_report.py','functional_inputs.py','model_metrics.py','evidence_aed.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
+        },['functional_report.py','functional_inputs.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
             file("${projectDir}/py_scripts/${it}",checkIfExists:true)
         })
     emit:

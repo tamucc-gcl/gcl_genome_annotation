@@ -2,7 +2,7 @@
 include { PREPARE_UTR_INPUTS; RUN_UTR_REFINEMENT; FINALIZE_UTR_ANNOTATION; EXTRACT_UTR_SEQUENCES; VALIDATE_UTR_REFINEMENT } from '../modules/utrRefinement.nf'
 include { ASSEMBLE_AED_RNA; MERGE_AED_RNA; ALIGN_AED_PROTEINS } from '../modules/evidenceAed.nf'
 include { FINALIZE_ANNOTATION; REPORT_FINAL_AED } from '../modules/finalAnnotation.nf'
-include { PREPARE_INGENANNOT_EVIDENCE; RUN_INGENANNOT_AED } from '../modules/ingenannotBenchmark.nf'
+include { PREPARE_INGENANNOT_EVIDENCE; RUN_INGENANNOT_AED } from '../modules/ingenannotAed.nf'
 include { ANNOTATION_BASELINE as FINAL_ANNOTATION_QC } from './annotationBaseline.nf'
 include { JUNCTION_SUPPORT } from './junctionSupport.nf'
 include { MODEL_ASSESSMENT } from './modelAssessment.nf'
@@ -24,10 +24,10 @@ workflow ANNOTATION_POSTPROCESSING {
         error 'Model selection requires run_model_assessment=true'
     if (params.ingenannot_rna_penalty < 0 || params.ingenannot_rna_penalty > 1)
         error 'ingenannot_rna_penalty must be between 0 and 1'
-    utrHelpers = ['utr_refinement.py','evidence_aed.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
+    utrHelpers = ['utr_refinement.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
         file("${projectDir}/py_scripts/${it}", checkIfExists: true)
     }
-    finalHelpers = ['final_annotation.py','ingenannot_benchmark.py','ingenannot_inputs.py','evidence_aed.py','prepare_protein_evidence.py'].collect {
+    finalHelpers = ['final_annotation.py','ingenannot_aed.py','ingenannot_inputs.py','annotation_models.py','prepare_protein_evidence.py'].collect {
         file("${projectDir}/py_scripts/${it}", checkIfExists: true)
     }
     rnaJobs = jobs.map { aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices ->
@@ -111,12 +111,12 @@ workflow ANNOTATION_POSTPROCESSING {
             aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices,folder,rna,proteinRows ->
             def match = proteinRows.find { it[0] == aid }
             if (mode in ['protein','rna_protein'] && !match) error "Missing protein alignment for ${aid}"
-            tuple(aid,file("${folder}/${aid}.gff3"),file("${folder}/annotation_status.json"),[],rna,match ? [match[1]] : [])
+            tuple(aid,file("${folder}/${aid}.gff3"),file("${folder}/annotation_status.json"),rna,match ? [match[1]] : [])
         }
         PREPARE_INGENANNOT_EVIDENCE(aedRequests,['ingenannot_inputs.py','prepare_protein_evidence.py'].collect {
             file("${projectDir}/py_scripts/${it}", checkIfExists: true)
         })
-        aedReady = aedRequests.map { aid,gff,validation,prior,rna,protein -> tuple(aid,gff) }
+        aedReady = aedRequests.map { aid,gff,validation,rna,protein -> tuple(aid,gff) }
             .join(PREPARE_INGENANNOT_EVIDENCE.out.evidence)
         RUN_INGENANNOT_AED(aedReady)
         REPORT_FINAL_AED(aedReady.join(RUN_INGENANNOT_AED.out.annotated).join(jobs.map {

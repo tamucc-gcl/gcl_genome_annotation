@@ -7,7 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from evidence_aed import features, models, merged, overlap_length, rna_hits
+from annotation_models import features, models, merged, overlap_length, rna_hits
 from prepare_protein_evidence import checksum, records
 from reference_repeats import fasta
 

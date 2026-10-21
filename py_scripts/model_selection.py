@@ -13,7 +13,7 @@ import math
 from pathlib import Path
 from urllib.parse import quote, unquote
 
-from evidence_aed import models
+from annotation_models import models
 from model_metrics import sequences
 from prepare_protein_evidence import checksum
 

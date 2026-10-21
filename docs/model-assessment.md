@@ -16,8 +16,8 @@ transcript is removed, renamed or altered in the accepted annotation.
   not a sum of overlapping alternative transcripts. Start/stop feature presence
   and terminal protein `*` are recorded separately; their absence is not a default
   exclusion. Internal `*` detection includes the first/last residues unless the
-  last symbol is the legitimate terminal marker. Functional-support and OMArk
-  quality rules remain deferred until those sources are connected.
+  last symbol is the legitimate terminal marker. Functional results and representative-only OMArk classes are joined later;
+  they do not introduce automatic removal or a composite quality rule.
 - `FLAG_TE_GENES` retains BEDTools overlap, SeqKit six-frame translation and
   DIAMOND homology, split into separately cached database/search/flag tasks.
   Repeat intervals are merged before coverage, so overlapping repeats cannot
@@ -65,7 +65,7 @@ Under `structural_annotation/assessment/<assembly>/`:
 automatic model removal. Single-exon/absent-RNA junction metrics are not converted
 to zero support. Native AED and junction tables are joined by transcript ID and
 validated against the exact accepted model/reference identities and gene parents.
-The original accepted GFF/protein/CDS sets remain the source for future selection.
+The accepted GFF/protein/CDS sets remain the source for connected selection.
 
 The assessment, repeat overlap and reports are distinct from native homology
 search. Changing only the overlap threshold reruns flags/reports; report-only
@@ -100,4 +100,4 @@ disabled. Keep the same entry when testing cache behavior.
 
 [Model selection](model-selection.md) now follows this stage, retaining these
 unfiltered assessment outputs. Final renaming, selected-set QC, functional annotation
-and unified QC figures remain subsequent implementation increments.
+and unified reporting are connected downstream. See [output locations](outputs.md).

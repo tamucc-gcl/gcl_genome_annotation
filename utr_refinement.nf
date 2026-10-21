@@ -10,7 +10,7 @@ workflow {
     def parse = { path -> new groovy.json.JsonSlurper().parse(new File(path.toString())) }
     def predictions = parse("${root}/structural_annotation/prediction_status.json")
     if (predictions.status != 'ready') error 'UTR refinement requires accepted BRAKER predictions'
-    def helpers = ['utr_refinement.py','evidence_aed.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
+    def helpers = ['utr_refinement.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
         file("${projectDir}/py_scripts/${it}", checkIfExists: true)
     }
     def base = Channel.fromList(predictions.assemblies).map { row ->

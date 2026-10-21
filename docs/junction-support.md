@@ -95,7 +95,7 @@ readsets, coding/UTR separation, RNA-free and single-exon cases, main syntax,
 resume, report-only/model-only cache reuse and disabled QC. It does not run
 mapping, repeats, BRAKER or InGenAnnot. Recovery uses the same output directory
 with `--resume`. Tiny native fallback acceptance does not validate full-scale
-random-forest behavior; the next step is the real-data pilot.
+random-forest behavior; the real-data pilot was reviewed separately as noted below.
 
 After acceptance, the usual `main.nf -resume` command includes this QC. To pilot
 only junction QC against existing accepted outputs, substitute `junction_qc.nf`
@@ -105,14 +105,15 @@ annotation and prediction metadata, while integrated main uses native channels.
 Moving between the two entries may change task cache identities. Keep the same
 entry for subsequent cache tests. `--run_junction_qc false` disables the work.
 
-Accepted 19 October 2026: 161 local Python tests and actual Nextflow 23.10.1 cluster
+Accepted 19 October 2026: local contracts and actual Nextflow 23.10.1 cluster
 acceptance passed, including native fallback, both strands, optional/no-RNA cases,
 resume and report/model-change cache checks. The real-data pilot completed native
 classification for both supplied readsets without fallback or overlapping native
 pass/fail exports; table reconciliation and coding/UTR support were reviewed.
 This QC remains report-only. Mandatory pre-BRAKER junction filtering is not planned.
-Interpretable junction figures are required in the forthcoming unified reporting
-stage; see the [continuation plan](evidence-scoring-plan.md).
+Coding/UTR junction figures are included in the connected structural and
+[unified reports](unified-report.md). Optional model selection on coding junction
+support is documented in [selection](model-selection.md); it remains off by default.
 
 ## Sources
 

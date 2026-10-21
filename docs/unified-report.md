@@ -18,13 +18,13 @@ Open `annotation_report.md` at the output root. Supporting outputs are:
 - `reports/annotation_report_data/`: source stage-manifest snapshots.
 - `reports/annotation_report_status.json`: inputs, output checksums and scope.
 
-The report retains the original Markdown table/number-formatting helpers and
-section subjects in `generate_annotation_report.py`. The production entry now
+The report retains the shared Markdown table/number-formatting helpers in
+`generate_annotation_report.py`; unused legacy parsing and plotting helpers were removed. The production entry now
 uses `unified_report.py` and the accepted keyed manifests. Legacy filename/source
 assumptions (`BRAKER3`, `g123.t1`), obsolete output links, combined/legacy AED and
 threshold-based tuning suggestions are removed from production reporting.
 
-The old R plotting script remains available as a reference. Current structural
+The old R plotting script has been removed; see [cleanup](cleanup.md). Current structural
 figures already provide accepted before/after structure, completeness, AED and
 Portcullis views. These are reused, not recomputed. The report carries forward
 functional coverage, functional-vocabulary/product frequency and telomere-position
@@ -99,4 +99,5 @@ plot correctness was validated by the earlier structural-QC stage tests.
 
 After acceptance, resume the usual `main.nf` run. Review `annotation_report.md`
 and `reports/annotation_report_status.json`. Native cluster reporting acceptance
-passed; the full-data report has been reviewed for the next formatting iteration.
+passed; the full-data report and subsequent readability changes were reviewed.
+See [validation scope](validation.md) for remaining regression checks.

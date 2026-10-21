@@ -103,7 +103,7 @@ def main():
         summary['checks'].append(dict(case='unit_tests',passed=True))
         if not a.resume: fixtures(root)
         files=['nextflow.config','utr_refinement.nf','modules/utrRefinement.nf','modules/evidenceAed.nf','modules/agat.nf',
-            'environments/ingenannot.yaml','environments/agat.yaml','py_scripts/utr_refinement.py','py_scripts/evidence_aed.py',
+            'environments/ingenannot.yaml','environments/agat.yaml','py_scripts/utr_refinement.py','py_scripts/annotation_models.py',
             'py_scripts/prepare_protein_evidence.py','py_scripts/reference_repeats.py']
         for relative in files:
             dest=root/'pipeline'/relative;dest.parent.mkdir(parents=True,exist_ok=True)

@@ -1,4 +1,4 @@
-# Remaining genome annotation tracks
+# Genome annotation tracks
 
 `main.nf` reconnects the existing tRNAscan-SE, parallel Infernal/Rfam, tidk and
 centroAnno modules. These independent branches do not consume gene predictions,
@@ -18,20 +18,13 @@ The existing per-assembly/global settings control `run_trnascan`, `run_infernal`
 each assembly's preflight-resolved `telomere_motif`, rather than a shared fallback.
 Window/count/end-distance settings remain in the single `nextflow.config`.
 
-The initial full-genome centroAnno pilot was SIGKILLed three times after reaching
-203–221 GiB RSS despite a 16 GB request. Accounting did not report `OUT_OF_MEMORY`,
-so this strongly suggests memory pressure without establishing the kill source.
-The default now reserves a whole Crest normal node (`centromere_cpus=64`,
-`centromere_memory='300 GB'`) while running at most `centromere_threads=8` native
-threads. Tool threads are capped by the allocated CPUs, so small acceptance jobs
-still use two. These are configurable resource settings, not a verified memory
-cap or guarantee of completion. The eight-thread rerun also failed at the same
-step. Inspection of the actual Conda artifact then identified a CLI mismatch:
-the rework's `-G true` was based on an upstream tag that differs from this package.
-The original `-x anno-asm` is restored; the corrected real-genome pilot passed.
-Retain the conservative allocation until actual assembly-mode usage is measured.
-The label terminates on failure rather than repeating identical memory-heavy
-attempts. Other clusters can reduce the allocation through these same parameters.
+centroAnno uses the original assembly mode `-x anno-asm` from the pinned
+qjh96 1.0.2 build 0. Its defaults reserve a whole Crest normal node
+(`centromere_cpus=64`, `centromere_memory='300 GB'`) while using at most
+`centromere_threads=8` native threads. These are requests, not enforced memory
+caps or a universal requirement. The corrected real assembly-mode pilot passed;
+reduce resources on another cluster only with appropriate measurements. The label
+terminates on failure rather than repeating an identical memory-heavy attempt.
 
 `--rfam_database /work/birdlab/databases/rfam` is the **store parent**, containing
 `rfam_db/Rfam.cm`, `Rfam.clanin` and `Rfam.cm.i1f`, `.i1i`, `.i1m`, `.i1p`.
@@ -76,9 +69,9 @@ Native format references: [tidk window writer](https://github.com/tolkit/telomer
 All four tracks now pass through a separate configurable QC stage. The main
 GFF3 filenames and workflow output channel contain the selected features;
 validated unfiltered GFF3 files remain under `raw/`. Changing a filter setting
-reuses native searches with `-resume`. The first run of this update needs one
-tRNAscan-SE rerun to retain its score breakdown and secondary structures for
-the native confidence filter. No other search command changes for this update.
+reuses native searches with `-resume`. tRNAscan-SE retains its score breakdown and secondary structures for the native
+confidence filter. Search-setting changes, unlike filter-only changes, correctly
+invalidate their native tasks.
 
 | Track | Default selection | Configuration in `nextflow.config` |
 |---|---|---|
@@ -147,6 +140,8 @@ selected features are merged regions. Their counts therefore cannot be compared
 by subtracting rejected windows from raw region counts. Other tracks report
 feature-level decisions, including parent-dependent child decisions. Native
 FASTA/BED outputs retain their raw meaning and are not selected sequence sets.
+The release separately extracts selected spliced tRNAs with selected-track IDs;
+see [final sequence exports](annotation-release.md).
 
 Validation blocks unknown contigs, out-of-bounds coordinates, invalid strands,
 duplicate IDs, dangling parents and missing/duplicate enabled results. A completed
@@ -159,7 +154,8 @@ cannot overwrite its source or report a checksum of modified input bytes.
 
 These outputs remain separate from the annotated coding GFF3. Release packaging
 combines accepted tracks into an additional GFF3 without altering coding IDs,
-model structures or functional tables. Unified QC reporting remains subsequent work.
+model structures or functional tables. The [unified report](unified-report.md)
+includes raw/selected counts, track filters and selected telomere figures.
 Reports are Markdown; the existing native tidk SVG remains available.
 
 ## Cluster acceptance
@@ -177,8 +173,8 @@ fewer contigs than requested chunks, enabled no-hit telomere/tRNA searches,
 native tRNA confidence filtering, disabled tracks/filters, threshold changes,
 native database-store reuse, unchanged resume and report-only changes.
 It does not download Rfam or run repeats, mapping, BRAKER or functional searches.
-Use a new test directory for this update because the fixtures changed. Then use
-`--resume` with that same directory to recover a failed test.
+Use a new empty test directory for a fresh acceptance. Use `--resume` with the
+same directory to recover an interrupted test without rewriting its inputs.
 
 Local Python and Nextflow parsing/routing checks are not a substitute for this
 Linux-tool acceptance. Native filtering acceptance and the real-genome QC review

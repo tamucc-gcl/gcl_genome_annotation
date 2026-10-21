@@ -1,189 +1,83 @@
 # Reference and repeat preparation
 
-`reference_repeats.nf` implements input preflight followed by reference normalization,
-repeat discovery/curation and soft masking. It stops after the reference/repeat gate;
-RNA alignment and gene prediction are not connected yet. Normal end-to-end execution
-with native `-resume` remains the eventual default. No checkpoint imports are required.
-
-The implementation reuses FILTER_ASSEMBLY, CURATE_DFAM, REPEAT_MODEL,
-CURATE_REPEATS, CLASSIFY_REPEATS, RECLASSIFY_REPEATS, FILTER_REPEAT_LIBRARY,
-COMBINE_REPEAT_LIBS and the existing parallel RepeatMasker workflow. Changes repair
-integrity problems and adapt interfaces to per-assembly inputs. Nextflow owns staging,
-scratch, publishing and cache reuse. Existing inputs are declared as path inputs.
-The legacy main entry receives corresponding interface adaptations; it has not been
-migrated to the complete new input contract or accepted as the reworked end-to-end run.
+`main.nf` connects normalized references, Dfam/de novo repeat preparation,
+parallel masking and integrity validation to alignment/prediction. The focused
+`reference_repeats.nf` entry stops after the reference/repeat report. Both reuse
+the original scientific modules with corrected contracts and native caching.
 
 ## Reference contract
 
-- Resolve `min_contig_length` per assembly through preflight, default 1,000 bp;
-  retain contigs at or above the threshold. Zero disables length exclusion.
-- Validate DNA/IUPAC sequence, including gzip FASTA; reject missing/empty records,
-  whitespace within sequences, invalid bases and gaps. Do not silently change lengths.
-- Normalize unsafe characters in the first header token; preserve the full original
-  header in a reversible TSV. Reject duplicate/colliding IDs, including excluded records.
-- Uppercase the reference before masking. Write its FASTA index, ordered contig
-  dictionary with sequence hashes, retained/excluded counts and bases, and excluded lengths.
-- Accept masking only when contig IDs, order, lengths and uppercase sequence hashes
-  match this normalized reference exactly. Soft masking may change letter case only.
+Per-assembly `min_contig_length` defaults to 1,000 bp; zero disables exclusion.
+Input DNA/IUPAC FASTA, including gzip, is validated for nonempty/unique records,
+invalid bases, gaps and ID collisions. Unsafe first-token characters are
+normalized with a reversible full-header map. Sequences are uppercased before
+masking. The output contains FASTA/index, ordered contig dictionary with hashes,
+exclusions and statistics. Soft masking may change case only: names, order,
+lengths and uppercase sequence hashes must remain identical.
 
-Invalid sequence data blocks that assembly and appears in the stage report, while
-independent valid assemblies can finish. Scheduler, environment or scientific tool
-failures can still terminate the run; those are not converted into accepted results.
-Incomplete reports produce a nonzero exit at the final assertion.
+## Libraries and discovery
 
-## Shared databases and discovery
+Default Dfam input is the complete 3.9 FamDB, all 17
+`dfam39_full.<partition>.h5` files under `dfam_database/dfam_db/`.
+Taxonomy resolves a supported ancestry group (for ray-finned fish,
+Actinopterygii); an exact species taxid need not exist in Dfam. Explicit
+`taxa_name` overrides remain authoritative and must produce nonempty extraction.
+There is no runtime fallback through progressively broader groups.
 
-For the flounder project, keep these existing arguments:
+Derived subsets use native stores under
+`dfam_database/subsets/dfam39/tetools-1.95/taxon_<hash>/`. The subset is
+checksummed; release, partition inventory/sizes and FamDB info are retained.
+This is not a full checksum audit of all large HDF5 partitions. Treat stores
+as immutable. RepeatPeps is reused from `dfam_database/RepeatPeps.lib`, with a
+content-derived DIAMOND index under `indices/diamond-2.1.11/`.
 
-```bash
---dfam_database /work/birdlab/databases/dfam \
---diamond_database /work/birdlab/databases/diamond
-```
+RepeatModeler retains consensus FASTA, Stockholm, training directories and logs,
+using seed 42 by default. Curation removes short, simple/low-complexity/satellite
+and duplicate consensuses, with optional CD-HIT clustering. RepeatClassifier and
+optional Terrier classify families. `run_terrier.py` is an active production
+wrapper, not an obsolete debugging script: it applies a source/version-checked
+in-memory correction for the pinned hierarchicalsoftmax single-child bug. No
+installed package is edited. Preserve its pinned environment and regression checks.
 
-The normal stage reads `dfam_db/dfam39_full.0.h5` through `.16.h5` directly and
-uses `diamond/swissprot.dmnd`. It does not download replacement databases or copy
-the full FamDB database into the project. Override the general protein index with
-`--repeat_filter_database /path/to/custom.dmnd` when needed.
-
-Automatic Dfam selection uses the closest ancestry group in
-`assets/taxonomy_rules.json`, rather than assuming that Dfam contains the exact
-NCBI species. For Paralichthys lethostigma (141886), this selects Actinopterygii;
-species identity remains 141886. An explicit global or assembly-row `taxa_name`
-still overrides this choice, including a more specific group supported by the
-installed release. Extraction must produce a nonempty library; this is not an
-automatic runtime search through progressively broader taxa.
-
-The first real pilot stopped at Dfam extraction because 141886 was absent from
-its taxonomy. RepeatModeler depends on successful extraction in this entry, so
-the failure preceded modelling. This ancestry-default correction has static
-checks and extended precedence assertions; cluster validation remains pending.
-Restart with the existing sbatch and `-resume`. Keep the work directory and
-Nextflow cache: changes to the input planner do not force reference tasks with
-unchanged scientific inputs to rerun. Any explicit `taxa_name=141886` override
-must instead be cleared or changed to Actinopterygii.
-
-Taxon subsets are native storeDir outputs under
-`dfam/subsets/dfam39/tetools-1.95/taxon_<taxonomy-hash>/`. The subset is checksummed;
-FamDB release, partition inventory/sizes and native information output are recorded.
-This does not claim complete checksums of the many large HDF5 partitions. Treat a
-release directory as immutable. Initial extraction checks the declared release and
-all 17 partitions. Reuse assumes the stored release has not been altered.
-
-`dfam/RepeatPeps.lib` is reused through the original extraction process's storeDir.
-Its derived index is stored under `dfam/indices/diamond-2.1.11/`, with a content-derived
-name and source/index checksums. Assemblies and projects share that index.
-
-Discovery retains native RepeatModeler consensus FASTA, Stockholm alignment, training
-directories and logs, with an explicit seed (default 42). Record-safe curation removes
-short, simple/low-complexity/satellite and duplicate consensuses, then retains optional
-CD-HIT clustering. Classification and the two-protein-database filter remain:
-RepeatPeps hits retain a family; sufficiently strong general-protein-only hits remove
-it; no-hit families remain. Preserve excluded families, every filter decision, both
-search outputs and source checksums. Search failures fail rather than becoming no hits.
-
-Tool environments/resources and parameter defaults remain controlled by root
-`nextflow.config`. [TEtools 1.95](https://github.com/Dfam-consortium/TETools/releases)
-and [Dfam 3.9](https://www.dfam.org/releases/Dfam_3.9/families/FamDB/) are pinned.
-The existing Terrier environment is now pinned to bio-terrier 0.4.0, torch 2.6.0 and
-lightning 2.6.1: the old torch <2.6 constraint conflicts with the current package's
-[requirements](https://github.com/rbturnbull/terrier/blob/main/pyproject.toml).
-Its CLI dependencies are pinned to Typer 0.15.4 and Click 8.1.8. The real pilot
-failed before inference with a missing `_param_default_explicit` attribute when
-torchapp mixed Typer's vendored CLI context with an independently installed Click.
-These pins use Typer's earlier external-Click implementation;
-[Typer 0.15.4 declares Click <8.2](https://github.com/fastapi/typer/blob/0.15.4/pyproject.toml).
-The real pilot passed CLI parsing and completed prediction after these pins.
-It then hit an upstream hierarchicalsoftmax single-child threshold indexing bug
-while writing classifications. `run_terrier.py` applies a version/source-checked
-in-memory correction to that one condition in hierarchicalsoftmax 1.4.4, with a
-small regression check before loading model weights. Single-child branches have
-no softmax slot; confidence thresholds still apply at every branching decision.
-The wrapper is a staged Nextflow input so changes invalidate reclassification.
-No installed package files are edited. Corrected output generation still awaits
-cluster verification. See the [affected upstream function](https://github.com/rbturnbull/hierarchicalsoftmax/blob/v1.4.4/hierarchicalsoftmax/inference.py).
-Terrier 0.4 uses updated training weights; this is recorded in the stage settings and
-must be evaluated in the real pilot, rather than assumed equivalent to older models.
-The [upstream release description](https://pypi.org/project/bio-terrier/) describes
-that model change. `--repeat_reclassify false` skips this optional classification step.
+The repeat-library homology filter retains RepeatPeps-supported families;
+sufficient general-protein-only matches remove likely gene-derived sequences;
+no-hit families remain. Main requires an existing
+`diamond_database/swissprot.dmnd` or explicit `repeat_filter_database` index.
+Both searches, excluded sequences and every decision remain available. Tool
+failures are not converted into no-hit results. `repeat_library` supplies a
+complete masking library and bypasses discovery; `repeat_reclassify=false`
+disables Terrier without disabling the other repeat preparation.
 
 ## Masking and outputs
 
-Batching balances whole contigs across at most `n_rm_chunks` batches. Every contig
-occurs exactly once, and the actual batch count controls gathering. There are no
-artificial tile boundaries. A large chromosome remains indivisible, so workloads
-can be uneven; requested batch counts above the contig count do not create empty jobs.
+Whole contigs are balanced across at most `n_rm_chunks` batches; each occurs
+once, without artificial tile boundaries. More requested chunks than contigs
+does not create empty tasks. A large chromosome remains indivisible. Temporary
+short-ID maps are restored safely for long names and coordinate-like suffixes.
+Merged FASTA follows reference order; fragment linkage is retained and feature
+IDs are unique across batches. Canonical repeat coverage uses interval unions;
+per-class unions may overlap. Native `.tbl` fragment sums are not unique genome
+coverage and must not be added to derive it.
 
-Retain RepeatMasker's temporary short-ID mapping and restore original IDs safely,
-including long names, internal double underscores and apparent coordinate suffixes.
-Reconstruct FASTA in reference order and wrap only sequence lines. Linked repeat
-fragments retain one linkage ID within each batch, then IDs are uniquely renumbered
-across batches. GFF features have unique IDs, escaped attributes and linkage IDs.
-Repeat interval coverage uses inclusive interval unions. Per-class unions can
-overlap and must not be added together. The legacy `.tbl` category lengths remain
-explicitly labelled alignment-fragment sums; the canonical unique coverage is in JSON.
-
-Published locations beneath `outdir`:
-
-| Location | Contents |
+| Directory | Outputs |
 |---|---|
-| `filtered_assemblies/<assembly>/` | Normalized FASTA, `.fai`, header map, excluded list, dictionary, statistics and status |
-| `repeats/denovo/` | Discovery/training outputs, curation/classification/filter decisions and excluded families |
-| `repeats/libraries/` | Combined masking libraries |
-| `repeats/batches/` | Whole-contig batch accounting |
-| `repeats/logs/` | Native masking logs |
-| `repeats/maps/` | Temporary short-ID to reference-coordinate maps |
-| `repeats/` | Soft-masked FASTA, repeat GFF/OUT, alignments, summaries and landscape |
-| `reference_repeats/` | Stage README, per-assembly status/identities/union statistics; optional benchmark results |
+| `filtered_assemblies/<assembly>/` | FASTA, index, header map, exclusions, contig identity and stats |
+| `repeats/denovo/` | Native discovery/classification and library filtering audits |
+| `repeats/libraries/`, `batches/`, `logs/`, `maps/` | Combined libraries, batch accounting and native logs/maps |
+| `repeats/` | Masked FASTA, GFF/OUT, alignments, summaries and native landscape |
+| `reference_repeats/` | Stage status, source/reference identities, union coverage, Markdown |
 
-Expensive outputs use native `-resume`; adding an assembly should reuse unchanged
-assemblies. Changing only library filtering should preserve discovery outputs and
-invalidate the filtering/masking descendants. Shared stores also work without
-`-resume`. Keep the work directory and Nextflow cache for settings iteration.
-
-## Cluster acceptance and real pilot
-
-Cluster fixture acceptance passed on 9 October 2026 under Nextflow 23.10.1 in
-`testing/reference_repeat_contracts_03` (user-supplied console output and
-`acceptance.json`). Python contracts, fresh actual masking, unchanged resume,
-adding an assembly, invalid-reference isolation and invalid-library blocking all
-passed. Fresh/resume/added checks include exact comparison against unsplit masking.
-The blocked cases returned the expected exit 1; these are successful safety checks.
-This acceptance covers reference integrity and custom-library masking, not de novo
-discovery, classification or protein filtering. Earlier regex interpolation and
-container interpreter errors are fixed; the successful run exercised the corrected
-merge. The Dfam extraction branch remains for the real pilot.
-
-To repeat acceptance, run from the consuming project root with a new empty directory:
+Changing library filtering reuses discovery but reruns filtering/masking and
+scientific descendants. Reporting-only edits need not redo repeat discovery.
+Main allows RNA mapping to proceed once its unmasked reference/reads are ready;
+BRAKER waits for masking and all requested evidence.
 
 ```bash
 python gcl_genome_annotation/tests/validate_reference_repeats_cluster.py \
-  --outdir testing/reference_repeat_contracts_04
+  --outdir testing/reference_repeat_contracts_01
 ```
 
-Use an empty output directory. This runs all Python contract tests and actual
-RepeatMasker/merge utilities with a tiny synthetic complete library. It checks
-nonzero masking, exact comparison against a single unsplit batch, long-ID and
-coordinate safety, per-assembly thresholds/zero, unchanged resume, adding an assembly,
-invalid-reference isolation and invalid-library blocking. It requests four CPUs and
-8 GB per masking job through root-config parameters. It writes `acceptance.json`,
-per-case commands, console logs, Nextflow logs and published reports.
-
-`--repeat_library /path/to/complete.lib` intentionally bypasses discovery, Dfam
-extraction, classification and protein filtering. It is an explicit supplied-library
-route, not fake discovery acceptance. `--repeat_mask_benchmark true` additionally
-compares parallel masking with one whole-reference batch; leave it false for the
-large real run to avoid duplicate masking.
-
-With fixture acceptance passed, change only the pipeline entry in the personal sbatch
-Nextflow command from `rna_preparation.nf` to `reference_repeats.nf`, retaining its
-sample sheet, taxonomy/database arguments, testing outdir, profile and `-resume`.
-Do not pass the synthetic `repeat_library` or benchmark option for the real pilot.
-The flounder run exercises the complete discovery/classification/filter/masking
-chain with existing shared databases and stops automatically before alignment.
-Its runtime depends on discovery and genome masking, and can be substantially
-longer than protein downloads or RNA preparation.
-
-Real de novo tool execution, taxon extraction/store reuse, shared RepeatPeps index
-reuse, downstream filter-change cache boundaries and repeat biology remain pending
-until their cluster/pilot evidence is available. Passing this fixture alone does not
-mark the full reference/repeat stage scientifically accepted.
+Acceptance exercises actual custom-library masking, unsplit comparison, resume,
+added assemblies and invalid-input blocking. It does not exercise full de novo
+discovery. The real-data discovery/classification/filtering/masking run completed
+and was reviewed separately. [Output guide](outputs.md), [validation scope](validation.md).

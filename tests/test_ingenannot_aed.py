@@ -8,80 +8,81 @@ import tempfile
 import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'py_scripts'))
-from ingenannot_benchmark import check, report
+from ingenannot_inputs import check
+from final_annotation import aed
+from annotation_fixtures import native_aed_fixture
 from prepare_protein_evidence import checksum
-from test_evidence_aed import IDENTITY, MODEL
 
 
-class NativeBenchmarkContracts(unittest.TestCase):
+
+class NativeAedContracts(unittest.TestCase):
+    def test_preparation_requires_matching_final_annotation_and_evidence_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);gff,validation,identity,native=native_aed_fixture(root)
+            with self.assertRaisesRegex(ValueError,'availability'):
+                check(gff,validation,None,root/'protein.gff',root/'missing.json')
+            state=json.loads(validation.read_text());state['stage']='braker_prediction'
+            validation.write_text(json.dumps(state))
+            with self.assertRaisesRegex(ValueError,'validated final annotation'):
+                check(gff,validation,root/'rna.gtf',root/'protein.gff',root/'bad_stage.json')
+            state['stage']='final_annotation';validation.write_text(json.dumps(state))
+            gff.write_text(gff.read_text()+'# changed\n')
+            with self.assertRaisesRegex(ValueError,'models differ'):
+                check(gff,validation,root/'rna.gtf',root/'protein.gff',root/'changed.json')
+
     def test_preparation_runs_without_reporting_or_scoring_helpers(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); gff,v,c,i,b,a=self.fixtures(root)
+            root=Path(tmp); gff,v,i,a=native_aed_fixture(root)
             scripts=root/'helpers'; scripts.mkdir()
             source=Path(__file__).resolve().parents[1]/'py_scripts'
             for name in ('ingenannot_inputs.py','prepare_protein_evidence.py'):
                 shutil.copy2(source/name,scripts/name)
             result=subprocess.run([sys.executable,str(scripts/'ingenannot_inputs.py'),
-                '--gff',str(gff),'--validation',str(v),'--current-status',str(c),
+                '--gff',str(gff),'--validation',str(v),
                 '--rna',str(root/'rna.gtf'),'--protein',str(root/'protein.gff'),
                 '--out',str(root/'independent_inputs.json')],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertEqual(json.loads((root/'independent_inputs.json').read_text()),
                              json.loads((root/'inputs.json').read_text()))
 
-    def fixtures(self,root,rna=True,protein=True):
-        gff=root/'models.gff3'; gff.write_text(MODEL)
-        validation=root/'validation.json'; validation.write_text(json.dumps(dict(status='ready',gff3_sha256=checksum(gff),reference_identity='test-ref')))
-        r=root/'rna.gtf'; r.write_text('# RNA fixture\n')
-        p=root/'protein.gff'; p.write_text('# protein fixture\n')
-        current=root/'current.json'; current.write_text(json.dumps(dict(status='ready',model_sha256=checksum(gff),reference_identity='test-ref',
-            evidence=dict(rna=dict(available=rna,source_sha256=checksum(r) if rna else None),protein=dict(available=protein,source_sha256=checksum(p) if protein else None)))))
-        identity=root/'identity.json'; identity.write_text(json.dumps(IDENTITY))
-        baseline=root/'scores.tsv'; baseline.write_text('gene_id\ttranscript_id\trna_aed\tprotein_aed\n'+f'g1\tt1\t{0.4 if rna else "."}\t{0.2 if protein else "."}\n')
-        annotated=root/'native.gff3'; annotated.write_text(MODEL.replace('ID=t1;Parent=g1','ID=t1;Parent=g1;aed_ev_tr=0.3000;aed_ev_pr=0.1000;ev_tr=r1;ev_pr=p1;ev_tr_penalty=no'))
-        check(gff,validation,current,r if rna else None,p if protein else None,root/'inputs.json')
-        return gff,validation,current,identity,baseline,annotated
-
     def test_native_scores_are_reported_not_recomputed_and_all_modes_preserved(self):
         for r,p in [(True,True),(True,False),(False,True),(False,False)]:
             with self.subTest(rna=r,protein=p),tempfile.TemporaryDirectory() as tmp:
-                root=Path(tmp); gff,v,c,i,b,a=self.fixtures(root,r,p)
-                data=report(gff,a,i,root/'inputs.json',b,True,.25,root/'out')
+                root=Path(tmp); gff,v,i,a=native_aed_fixture(root,r,p)
+                data=aed(gff,a,i,root/'inputs.json',True,.25,root/'out')
                 self.assertTrue(data['models_unchanged'])
-                with (root/'out/benchmark_scores.tsv').open() as handle: row=next(csv.DictReader(handle,delimiter='\t'))
-                self.assertEqual(row['ingenannot_rna_aed'],'0.30000000' if r else '.')
-                self.assertEqual(row['ingenannot_protein_aed'],'0.10000000' if p else '.')
+                with (root/'out/aed_scores.tsv').open() as handle: row=next(csv.DictReader(handle,delimiter='\t'))
+                self.assertEqual(row['rna_aed'],'0.3' if r else '.')
+                self.assertEqual(row['protein_aed'],'0.1' if p else '.')
                 self.assertFalse(any('combined' in k for k in row))
 
     def test_changed_models_sources_and_ids_block_assessment(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); gff,v,c,i,b,a=self.fixtures(root)
-            (root/'rna.gtf').write_text('# changed\n')
-            with self.assertRaisesRegex(ValueError,'evidence changed'): check(gff,v,c,root/'rna.gtf',root/'protein.gff',root/'other.json')
+            root=Path(tmp); gff,v,i,a=native_aed_fixture(root)
             a.write_text(a.read_text().replace('exon\t101\t200','exon\t101\t199'))
-            with self.assertRaisesRegex(ValueError,'changed model structure'): report(gff,a,i,root/'inputs.json',b,True,.25,root/'out')
+            with self.assertRaisesRegex(ValueError,'changed model structure'): aed(gff,a,i,root/'inputs.json',True,.25,root/'out')
 
     def test_native_score_outside_range_is_not_accepted(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); gff,v,c,i,b,a=self.fixtures(root)
+            root=Path(tmp); gff,v,i,a=native_aed_fixture(root)
             a.write_text(a.read_text().replace('aed_ev_tr=0.3000','aed_ev_tr=1.3000'))
-            with self.assertRaisesRegex(ValueError,'Invalid native AED'): report(gff,a,i,root/'inputs.json',b,True,.25,root/'out')
+            with self.assertRaisesRegex(ValueError,'Invalid native AED'): aed(gff,a,i,root/'inputs.json',True,.25,root/'out')
 
     def test_score_one_is_not_reported_as_zero_overlap(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); gff,v,c,i,b,a=self.fixtures(root)
+            root=Path(tmp); gff,v,i,a=native_aed_fixture(root)
             a.write_text(a.read_text().replace('aed_ev_tr=0.3000','aed_ev_tr=1.0000').replace('ev_tr=r1','ev_tr=None'))
-            data=report(gff,a,i,root/'inputs.json',b,True,.25,root/'out')
-            stats=data['metrics']['ingenannot_rna_aed']
+            data=aed(gff,a,i,root/'inputs.json',True,.25,root/'out')
+            stats=data['metrics']['rna']
             self.assertNotIn('no_overlap',stats)
             self.assertEqual(stats['score_equals_one'],1)
-            self.assertEqual(stats['no_selected_evidence'],1)
-            self.assertEqual(stats['score_one_with_previous_overlap'],1)
+            with (root/'out/aed_scores.tsv').open() as h: row=next(csv.DictReader(h,delimiter='\t'))
+            self.assertEqual(row['rna_evidence_id'],'None')
 
     def test_exon_envelope_normalization_preserves_blocks_on_both_strands(self):
         for strand in ('+','-'):
             with self.subTest(strand=strand),tempfile.TemporaryDirectory() as tmp:
-                root=Path(tmp); gff,v,c,i,b,a=self.fixtures(root)
+                root=Path(tmp); gff,v,i,a=native_aed_fixture(root)
                 # Mirror BRAKER's separate terminal stop codon: mRNA extends
                 # beyond exons/CDS, native export recomputes the exon envelope.
                 def rewrite(path,native):
@@ -98,15 +99,15 @@ class NativeBenchmarkContracts(unittest.TestCase):
                 rewrite(gff,False); rewrite(a,True)
                 accepted=json.loads((root/'inputs.json').read_text()); accepted['model_sha256']=checksum(gff)
                 (root/'inputs.json').write_text(json.dumps(accepted))
-                data=report(gff,a,i,root/'inputs.json',b,True,.25,root/'out')
+                data=aed(gff,a,i,root/'inputs.json',True,.25,root/'out')
                 self.assertEqual(data['transcript_bounds_normalized_to_exons'],['t1'])
                 a.write_text(a.read_text().replace('mRNA\t101','mRNA\t99'))
                 with self.assertRaisesRegex(ValueError,'unexpected transcript bounds'):
-                    report(gff,a,i,root/'inputs.json',b,True,.25,root/'out')
+                    aed(gff,a,i,root/'inputs.json',True,.25,root/'out')
 
     def test_cds_phase_changes_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); gff,v,c,i,b,a=self.fixtures(root)
+            root=Path(tmp); gff,v,i,a=native_aed_fixture(root)
             lines=[]
             for line in a.read_text().splitlines():
                 fields=line.split('\t')
@@ -116,7 +117,7 @@ class NativeBenchmarkContracts(unittest.TestCase):
                 lines.append(line)
             a.write_text('\n'.join(lines)+'\n')
             with self.assertRaisesRegex(ValueError,'coding phases differ'):
-                report(gff,a,i,root/'inputs.json',b,True,.25,root/'out')
+                aed(gff,a,i,root/'inputs.json',True,.25,root/'out')
 
 
 if __name__=='__main__': unittest.main()

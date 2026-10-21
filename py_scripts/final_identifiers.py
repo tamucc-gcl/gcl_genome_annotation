@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 from urllib.parse import quote, unquote
 
-from evidence_aed import models
+from annotation_models import models
 from model_metrics import sequences
 from model_selection import table, write_table
 from prepare_protein_evidence import checksum

@@ -13,12 +13,12 @@ workflow FINAL_STRUCTURAL_ANNOTATION {
         error 'final_id_prefix must use letters, digits, underscore, dot or hyphen'
     RENAME_GENE_MODELS(selected.join(metadata).map { aid,folder,settings,genome,identity -> tuple(aid,folder,identity) },
         params.final_id_prefix ?: '',
-        ['final_identifiers.py','model_selection.py','model_metrics.py','evidence_aed.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
+        ['final_identifiers.py','model_selection.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
             file("${projectDir}/py_scripts/${it}",checkIfExists:true)
         })
     SELECTED_ANNOTATION_QC(metadata.join(RENAME_GENE_MODELS.out.bundle).map { aid,settings,genome,identity,folder ->
         tuple(aid,settings,genome,file("${folder}/${aid}.gff3"),file("${folder}/${aid}_proteins.fa"),file("${folder}/annotation_status.json"))
-    },['identified_qc.py','annotation_baseline.py','model_metrics.py','evidence_aed.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
+    },['identified_qc.py','annotation_baseline.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
         file("${projectDir}/py_scripts/${it}",checkIfExists:true)
     })
     afterQc = SELECTED_ANNOTATION_QC.out.agat.mix(SELECTED_ANNOTATION_QC.out.busco)
@@ -29,7 +29,7 @@ workflow FINAL_STRUCTURAL_ANNOTATION {
     STRUCTURAL_QC(RENAME_GENE_MODELS.out.bundle.join(selected).join(assessments).combine(qcRows).map {
         aid,identified,selection,assessment,status,before,after ->
         tuple(aid,identified,selection,assessment,status,before.findAll { it[0]==aid }.collect { it[1] },after.findAll { it[0]==aid }.collect { it[1] })
-    },['structural_report.py','collect_annotation_metrics.py','model_selection.py','model_metrics.py','evidence_aed.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
+    },['structural_report.py','qc_metrics.py','model_selection.py','model_metrics.py','annotation_models.py','prepare_protein_evidence.py','reference_repeats.py'].collect {
         file("${projectDir}/py_scripts/${it}",checkIfExists:true)
     })
     reportRows = STRUCTURAL_QC.out.report.toList().map { rows -> rows.sort { it[0] } }

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import statistics
 
-from ingenannot_benchmark import assess
+from ingenannot_aed import assess
 from prepare_protein_evidence import checksum
 
 
@@ -50,7 +50,7 @@ def aed(gff,annotated,identity,inputs,cds_only,penalty,outdir):
         f"Repeated identical exon records differ for {len(accepted['native_exon_record_normalizations'])} transcripts in the native export; counts are audited in the status JSON. "
         'Exact unique exon boundaries, CDS records and coding phases are preserved.\n\n'
         'Assessment does not replace or edit the accepted final GFF3. Filtering is disabled by default; '
-        'the downstream filtering stage has not yet been connected.\n')
+        'source-specific filtering is available in the downstream selection stage.\n')
     return status
 
 

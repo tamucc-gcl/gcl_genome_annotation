@@ -74,7 +74,7 @@ class ModelAssessmentContracts(unittest.TestCase):
             flagged=(te/'A.te_flagged.gff3').read_text()
             self.assertIn('Note=old%3Bnote,putative_TE_derived',flagged)
             # Structure/IDs are preserved in a derived flag-only GFF.
-            from evidence_aed import models
+            from annotation_models import models
             self.assertEqual({k:v['cds'] for k,v in models(g,{'chr1':1000}).items()},
                              {k:v['cds'] for k,v in models(te/'A.te_flagged.gff3',{'chr1':1000}).items()})
 

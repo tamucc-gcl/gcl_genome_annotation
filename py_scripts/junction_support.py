@@ -5,7 +5,7 @@ import csv
 import json
 from pathlib import Path
 
-from evidence_aed import models
+from annotation_models import models
 from portcullis_inputs import decode, dump, table
 from prepare_protein_evidence import checksum
 

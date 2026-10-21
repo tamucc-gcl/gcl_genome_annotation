@@ -1,5 +1,14 @@
 # Evaluate evidence alignment and AED before filtering
 
+**Historical record — not current operating instructions.** Retained for the
+decision trail and flagged for archival in [cleanup](cleanup.md). Statements
+below about pending stages, proposed MAKER compatibility, old AED/filter behavior
+or pilot totals describe their original dates. The current implementation is
+documented in [the guide index](index.md), [native AED](evidence-scoring.md),
+[selection](model-selection.md) and [validation scope](validation.md). In a
+conflict, use those current guides and root configuration; do not run historical
+plans as additional pipeline steps.
+
 The governing target is now [MAKER-matched AED](aed-requirements.md), including
 prepared evidence bags. This evaluation supports that requirement; the custom
 best-chain pilot does not establish MAKER compatibility.

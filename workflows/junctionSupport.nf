@@ -37,7 +37,7 @@ workflow JUNCTION_SUPPORT {
         def selected = rows.findAll { it[0] == aid }.sort { a,b -> a[1] <=> b[1] }
         def request = groovy.json.JsonOutput.toJson([assembly_id:aid,readsets:readsets]).getBytes('UTF-8').encodeBase64().toString()
         tuple(aid,request,gff,validation,identity,selected.collect { it[2] })
-    },['junction_support.py','portcullis_inputs.py','evidence_aed.py','reference_repeats.py','prepare_protein_evidence.py'].collect {
+    },['junction_support.py','portcullis_inputs.py','annotation_models.py','reference_repeats.py','prepare_protein_evidence.py'].collect {
         file("${projectDir}/py_scripts/${it}", checkIfExists:true)
     })
     emit:

@@ -1,102 +1,48 @@
-# Unfiltered annotation baseline
+# Unfiltered and selected scientific QC
 
-The first downstream increment reuses AGAT, BUSCO and OMArk from the original
-pipeline. It assesses accepted BRAKER outputs without filtering or renaming them.
-The integrated `main.nf` now runs these same modules after optional UTR
-refinement and final model validation when `run_baseline_qc = true` (default),
-publishing under `qc/final/`. The standalone `annotation_qc.nf` entry retains
-raw BRAKER assessment under `qc/baseline/`. Original BRAKER predictions remain
-preserved. QC is skipped in BRAKER software-check mode.
-No manual checkpoint is required in a normal pipeline run.
+`ANNOTATION_BASELINE` reuses AGAT, BUSCO and OMArk to assess accepted annotations.
+In `main.nf`, unfiltered QC follows UTR validation under `qc/final/`; selected
+final-ID QC follows selection under `qc/selected/`. Original BRAKER results remain
+preserved. The focused `annotation_qc.nf` entry instead assesses raw accepted
+BRAKER output under `qc/baseline/` and stops without prediction or filtering.
 
-AGAT assesses the complete GFF3, including alternative isoforms. BUSCO and OMArk
-use one representative protein per coding gene: the longest predicted protein,
-with ties broken by transcript ID. Terminal `*` is excluded from length ranking;
-the sequence itself is retained unchanged, including partial/internal-stop models.
-The selection uses explicit GFF3 Parent relationships, not transcript name suffixes,
-and creates a mapping table. It does not remove genes or replace the full proteome.
+## Populations and tools
 
-BUSCO receives each assembly's resolved lineage; OMArk receives its effective
-taxid. `run_busco` and `run_omark` are resolved per assembly. Disabled tools are
-reported as `not_requested` and do not block joins or require dummy evidence files.
-BUSCO retains its existing 5.3.2 tool version and odb10 lineage baseline; AGAT and
-OMArk retain their existing environments. BUSCO's full results and OMArk's output
-directory are preserved alongside human-readable summaries and version records.
+AGAT assesses all GFF3 isoforms, including UTRs, and retains native statistics,
+YAML and distribution outputs. BUSCO 5.3.2 runs in **protein mode** with the
+resolved lineage. BUSCO and OMArk receive one longest protein per coding gene,
+not the genome FASTA or all isoforms. Terminal `*` is excluded from length
+ranking, not silently removed from the scientific input sequence.
 
-The existing shared database modules use native `storeDir`; the downloads run
-locally without scratch so the driver and transfer share filesystem metadata.
-Existing `lineages/<lineage>/`, `<oma_db_name>.h5` and `taxa.sqlite` outputs skip
-acquisition. The user confirmed `actinopterygii_odb10`, `LUCA.h5` and `taxa.sqlite`
-are present on Crest. Scientific QC remains on Slurm. Database compatibility and
-actual BUSCO/OMArk execution still require the real pilot.
+Ties use transcript IDs; selected QC preserves the original-ID tie-break through
+renaming. Exact representative FASTAs/tables remain available. Selection of a
+QC representative does not remove genes or replace the complete proteome.
+Per-assembly `run_busco`/`run_omark` switches are honored. Disabled analyses are
+`not_requested`, not zero completeness. Native unclassified/short-protein
+behavior remains explicit; unassessed isoforms do not inherit OMArk classes.
 
-All parameters, environments and process resources remain in `nextflow.config`.
-No additional configuration files are needed.
+Shared stores retain `busco_database/lineages/<lineage>/` and
+`omark_database/<oma_db_name>.h5` plus `taxa.sqlite`. Existing contents are
+reused natively; declared settings are not independent database-release audits.
+Full native BUSCO/OMArk directories, summaries and versions are preserved.
 
-## Cluster contracts
+## Controls and outputs
+
+`run_baseline_qc=true` enables unfiltered main QC. Selected QC is part of
+`run_finalization`; per-tool BUSCO/OMArk switches control both populations.
+Each QC root contains its README/status and per-assembly `selection/`, `agat/`,
+`busco/`, `omark/` outputs as applicable. A QC input named `<assembly>.fa` here
+is the representative **protein** FASTA, not the genome. Ready indicates
+requested tool completion and integrity, not a completeness threshold.
 
 ```bash
 python gcl_genome_annotation/tests/validate_annotation_baseline_cluster.py \
   --outdir testing/annotation_baseline_contracts_01
 ```
 
-This uses tiny synthetic validated predictions and actual AGAT. It checks
-multi-assembly processing, representative selection, disabled optional metrics,
-unchanged resume, addition of an assembly without rerunning existing AGAT tasks,
-and blocking files whose checksums no longer match validation. It does not run
-BRAKER, repeat discovery, alignments, BUSCO or OMArk. Interrupted acceptance can
-be recovered with the same directory and `--resume`.
-
-Local Python contracts passed; cluster acceptance remains pending.
-
-## Real flounder pilot
-
-The user supplied the ready real-data baseline report on 13 October 2026.
-AGAT, BUSCO and OMArk completed. It records 21,528 genes, 45,399 coding
-transcripts and 21,528 selected representative proteins. BUSCO 5.3.2 with
-actinopterygii_odb10 found C:97.9% [S:93.9%, D:4.0%], F:0.3%, M:1.8%
-across 3,640 groups. OMArk used Percomorphaceae (16,241 conserved HOGs):
-91.71% single, 4.41% duplicated and 3.88% missing. It assessed 21,524 proteins:
-96.31% consistent, 0.75% inconsistent, 0% contaminants and 2.94% unknown.
-Consistent partial hits (530) and fragmented proteins (322) are subcategories,
-not additional independent totals. The user reconciled the four proteins absent
-from OMArk classifications: g11457.t1 (2 aa), g7676.t1 (4 aa), g7679.t1 (4 aa)
-and g7683.t1 (4 aa), each the sole isoform of its gene. They remain in the selected
-FASTA; they were not filtered by this pipeline. The selected count is 21,528,
-not the 21,524 previously inferred from the OMAmer progress log. The exact
-OMAmer short-sequence exclusion condition has not been verified for this database.
-This confirms real tool execution and establishes an unfiltered baseline, not
-final model quality. Inspect those extremely short predictions during model QC.
-
-After cluster contracts pass, change only the Nextflow script target in the
-project's sbatch from `braker_prediction.nf` to `annotation_qc.nf`. Keep the
-sample/RNA sheets, taxonomy/database arguments, existing output directory
-`testing/genome_annotation` and `-resume`. This entry reads the completed
-predictions and runs QC only; BRAKER, RNA preparation/alignment and repeats are
-not invoked. `baseline_inputs_root` optionally points at a different accepted
-output root; by default it is the current `outdir`.
-
-Inspect `qc/baseline/README.md` and `qc/baseline/baseline_status.json`.
-Per-assembly directories contain `selection/`, `agat/`, `busco/` and `omark/`.
-The report includes links and BUSCO/OMArk text summaries. `ready` means requested
-tools completed with nonempty outputs, not that a biological quality threshold
-was met. Preserve published predictions and backing work directories when outputs
-are links. The development entry checks ready prediction status and GFF3/protein
-checksums and the genome's normalized contig identity before selecting representatives.
-
-## AED and subsequent filtering
-
-MAKER AED measures agreement with available transcript and protein evidence; a
-protein-only score is an evidence-specific assessment, not a reproduction of
-MAKER's combined-evidence score. The existing COMPUTE_AED module compares BRAKER
-CDS coordinates against the best overlapping miniprot protein alignment. Retain
-it explicitly as protein-based AED for historical comparison. The user clarified
-that the final AED output must assess all supplied evidence, including RNA when
-available. Its implementation and transcript assembly/polishing choices are deferred
-until after baseline QC. Missing evidence is unavailable, never substituted with
-1.0. Combined-evidence scoring requires separate validation before interpreting
-the legacy 0.7 cutoff; protein-only scoring is not the final RNA-inclusive policy.
-
-Sources: [MAKER-P paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC3912085/),
-[AGAT statistics implementation](https://github.com/NBISweden/AGAT/blob/master/bin/agat_sp_statistics.pl),
-[OMArk usage](https://github.com/DessimozLab/OMArk#usage).
+This focused acceptance uses actual AGAT, representative selection and resume/
+integrity cases; it does not run BUSCO/OMArk's full databases. Their real-data
+unfiltered and selected runs were reviewed separately. The initial raw BRAKER
+pilot and later integrated model counts differ; use current manifests for a
+current comparison, not historical pilot totals. See
+[final structural QC](final-structural-qc.md) and [validation](validation.md).

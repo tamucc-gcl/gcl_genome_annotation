@@ -13,7 +13,7 @@ from structural_report import report
 from structural_report_index import write_index
 from model_selection import table, select
 from model_metrics import sequences
-from evidence_aed import models
+from annotation_models import models
 from prepare_protein_evidence import checksum
 from annotation_baseline import prepare
 from identified_qc import prepare_selected

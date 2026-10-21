@@ -2,8 +2,8 @@
 
 After accepted model selection, main now assigns final identifiers, runs selected-set
 AGAT/BUSCO/OMArk, and produces a structural report comparing the accepted unfiltered
-post-UTR models with the selected identified models. Functional annotation is still
-the next independent stage. The original accepted and excluded sets remain available.
+post-UTR models with the selected identified models. Functional annotation follows as
+an independent connected stage. The original accepted and excluded sets remain available.
 
 ## Final identifiers
 
@@ -91,10 +91,11 @@ Missing evidence is unavailable, not zero support/AED=1. RNA and protein AED sta
 separate. Retained evidence rows are re-keyed, without repeating alignment/scoring.
 Gene-level repeat context is inherited from the original assessed locus and can
 reflect an excluded isoform; it is not silently recomputed as new selected-only
-evidence. No automatic high-confidence list is inferred before functional support.
+evidence. No automatic composite high-confidence list is inferred.
 
-The existing structural module's best/worst gene aggregation and report's
-BUSCO/OMArk parsers are reused/adapted. The new structural report uses Matplotlib
+The existing structural module's best/worst gene aggregation and native
+BUSCO/OMArk parsers are reused/adapted. The parsers now live in `qc_metrics.py`,
+separate from the retired all-in-one metric collection CLI. The new structural report uses Matplotlib
 for standalone scientific figures, avoiding the legacy full functional report's
 unused GO/database dependencies. Original AGAT figures are linked as well.
 Native summary formats are checked before parsing: missing or malformed outputs
@@ -109,9 +110,8 @@ testing only earlier stages. Existing baseline-QC and individual BUSCO/OMArk
 switches remain effective; disabling baseline QC makes the native before-comparison
 unavailable, rather than inventing a baseline.
 
-Local Python contracts and Nextflow 23.10.1 parsing pass, including visual inspection
-of representative report figures. Actual native cluster runtime acceptance and
-the full-data selected BUSCO/OMArk pilot remain pending. On Crest first run:
+Local contracts, native before/after AGAT acceptance and the real selected-set
+BUSCO/OMArk pilot passed. To check changes on the cluster:
 
 ```bash
 python gcl_genome_annotation/tests/validate_final_structural_cluster.py \
@@ -122,11 +122,11 @@ This tests actual before/after AGAT, final mappings, all four synthetic accepted
 evidence-mode handoffs, ten figure groups, report source validation, resume,
 report-only cache reuse, prefix changes and disabled finalization. It does not
 run BRAKER, mapping, repeat discovery, AED, Portcullis or database downloads.
-BUSCO/OMArk parsing and handoffs have local contracts; their actual selected-set
-execution is checked on the real-data pilot using the existing databases.
+BUSCO/OMArk parsing and handoffs have local contracts; actual selected-set
+execution was reviewed separately using the existing databases.
 Recovery uses the same test directory and `--resume`.
 
-After acceptance, use the normal main sbatch with `-resume`. A development-only
+Normal execution uses `main.nf` with `-resume`. A development-only
 `final_structural_qc.nf` entry can instead read accepted published selection,
 preflight and before-QC outputs via `--structural_inputs_root "${outdir}"`, without
 relaunching earlier scientific stages. Keep the same entry/work directory for
