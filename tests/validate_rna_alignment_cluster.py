@@ -60,7 +60,7 @@ def create_inputs(root):
     table(root / 'none.csv', header, [['N', 'genome.fa', '', 'false']])
 
 
-def run_case(root, inputs, name, sheet, expected, suffix='fresh', resume=False, strand=None, minimum=20):
+def run_case(root, inputs, name, sheet, expected, suffix='fresh', resume=False, strand=None, minimum=20, policy='unstranded'):
     case = root / name
     case.mkdir(exist_ok=True)
     output = case / 'results'
@@ -71,7 +71,7 @@ def run_case(root, inputs, name, sheet, expected, suffix='fresh', resume=False, 
                '--taxid', '999', '--taxdump_dir', str(inputs / 'taxdump'), '--outdir', str(output),
                '--rna_alignment_memory', '8 GB',
                '--rna_alignment_cpus', '4', '--rna_alignment_threads', '2',
-               '--rna_strand_min_informative', str(minimum)]
+               '--rna_strand_min_informative', str(minimum), '--rna_unresolved_strand_policy', policy]
     if resume:
         command.append('-resume')
     if strand:
@@ -115,14 +115,22 @@ def run_case(root, inputs, name, sheet, expected, suffix='fresh', resume=False, 
         for row in data['readsets']:
             assert row['mapped_fraction'] > .95
             assert row['junctions'] == 2, 'Known synthetic splice junctions missing/extra'
-            assert row['strand']['strandedness'] == (strand or ('reverse' if row['readset_id'] == 'S' else 'forward'))
+            if suffix.startswith('policy_'):
+                assert row['strand']['inference_outcome'] == 'insufficient'
+                assert row['strand']['inferred_strandedness'] == 'unresolved'
+                assert row['strand']['status'] == ('ready' if policy == 'unstranded' else 'blocked')
+                if policy == 'unstranded':
+                    assert row['strand']['effective_strandedness'] == 'unstranded'
+                    assert row['strand']['effective_setting_source'] == 'conservative_fallback'
+            else:
+                assert row['strand']['strandedness'] == (strand or ('reverse' if row['readset_id'] == 'S' else 'forward'))
         libs = {(row['assembly_id'], row['library_id']): row for row in data['libraries']}
         assert libs[('A', 'P')]['readsets'] == ['P1', 'P2']
         assert libs[('A', 'S')]['readsets'] == ['S']
         assert libs[('B', 'P')]['readsets'] == ['P1']
-        assert len(libs[('A', 'P')]['bams']) == 2, 'Technical lanes were merged/dropped'
+        assert len(libs[('A', 'P')].get('bams', [])) == (0 if suffix == 'policy_error' else 2), 'Technical lanes were merged/dropped'
         for row in data['libraries']:
-            for path in row['bams'] + row['bam_indices']:
+            for path in row.get('bams', []) + row.get('bam_indices', []):
                 assert (output / 'rna_alignment' / path).is_file()
         assert not any(row['name'].startswith('MERGE_RNA') for row in trace)
     if name == 'blocked':
@@ -166,8 +174,10 @@ def main():
                                          'recover' if args.resume else 'fresh', resume=args.resume))
         summary['checks'].append(run_case(root, inputs, 'ready', 'ready.csv', expected, 'resume', resume=True))
         summary['checks'].append(run_case(root, inputs, 'ready', 'ready.csv', expected, 'strand_change', resume=True, strand='reverse'))
+        summary['checks'].append(run_case(root, inputs, 'ready', 'ready.csv', expected, 'policy_fallback', resume=True, minimum=1000000))
+        summary['checks'].append(run_case(root, inputs, 'ready', 'ready.csv', dict(A='blocked', B='blocked'), 'policy_error', resume=True, minimum=1000000, policy='error'))
         summary['checks'].append(run_case(root, inputs, 'ready', 'added.csv', {**expected, 'C': 'ready'}, 'added', resume=True))
-        summary['checks'].append(run_case(root, inputs, 'blocked', 'ready.csv', dict(A='blocked', B='blocked'), minimum=1000000))
+        summary['checks'].append(run_case(root, inputs, 'blocked', 'ready.csv', dict(A='blocked', B='blocked'), minimum=1000000, policy='error'))
         summary['checks'].append(run_case(root, inputs, 'none', 'none.csv', dict(N='not_requested')))
         summary['status'] = 'passed'
     except (AssertionError, ValueError, OSError, RuntimeError) as exc:

@@ -10,7 +10,7 @@ process PLAN_RNA_ALIGNMENT {
     path 'alignment_plan.json', emit: plan
     script:
     """
-    python ${helper} plan --preflight '${preflight}/resolved_inputs.json' --prepared '${prepared}' --request '${locations}' --output alignment_plan.json
+    python rna_alignment.py plan --preflight '${preflight}/resolved_inputs.json' --prepared '${prepared}' --request '${locations}' --output alignment_plan.json
     """
 }
 
@@ -27,7 +27,7 @@ process INDEX_RNA_REFERENCE {
     """
     set -euo pipefail
     mkdir ${reference_id}
-    python rna_alignment.py reference --reference '${reference}' --identity '${identity}' --output '${reference_id}/reference.json'
+    python rna_mapping.py reference --reference '${reference}' --identity '${identity}' --output '${reference_id}/reference.json'
     hisat2-build -p ${task.cpus} '${reference}' '${reference_id}/genome' > '${reference_id}/build.log' 2>&1
     hisat2-build --version > '${reference_id}/hisat2_version.txt'
     """
@@ -53,7 +53,7 @@ process ALIGN_RNA_READSET {
     def spliceReuseArg = params.rna_no_temp_splicesite ? '--no-temp-splicesite' : ''
     """
     set -euo pipefail
-    python rna_alignment.py reads --request '${readCheck}'
+    python rna_mapping.py reads --request '${readCheck}'
     mkdir ${rid}
     # Strand-neutral mapping: splice-derived XS tags remain independent of a supplied strand setting.
     hisat2 -x '${index}/genome' ${readArgs} --dta ${spliceReuseArg} --seed ${params.rna_alignment_seed} \\
@@ -81,7 +81,7 @@ process QC_RNA_ALIGNMENT {
     tuple val(aid), val(rid), path("${rid}"), emit: qc
     script:
     """
-    python ${helper} stats --request '${spec}' --bam '${alignment}/aligned.bam' --identity '${index}/reference.json' --outdir '${rid}'
+    python rna_alignment.py stats --request '${spec}' --bam '${alignment}/aligned.bam' --identity '${index}/reference.json' --outdir '${rid}'
     """
 }
 
@@ -96,7 +96,7 @@ process RESOLVE_RNA_STRAND {
     tuple val(aid), val(rid), path("${rid}.strand.json"), emit: strand
     script:
     """
-    python ${helper} strand --request '${policy}' --identity '${qc}/alignment.json' --output '${rid}.strand.json'
+    python rna_alignment.py strand --request '${policy}' --identity '${qc}/alignment.json' --output '${rid}.strand.json'
     """
 }
 
@@ -132,9 +132,13 @@ process ASSERT_RNA_ALIGNMENT {
     python - <<'PY'
     import json
     from pathlib import Path
-    if json.loads(Path('${status}').read_text())['status'] != 'ready':
-        raise SystemExit('RNA alignment incomplete; review rna_alignment/README.md')
-    Path('rna_alignment_passed.txt').write_text('RNA alignment and readset BAMs validated.\\n')
+    state = json.loads(Path('${status}').read_text())
+    if state['status'] != 'ready':
+        details = '; '.join(row.get('reason', 'unusable evidence') for row in state['libraries'] if row['status'] != 'ready')
+        raise SystemExit('RNA alignment incomplete: ' + details + '; review rna_alignment/README.md')
+    for warning in state.get('warnings', []):
+        print('WARNING:', warning)
+    Path('rna_alignment_passed.txt').write_text('RNA alignment operationally ready; review retained strand warnings.\\n')
     PY
     """
 }

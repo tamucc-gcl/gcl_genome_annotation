@@ -20,7 +20,7 @@ workflow JUNCTION_SUPPORT {
         if (!(aid ==~ /[A-Za-z0-9][A-Za-z0-9_.-]*/) || readsets.any { !(it.readset_id ==~ /[A-Za-z0-9][A-Za-z0-9_.-]*/) })
             error 'Portcullis assembly/readset IDs must be safe file identifiers'
         readsets.withIndex().collect { row,i ->
-            def strand = [reverse:'firststrand',forward:'secondstrand',unstranded:'unstranded'][row.strandedness]
+            def strand = [reverse:'firststrand',forward:'secondstrand',unstranded:'unstranded'][(row.effective_strandedness ?: row.strandedness)]
             if (!strand) error "Unresolved Portcullis library strand: ${aid}/${row.readset_id}"
             def orientation = row.layout == 'single' ? 'SE' : params.portcullis_paired_orientation
             def request = groovy.json.JsonOutput.toJson([assembly_id:aid,readset:row,orientation:orientation]).getBytes('UTF-8').encodeBase64().toString()

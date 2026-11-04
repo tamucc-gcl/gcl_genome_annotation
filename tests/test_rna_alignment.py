@@ -56,7 +56,8 @@ class AlignmentContracts(unittest.TestCase):
                                (0, 100, 'reverse'), (10, 90, 'reverse'), (50, 50, 'unstranded')):
             self.assertEqual(alignment.strand(qc(f, r), POLICY)['strandedness'], expected)
         for f, r in ((1, 0), (75, 25), (0, 0)):
-            self.assertEqual(alignment.strand(qc(f, r), POLICY)['status'], 'blocked')
+            self.assertEqual(alignment.strand(qc(f, r), POLICY)['status'], 'ready')
+            self.assertEqual(alignment.strand(qc(f, r), {**POLICY, 'unresolved_policy': 'error'})['status'], 'blocked')
 
     def test_explicit_strand_does_not_hide_invalid_bam(self):
         explicit = {**POLICY, 'strandedness': 'reverse'}
@@ -91,10 +92,75 @@ class AlignmentContracts(unittest.TestCase):
                 'assemblies': [dict(assembly_id='A', rna_readsets=['R', 'R2'])]}
         states = [{**alignment.strand(qc(), POLICY), 'readset_id': rid} for rid in ('R', 'R2')]
         paths = [dict(assembly_id='A', readset_id=rid, bam=rid + '.bam', bam_index=rid + '.csi') for rid in ('R', 'R2')]
-        result = alignment.report(plan, [], states, paths)
+        result = alignment.report(plan, [{**qc(), 'readset_id': rid} for rid in ('R', 'R2')], states, paths)
         self.assertEqual(result['status'], 'ready')
         self.assertEqual(result['libraries'][0]['bams'], ['R.bam', 'R2.bam'])
         self.assertEqual(result['assemblies'][0]['bams'], ['R.bam', 'R2.bam'])
+
+    def test_n2_fallback_preserves_evidence_and_strict_blocks(self):
+        state = alignment.strand(qc(56916, 196953), POLICY)
+        self.assertEqual(state['inference_outcome'], 'ambiguous')
+        self.assertEqual(state['inferred_strandedness'], 'unresolved')
+        self.assertEqual(state['informative'], 253869)
+        self.assertAlmostEqual(state['reverse_fraction'], .7758, places=4)
+        self.assertEqual(state['effective_strandedness'], 'unstranded')
+        self.assertEqual(state['effective_setting_source'], 'conservative_fallback')
+        self.assertIn('Intermediate', state['warning'])
+        self.assertEqual(state['status'], 'ready')
+        strict = alignment.strand(qc(56916, 196953), {**POLICY, 'unresolved_policy': 'error'})
+        self.assertEqual(strict['status'], 'blocked')
+        self.assertIn('strict strand policy', strict['reason'])
+
+    def test_explicit_and_insufficient_provenance(self):
+        for setting in ('forward', 'reverse', 'unstranded'):
+            state = alignment.strand(qc(56916, 196953), {**POLICY, 'strandedness': setting})
+            self.assertEqual(state['effective_setting_source'], 'explicit')
+            self.assertEqual(state['effective_strandedness'], setting)
+            self.assertEqual(state['inferred_strandedness'], 'unresolved')
+            self.assertEqual(state['strand_reverse'], 196953)
+        state = alignment.strand(qc(2, 1), POLICY)
+        self.assertEqual(state['inference_outcome'], 'insufficient')
+        self.assertIn('Only 3', state['warning'])
+        for policy in ('unstranded', 'error'):
+            state = alignment.strand(qc(status='blocked'), {**POLICY, 'unresolved_policy': policy})
+            self.assertEqual(state['status'], 'blocked')
+            self.assertEqual(state['inference_outcome'], 'not_evaluated')
+        for override in ({'strandedness': 'wrong'}, {'unresolved_policy': 'wrong'}):
+            with self.assertRaises(ValueError): alignment.strand(qc(), {**POLICY, **override})
+
+    def library_report(self, policies, counts):
+        ids = ['R', 'R2']
+        plan = dict(jobs=[dict(assembly_id='A', readset_id=rid, library_id='L') for rid in ids],
+                    assemblies=[dict(assembly_id='A', rna_readsets=ids)])
+        statistics = [{**qc(*count), 'readset_id': rid} for rid, count in zip(ids, counts)]
+        states = [alignment.strand(row, policy) for row, policy in zip(statistics, policies)]
+        paths = [dict(assembly_id='A', readset_id=rid, bam=rid+'.bam', bam_index=rid+'.csi') for rid in ids]
+        return alignment.report(plan, statistics, states, paths)
+
+    def test_lane_disagreement_and_unresolved_library_fallback(self):
+        for counts in ([(100, 0), (0, 100)], [(100, 0), (56916, 196953)]):
+            result = self.library_report([POLICY, POLICY], counts)
+            self.assertEqual(result['status'], 'ready')
+            self.assertEqual(result['libraries'][0]['effective_strandedness'], 'unstranded')
+            self.assertTrue(result['has_warnings'])
+            self.assertEqual(len(result['warnings']), 2)
+            self.assertTrue(all(r['strand']['effective_strandedness'] == 'unstranded' for r in result['readsets']))
+            self.assertEqual(result['readsets'][0]['strand']['inferred_strandedness'], 'forward')
+            self.assertIn('conservative_fallback', alignment.markdown(result))
+        strict = {**POLICY, 'unresolved_policy': 'error'}
+        self.assertEqual(self.library_report([strict, strict], [(100, 0), (0, 100)])['status'], 'incomplete')
+        explicit = [{**POLICY, 'strandedness': setting} for setting in ('forward', 'reverse')]
+        self.assertEqual(self.library_report(explicit, [(100, 0), (0, 100)])['status'], 'incomplete')
+
+    def test_missing_or_invalid_alignment_cannot_be_rescued_by_fallback(self):
+        state = alignment.strand(qc(56916, 196953), POLICY)
+        plan = dict(jobs=[dict(assembly_id='A', readset_id='R', library_id='L')],
+                    assemblies=[dict(assembly_id='A', rna_readsets=['R'])])
+        paths = [dict(assembly_id='A', readset_id='R', bam='r.bam', bam_index='r.csi')]
+        for statistics, strands in (([], [state]), ([qc(status='blocked')], [state]), ([qc()], [])):
+            result = alignment.report(plan, statistics, strands, paths)
+            self.assertEqual(result['status'], 'incomplete')
+            self.assertIn('blocked', alignment.markdown(result))
 
     def test_reference_content_contract(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -171,6 +237,14 @@ class BamStatsContracts(unittest.TestCase):
         result = self.run_stats([self.read(nh=2)])
         self.assertEqual(result['strand_forward'], 0)
         self.assertEqual(result['junctions'], 0)
+
+    def test_xs_availability_allows_ambiguous_records(self):
+        result = self.run_stats([self.read(xs='.'), self.read(xs='+', position=20)], expected=2)
+        self.assertEqual(result['status'], 'ready')
+        self.assertEqual(result['spliced_xs_reads'], 1)
+        result = self.run_stats([self.read(xs='.')])
+        self.assertEqual(result['status'], 'ready')
+        self.assertEqual(result['spliced_xs_reads'], 0)
 
     def test_dictionary_sort_and_counts(self):
         self.assertEqual(self.run_stats([self.read()], references=('wrong',))['status'], 'blocked')

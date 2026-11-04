@@ -13,6 +13,6 @@ process PLAN_CONNECTED_RNA_ALIGNMENT {
     path 'alignment_plan.json', emit: plan
     script:
     """
-    python ${helper} plan --preflight '${preflight}/resolved_inputs.json' --prepared '${prepared}' --request '${locations}' --output alignment_plan.json
+    python rna_alignment.py plan --preflight '${preflight}/resolved_inputs.json' --prepared '${prepared}' --request '${locations}' --output alignment_plan.json
     """
 }

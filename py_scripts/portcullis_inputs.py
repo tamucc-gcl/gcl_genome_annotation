@@ -27,8 +27,9 @@ def check(genome, identity, bam, request, output):
     row=request['readset']
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*',row['readset_id']):
         raise ValueError('Unsafe/missing readset identity')
-    if row['strandedness'] not in ('forward','reverse','unstranded') or row['layout'] not in ('paired','single'):
-        raise ValueError('Portcullis requires resolved library strand and layout')
+    effective = row.get('effective_strandedness', row['strandedness'])
+    if effective not in ('forward','reverse','unstranded') or row['layout'] not in ('paired','single'):
+        raise ValueError('Portcullis requires effective processing strand and layout')
     orientation=request.get('orientation','SE' if row['layout']=='single' else 'FR')
     if orientation not in (('SE',) if row['layout']=='single' else ('FR','RF','FF','UNKNOWN')):
         raise ValueError('Portcullis orientation does not match read layout')
@@ -44,7 +45,7 @@ def check(genome, identity, bam, request, output):
             raise ValueError('Portcullis requires coordinate-sorted BAMs')
         handle.check_index()
     dump(output,dict(status='ready',assembly_id=request['assembly_id'],readset=row,
-        orientation=orientation,python_version=sys.version.split()[0],pysam_version=pysam.__version__,
+        orientation=orientation,effective_strandedness=effective,python_version=sys.version.split()[0],pysam_version=pysam.__version__,
         reference_identity=reference['reference_identity'],bam_bytes=Path(bam).stat().st_size,
         input_validation_scope='Accepted genome sequence identity and BAM dictionary, sort header and readable index; Nextflow manages BAM file identity/staging'))
 

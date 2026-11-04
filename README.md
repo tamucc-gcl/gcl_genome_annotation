@@ -44,6 +44,12 @@ RNA. Disable unused analyses/evidence explicitly; omitting a database path does
 not disable its analysis. See the running guide for existing database layouts,
 mode selection, dependencies and resource controls.
 
+RNA alignment separates BAM validity from library-strand uncertainty. By default,
+valid unresolved automatic libraries proceed as unstranded processing with visible
+warnings; their preparation remains unresolved. Use
+`--rna_unresolved_strand_policy error` for strict inference. Read the
+[RNA alignment policy and schema](docs/rna-alignment.md) before interpreting readiness.
+
 The production entry is `main.nf`. Focused stage launchers are kept under
 `validation/entrypoints/` for diagnostics and regression testing; see the
 [testing guide](docs/testing.md). Development scratch material is not required

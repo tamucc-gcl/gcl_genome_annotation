@@ -236,8 +236,10 @@ def build(request, outdir):
         ids = set(prepared.get('rna_readsets', []))
         read_units = {r['readset_id']:r for r in stages['rna','run'].get('readsets',[]) if r['readset_id'] in ids}
         mapping = [r for r in stages['rna_alignment','run'].get('readsets',[]) if r.get('assembly_id', r.get('strand',{}).get('assembly_id')) == aid]
-        p += [md_table(['RNA readset','Selected units','Mapped primary reads','Resolved strand'],[[r['readset_id'],read_units.get(r['readset_id'],{}).get('read_units'),
-            f"{r['mapped_fraction']:.1%}" if r.get('mapped_fraction') is not None else None,r.get('strand',{}).get('strandedness')] for r in mapping]) if mapping else 'RNA alignment: not requested.', '',
+        p += [md_table(['RNA readset','Selected units','Mapped primary reads','Inferred strand','Effective strand','Setting source','Warning'],[[r['readset_id'],read_units.get(r['readset_id'],{}).get('read_units'),
+            f"{r['mapped_fraction']:.1%}" if r.get('mapped_fraction') is not None else None,r.get('strand',{}).get('inferred_strandedness','unrecorded'),
+            r.get('strand',{}).get('effective_strandedness',r.get('strand',{}).get('strandedness')),
+            r.get('strand',{}).get('effective_setting_source','legacy'),r.get('strand',{}).get('warning')] for r in mapping]) if mapping else 'RNA alignment: not requested.', '',
             '[Raw RNA MultiQC](rna/multiqc/raw/multiqc_report.html) · [Processed RNA MultiQC](rna/multiqc/filtered/multiqc_report.html) · [Alignment MultiQC](rna_alignment/multiqc/multiqc_report.html)' if ids else '', '',
             '### Prediction, UTR refinement and selection', '', md_table(['Model set','Genes','Coding transcripts'],[
                 ['BRAKER predictions',prediction.get('genes'),prediction.get('coding_transcripts')],

@@ -42,8 +42,9 @@ workflow {
     def rnaHelper = file("${projectDir}/py_scripts/prepare_rna.py", checkIfExists: true)
     def repeatHelper = file("${projectDir}/py_scripts/reference_repeats.py", checkIfExists: true)
     def alignmentHelper = file("${projectDir}/py_scripts/rna_alignment.py", checkIfExists: true)
-    def helpers = [alignmentHelper, repeatHelper]
-    def readHelpers = [alignmentHelper, rnaHelper]
+    def mappingHelper = file("${projectDir}/py_scripts/rna_mapping.py", checkIfExists: true)
+    def helpers = [mappingHelper, repeatHelper]
+    def readHelpers = [mappingHelper, rnaHelper]
     def brakerHelpers = ['braker_prediction.py', 'reference_repeats.py', 'prepare_protein_evidence.py'].collect {
         file("${projectDir}/py_scripts/${it}", checkIfExists: true)
     }
@@ -287,8 +288,8 @@ workflow {
     PLAN_CONNECTED_RNA_ALIGNMENT(RESOLVE_ANNOTATION_INPUTS.out.bundle, ASSERT_ANNOTATION_INPUTS.out,
         REPORT_RNA_PREPARATION.out.status, ASSERT_RNA_PREPARATION.out,
         referenceSplit.ready.join(FILTER_ASSEMBLY.out.bundle).map { aid, state, folder -> folder }.toList(),
-        encode([reference_dir: 'reference_inputs', strand_policy: [min_informative: params.rna_strand_min_informative,
-            dominant_fraction: params.rna_strand_dominant_fraction, unstranded_tolerance: params.rna_strand_unstranded_tolerance]]), alignmentHelper)
+        encode([reference_dir: 'reference_inputs', strand_policy: [unresolved_policy: params.rna_unresolved_strand_policy, min_informative: params.rna_strand_min_informative,
+            dominant_fraction: params.rna_strand_dominant_fraction, unstranded_tolerance: params.rna_strand_unstranded_tolerance]]), [alignmentHelper, mappingHelper])
     def alignmentPlans = PLAN_CONNECTED_RNA_ALIGNMENT.out.plan.map { path -> new groovy.json.JsonSlurper().parse(path.toFile()) }
     def alignmentReferences = alignmentPlans.flatMap { plan -> plan.references }
     INDEX_RNA_REFERENCE(alignmentReferences.map { row ->
@@ -305,11 +306,11 @@ workflow {
     def aligned = ALIGN_RNA_READSET.out.alignment.map { aid, rid, folder -> tuple([aid, rid], folder) }
     QC_RNA_ALIGNMENT(indexed.join(aligned).map { key, job, index, folder ->
         tuple(job.assembly_id, job.readset_id, encode(job.spec + [min_mapq: params.rna_strand_min_mapq]), folder, index)
-    }, alignmentHelper)
+    }, [alignmentHelper, mappingHelper])
     def qc = QC_RNA_ALIGNMENT.out.qc.map { aid, rid, folder -> tuple([aid, rid], folder) }
     RESOLVE_RNA_STRAND(indexed.join(qc).map { key, job, index, folder ->
         tuple(job.assembly_id, job.readset_id, encode(job.policy), folder)
-    }, alignmentHelper)
+    }, [alignmentHelper, mappingHelper])
     def alignmentBamLocations = ALIGN_RNA_READSET.out.alignment.map { aid, rid, folder ->
         [assembly_id: aid, readset_id: rid, bam: "readsets/${aid}/${rid}/aligned.bam",
          bam_index: "readsets/${aid}/${rid}/aligned.bam.csi"]
@@ -330,7 +331,7 @@ workflow {
     REPORT_RNA_ALIGNMENT(PLAN_CONNECTED_RNA_ALIGNMENT.out.plan,
         QC_RNA_ALIGNMENT.out.qc.map { aid, rid, folder -> file("${folder}/alignment.json", checkIfExists: true) }.toList(),
         RESOLVE_RNA_STRAND.out.strand.map { aid, rid, path -> path }.toList(), alignmentBamLocations, alignmentLogs,
-        [alignmentHelper, file("${projectDir}/py_scripts/report_rna_alignment.py", checkIfExists: true)])
+        [alignmentHelper, mappingHelper, file("${projectDir}/py_scripts/report_rna_alignment.py", checkIfExists: true)])
     ASSERT_RNA_ALIGNMENT(REPORT_RNA_ALIGNMENT.out.status)
     // Independent genome tracks reuse native reference channels; no prediction dependency.
     if (!params.braker_check_only) GENOME_TRACKS(preparedReferences.join(assemblies).join(FILTER_ASSEMBLY.out.bundle).map { aid,genome,state,row,folder ->

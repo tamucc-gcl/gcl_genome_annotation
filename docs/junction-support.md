@@ -121,3 +121,11 @@ support is documented in [selection](model-selection.md); it remains off by defa
 - [Native workflow and options](https://portcullis.readthedocs.io/en/latest/using.html)
 - [Metrics and pooling behavior](https://portcullis.readthedocs.io/en/latest/metrics.html)
 - [Bioconda package recipe](https://github.com/bioconda/bioconda-recipes/blob/master/recipes/portcullis/meta.yaml)
+
+Accepted strand fallbacks use effective `unstranded` for Portcullis; preparation
+inference remains unresolved in retained readset provenance. This setting is
+separate from mate orientation, which retains the configured FR/RF geometry.
+Native [strandedness options](https://portcullis.readthedocs.io/en/latest/using.html)
+include `unstranded`, `firststrand` and `secondstrand`. Unknown junction strands
+remain separately reported; a protocol fallback does not erase splice-derived
+junction strand evidence or turn unknown junctions into passing support.

@@ -65,7 +65,7 @@ and the retained production score/invariance tests. Shared model/native-score
 fixtures are in `annotation_fixtures.py`, rather than imported from a benchmark
 test class. See [consolidation record](cleanup.md).
 
-The five `check_*.groovy` files test production argument construction/routing
+The `check_*.groovy` files test production argument construction/routing
 with a Nextflow runtime. Keep them alongside native validators. Every current
 `*_fixture.nf` and `utr_fixture_bams.nf` supports an active stage validator.
 Those tiny workflows are tests, not extra production pipelines.
@@ -126,3 +126,12 @@ stable, but renamed staged helper files change some hashes: a one-time rerun of
 affected UTR/AED/assessment/QC descendants is possible. Do not assume this cleanup
 is report-only or force old cache hits for changed helper identities. Mapping,
 repeat discovery and BRAKER scientific inputs were not intentionally changed.
+
+RNA fallback regressions include N2-like counts, strict/insufficient inference,
+confident/explicit settings, invalid/missing BAM QC, automatic lane disagreements,
+explicit contradictions, BRAKER fallback/XS checks, UTR/Portcullis provenance and
+no-RNA reports. `check_rna_strand_commands.groovy` evaluates production StringTie,
+Portcullis routing and InGenAnnot FOF construction using the Nextflow runtime.
+The alignment cluster controller checks default-fallback and strict policy changes
+with resumed mapping and unchanged BAM/index task counts. Run it on the cluster;
+Python unit success alone does not establish native mapping, training or cache reuse.

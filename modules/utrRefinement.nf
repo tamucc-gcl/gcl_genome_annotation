@@ -36,7 +36,7 @@ process RUN_UTR_REFINEMENT {
     script:
     def reads = rna instanceof Collection ? rna : [rna]
     def bamList = bams instanceof Collection ? bams : [bams]
-    def fof = readsets.withIndex().collect { row, i -> "${bamList[i]}\t${row.layout == 'paired'}\t${row.strandedness == 'reverse'}" }.join('\n')
+    def fof = readsets.withIndex().collect { row, i -> "${bamList[i]}\t${row.layout == 'paired'}\t${(row.effective_strandedness ?: row.strandedness) == 'reverse'}" }.join('\n')
     def fofEncoded = (fof ? fof + '\n' : '').getBytes('UTF-8').encodeBase64().toString()
     def nativeCommand = enabled && reads ? """
     awk 'BEGIN{FS=OFS="\\t"} !/^#/ && NF==9 && (\$7=="+" || \$7=="-")' '${reads[0]}' > resolved_rna.gtf

@@ -32,8 +32,14 @@ readable indices and accepted alignment QC. Output checks require nonempty
 predictions, reference bounds, valid feature IDs/parents and matching coding
 transcript/protein/CDS IDs. Ready means integrity checks passed, not that every
 gene is biologically correct. BRAKER UTR prediction and strand-separated coverage
-BAM options are not enabled: resolved library strand is metadata used by later
-RNA analysis, not passed as an unrelated BRAKER strand flag.
+BAM options are not enabled. Library protocol labels are not passed as BRAKER's
+`--stranded` flag, which describes strand-separated BAMs. Valid uncertain libraries
+accepted under the RNA fallback policy remain available in ET/ETP. Effective
+processing, unresolved inference and warnings are retained in readset provenance.
+Each requested BAM must contain usable splice-derived XS tags; absent/old XS QC
+requires rerunning alignment QC. Individual ambiguous/tagless alignments are allowed.
+See the [RNA contract](rna-alignment.md) and
+[BRAKER strand documentation](https://github.com/Gaius-Augustus/BRAKER#stranded-rna-seq-alignments).
 
 ## Outputs and focused entry
 

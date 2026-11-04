@@ -11,8 +11,9 @@ workflow {
         rna_sheet: params.rna_sheet?.toString(), taxdump_dir: params.taxdump_dir?.toString(),
         params: params.collectEntries { key, value -> [key.toString(), value] }]
     def helper = file("${params.pipeline_root}/py_scripts/rna_alignment.py", checkIfExists: true)
-    def helpers = [helper, file("${params.pipeline_root}/py_scripts/reference_repeats.py", checkIfExists: true)]
-    def readHelpers = [helper, file("${params.pipeline_root}/py_scripts/prepare_rna.py", checkIfExists: true)]
+    def mappingHelper = file("${params.pipeline_root}/py_scripts/rna_mapping.py", checkIfExists: true)
+    def helpers = [mappingHelper, file("${params.pipeline_root}/py_scripts/reference_repeats.py", checkIfExists: true)]
+    def readHelpers = [mappingHelper, file("${params.pipeline_root}/py_scripts/prepare_rna.py", checkIfExists: true)]
     def prepared = file(params.rna_prepared_status ?: "${params.outdir}/rna/rna_status.json", checkIfExists: true)
     def referenceDir = file(params.rna_reference_dir ?: "${params.outdir}/filtered_assemblies").toString()
     if ((params.rna_min_intron as int) < 1 || (params.rna_max_intron as int) < (params.rna_min_intron as int))
@@ -25,9 +26,9 @@ workflow {
         file("${params.pipeline_root}/assets/taxonomy_rules.json"))
     ASSERT_ANNOTATION_INPUTS(RESOLVE_ANNOTATION_INPUTS.out.bundle)
     PLAN_RNA_ALIGNMENT(RESOLVE_ANNOTATION_INPUTS.out.bundle, ASSERT_ANNOTATION_INPUTS.out, prepared,
-        encode([reference_dir: referenceDir, strand_policy: [min_informative: params.rna_strand_min_informative,
+        encode([reference_dir: referenceDir, strand_policy: [unresolved_policy: params.rna_unresolved_strand_policy, min_informative: params.rna_strand_min_informative,
                 dominant_fraction: params.rna_strand_dominant_fraction,
-                unstranded_tolerance: params.rna_strand_unstranded_tolerance]]), helper)
+                unstranded_tolerance: params.rna_strand_unstranded_tolerance]]), [helper, mappingHelper])
 
     def plans = PLAN_RNA_ALIGNMENT.out.plan.map { path -> new groovy.json.JsonSlurper().parse(path.toFile()) }
     def references = plans.flatMap { plan -> plan.references }
@@ -45,11 +46,11 @@ workflow {
     def aligned = ALIGN_RNA_READSET.out.alignment.map { aid, rid, folder -> tuple([aid, rid], folder) }
     QC_RNA_ALIGNMENT(indexed.join(aligned).map { key, job, index, folder ->
         tuple(job.assembly_id, job.readset_id, encode(job.spec + [min_mapq: params.rna_strand_min_mapq]), folder, index)
-    }, helper)
+    }, [helper, mappingHelper])
     def qc = QC_RNA_ALIGNMENT.out.qc.map { aid, rid, folder -> tuple([aid, rid], folder) }
     RESOLVE_RNA_STRAND(indexed.join(qc).map { key, job, index, folder ->
         tuple(job.assembly_id, job.readset_id, encode(job.policy), folder)
-    }, helper)
+    }, [helper, mappingHelper])
     def bams = ALIGN_RNA_READSET.out.alignment.map { aid, rid, folder ->
         [assembly_id: aid, readset_id: rid, bam: "readsets/${aid}/${rid}/aligned.bam",
          bam_index: "readsets/${aid}/${rid}/aligned.bam.csi"]
@@ -70,6 +71,6 @@ workflow {
     REPORT_RNA_ALIGNMENT(PLAN_RNA_ALIGNMENT.out.plan,
         QC_RNA_ALIGNMENT.out.qc.map { aid, rid, folder -> file("${folder}/alignment.json", checkIfExists: true) }.toList(),
         RESOLVE_RNA_STRAND.out.strand.map { aid, rid, path -> path }.toList(), bams, alignmentLogs,
-        [helper, file("${params.pipeline_root}/py_scripts/report_rna_alignment.py", checkIfExists: true)])
+        [helper, mappingHelper, file("${params.pipeline_root}/py_scripts/report_rna_alignment.py", checkIfExists: true)])
     ASSERT_RNA_ALIGNMENT(REPORT_RNA_ALIGNMENT.out.status)
 }

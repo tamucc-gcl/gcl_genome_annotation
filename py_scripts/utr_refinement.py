@@ -94,6 +94,8 @@ def prepare(gff,validation,identity,rna,metadata,bams,indices,output):
     if len(rows)!=len(bams) or len(rows)!=len(indices): raise ValueError('UTR BAM metadata count differs')
     if rna and not rows: raise ValueError('RNA refinement requires BAMs for ranking')
     for row,bam,index in zip(rows,bams,indices):
+        row['strandedness'] = row.get('effective_strandedness', row['strandedness'])
+        row['ingenannot_stranded'] = row['strandedness'] == 'reverse'
         if row['layout'] not in ('paired','single') or row['strandedness'] not in ('reverse','unstranded'):
             raise ValueError('Pinned InGenAnnot ranking supports reverse/unstranded BAMs; forward/auto requires a validated adapter')
         if not Path(index).is_file() or not Path(bam).is_file(): raise ValueError('Missing BAM/index')
@@ -341,6 +343,7 @@ def validate(original,refined,identity,genome,inputs,old_cds,new_cds,old_protein
     status['coding_overlap_warning_pairs']=len(warnings)
     status['transcripts_with_coding_overlap_warnings']=len({r['transcript_id'] for r in warnings})
     status['same_strand_coding_overlap_warning_pairs']=sum(r['same_strand'] for r in warnings)
+    status['readsets'] = accepted.get('readsets', [])
     status['rna_ambiguous_strand_excluded']=accepted.get('rna_ambiguous_strand_excluded',0)
     dump(output/'utr_status.json',status)
     (output/'README.md').write_text('# UTR refinement\n\nStatus: **ready**\n\n'+

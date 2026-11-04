@@ -35,6 +35,13 @@ class JunctionSupportContracts(unittest.TestCase):
                 bad_orientation=encoded(dict(assembly_id='A',orientation='FR',readset=dict(readset_id='R1',strandedness='forward',layout='single')))
                 with self.assertRaisesRegex(ValueError,'orientation does not match'):
                     check(genome,identity,bam,bad_orientation,root/'bad')
+                fallback=dict(readset_id='R1',strandedness='unstranded',effective_strandedness='unstranded',
+                              inferred_strandedness='unresolved',effective_setting_source='conservative_fallback',layout='paired')
+                check(genome,identity,bam,encoded(dict(assembly_id='A',orientation='RF',readset=fallback)),root/'fallback.json')
+                retained=json.loads((root/'fallback.json').read_text())
+                self.assertEqual(retained['orientation'],'RF')
+                self.assertEqual(retained['effective_strandedness'],'unstranded')
+                self.assertEqual(retained['readset'],fallback)
                 handle.references=['other']
                 with self.assertRaisesRegex(ValueError,'dictionary'):check(genome,identity,bam,request,root/'bad')
                 genome.write_text('>chr1\nAAAA\n')

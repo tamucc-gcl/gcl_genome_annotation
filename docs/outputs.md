@@ -10,7 +10,7 @@ assembly's release README. Stage-native/audit outputs remain available separatel
 | `rna/` | Raw/processed/selected read manifests, FastQC/fastp, separate raw and filtered MultiQC |
 | `filtered_assemblies/<assembly>/` | Normalized retained reference, contig identities/header map and exclusions |
 | `reference_repeats/`, `repeats/` | Repeat preparation status, libraries, masking outputs, union coverage, logs/audits and native landscape |
-| `rna_alignment/` | HISAT2 indices, separate BAM/CSI pairs, mapping/strand QC and MultiQC |
+| `rna_alignment/` | HISAT2 indices, separate BAM/CSI pairs, mapping QC, v2 strand inference/effective settings and warnings, MultiQC |
 | `structural_annotation/braker_inputs/`, `braker_runtime/` | Prediction handoff and software/runtime records |
 | `structural_annotation/braker/<assembly>/` | Original BRAKER predictions, coding sequences, logs and trained parameters |
 | `structural_annotation/utr/<assembly>/` | Native UTR candidates, accepted changes/rejections, warnings and unfiltered extracted transcripts |

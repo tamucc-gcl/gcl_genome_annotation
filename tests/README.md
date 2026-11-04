@@ -26,3 +26,8 @@ Focused stage launchers live in [validation/entrypoints](../validation/entrypoin
 The validators use those paths and preserve their layout in staged fixtures.
 `check_validation_entries.groovy` checks root configuration resolution, includes
 and staged helper/environment paths for production and focused launchers.
+
+RNA strand-policy regression details and cache expectations are documented in
+[RNA alignment](../docs/rna-alignment.md). Include
+`check_rna_strand_commands.groovy` with the existing Nextflow/Groovy checks and
+rerun `validate_rna_alignment_cluster.py` for native fallback/strict resume acceptance.

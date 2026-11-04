@@ -39,7 +39,7 @@ workflow ANNOTATION_POSTPROCESSING {
             mode in ['rna','rna_protein'] && !params.aed_reassemble_rna && retained.exists() ? [retained] : [])
     }
     ASSEMBLE_AED_RNA(rnaJobs.filter { it[1] && !it[4] }.flatMap { aid,readsets,bams,indices,retained ->
-        readsets.withIndex().collect { row,i -> tuple(aid,row.readset_id,row.strandedness,bams[i],indices[i]) }
+        readsets.withIndex().collect { row,i -> tuple(aid,row.readset_id,(row.effective_strandedness ?: row.strandedness),bams[i],indices[i]) }
     })
     MERGE_AED_RNA(ASSEMBLE_AED_RNA.out.transcripts.groupTuple())
     rnaSources = rnaJobs.filter { !it[1] || it[4] }.map { aid,readsets,bams,indices,retained -> tuple(aid,retained) }

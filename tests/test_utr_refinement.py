@@ -73,6 +73,23 @@ class UtrContracts(unittest.TestCase):
                 self.assertEqual(result.returncode,0,result.stderr)
                 self.assertEqual((Path(tmp)/'bam.fof').read_bytes(),expected.encode())
 
+    def test_fallback_processing_is_unstranded_and_retains_uncertainty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); original,raw,refined,identity,genome,inputs=self.fixture(root)
+            validation=root/'validation.json'
+            dump(validation,dict(status='ready',gff3_sha256=checksum(original),reference_identity='ref'))
+            metadata=root/'readsets.json'
+            row=dict(layout='paired',strandedness='unstranded',effective_strandedness='unstranded',
+                     inferred_strandedness='unresolved',effective_setting_source='conservative_fallback')
+            dump(metadata,[row])
+            bam=root/'reads.bam';index=root/'reads.bam.csi'
+            bam.touch();index.touch()
+            prepare(original,validation,identity,None,metadata,[bam],[index],root/'prepared')
+            retained=json.loads((root/'prepared/inputs.json').read_text())['readsets'][0]
+            self.assertFalse(retained['ingenannot_stranded'])
+            self.assertEqual(retained['inferred_strandedness'],'unresolved')
+            self.assertEqual(retained['effective_setting_source'],'conservative_fallback')
+
     def test_preparation_rejects_unresolved_bam_protocol_and_reports_rna_strands(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); original,raw,refined,identity,genome,inputs=self.fixture(root)

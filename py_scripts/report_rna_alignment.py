@@ -2,8 +2,9 @@
 """Alignment reporting only; report changes do not invalidate mapping."""
 import argparse
 import subprocess
+import sys
 from pathlib import Path
-from rna_alignment import decode, dump, load, report
+from rna_alignment import decode, dump, load, report, markdown
 
 
 def alignment_multiqc(request, outdir):
@@ -49,23 +50,10 @@ def main():
                     [load(x) for x in Path(args.strands).glob('*.json')],
                     decode(args.request))
     dump(Path(args.outdir) / 'rna_alignment_status.json', result)
-    lines = ['# RNA alignment', '', f'Status: **{result["status"]}**', '',
-             'Mapping uses the accepted normalized reference and previously selected reads.',
-             'Automatic strandedness uses unique, high-quality spliced primary alignments (R1 for paired reads).',
-             'Validated readset BAMs are listed for BRAKER; gene prediction has not run.', '',
-             '| Assembly | Readset | Mapped | Informative | Strand | Status |', '|---|---|---:|---:|---|---|']
-    for row in result['readsets']:
-        state = row['strand']
-        lines.append(f'| {state["assembly_id"]} | {state["readset_id"]} | {row.get("mapped_fraction", 0):.1%} | {state["informative"]} | {state.get("strandedness", "unresolved")} | {state["status"]} |')
-        if state.get('reason'):
-            lines.extend(['', state['reason'], ''])
-    lines.extend(['', '| Assembly | Library | Status | Strand | Detail |', '|---|---|---|---|---|'])
-    for row in result['libraries']:
-        detail = ', '.join(f'[BAM {i}]({path})' for i, path in enumerate(row['bams'], 1)) if row['status'] == 'ready' else row['reason']
-        lines.append(f'| {row["assembly_id"]} | {row["library_id"]} | {row["status"]} | {row.get("strandedness", "unresolved")} | {detail} |')
-    lines.extend(['', '[Alignment QC: HISAT2 and samtools](multiqc/multiqc_report.html)',
-                  '[Resolved alignment statistics and BAM inputs](rna_alignment_status.json)', ''])
-    Path(args.outdir, 'README.md').write_text('\n'.join(lines), encoding='utf-8')
+    for warning in result['warnings']:
+        print('WARNING: ' + str(warning), file=sys.stderr)
+    Path(args.outdir, 'README.md').write_text(markdown(result), encoding='utf-8')
+
 
 
 if __name__ == '__main__':

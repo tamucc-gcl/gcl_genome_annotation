@@ -32,7 +32,7 @@ workflow {
     }
     def fallback = base.filter { it[1] && !it[6] }
     ASSEMBLE_AED_RNA(fallback.flatMap { aid, enabled, readsets, gff, validation, identity, rna, bams, indices ->
-        readsets.withIndex().collect { row, i -> tuple(aid, row.readset_id, row.strandedness, bams[i], indices[i]) }
+        readsets.withIndex().collect { row, i -> tuple(aid, row.readset_id, (row.effective_strandedness ?: row.strandedness), bams[i], indices[i]) }
     })
     MERGE_AED_RNA(ASSEMBLE_AED_RNA.out.transcripts.groupTuple())
     def rnaSources = base.filter { !it[1] || it[6] }.map { tuple(it[0],it[6]) }.mix(

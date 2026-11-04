@@ -18,7 +18,7 @@ def inputs():
     proteins = dict(status='ready', assemblies=[dict(assembly_id='A', status='ready',
                     protein_count=2, proteins_sha256='prot', source_ids=['db', 'spike'])])
     rows = [dict(assembly_id='A', readset_id=rid, library_id=rid, sample_id=rid, layout='paired',
-                 status='ready', reference_identity='ref', spliced_primary_reads=100,
+                 status='ready', reference_identity='ref', spliced_primary_reads=100, spliced_xs_reads=100,
                  strand=dict(status='ready', strandedness='reverse')) for rid in ('R1', 'R2')]
     preflight['rna_readsets'] = [dict(readset_id=r['readset_id'], library_id=r['library_id'],
                                     sample_id=r['sample_id'], layout=r['layout'], strandedness='auto') for r in rows]
@@ -82,6 +82,24 @@ class BrakerHandoff(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'RNA sheet differs'): braker.plan(*data)
         data = inputs(); data[0]['rna_readsets'][0]['strandedness'] = 'forward'
         with self.assertRaisesRegex(ValueError, 'strand setting differs'): braker.plan(*data)
+
+    def test_fallback_bam_handoff_and_absent_xs_rejected(self):
+        from rna_alignment import strand
+        data = inputs()
+        row = data[3]['readsets'][0]
+        row['strand'] = strand(dict(assembly_id='A', readset_id='R1', library_id='R1',
+            status='ready', strand_forward=56916, strand_reverse=196953),
+            dict(strandedness='auto', min_informative=100, dominant_fraction=.9, unstranded_tolerance=.1))
+        job = braker.plan(*data)['jobs'][0]
+        self.assertEqual(job['training_mode'], 'ETP')
+        self.assertEqual(job['readsets'][0]['effective_strandedness'], 'unstranded')
+        self.assertEqual(job['readsets'][0]['strand_provenance']['inferred_strandedness'], 'unresolved')
+        args = braker.command(job, 'g', 'p', ['b1', 'b2'], 4, 2, 'w', 'a')
+        self.assertFalse(any(a.startswith(('--stranded', '--UTR')) for a in args))
+        row['spliced_xs_reads'] = 0
+        with self.assertRaisesRegex(ValueError, 'XS tags'): braker.plan(*data)
+        del row['spliced_xs_reads']
+        with self.assertRaisesRegex(ValueError, 'rerun RNA alignment QC'): braker.plan(*data)
 
     def test_all_evidence_combinations_select_matching_flags(self):
         for mode in braker.MODES:

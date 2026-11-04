@@ -86,3 +86,20 @@ See [cleanup](cleanup.md) for retired names and cache implications.
 [Native UTR workflow](https://bioger.pages-forge.inrae.fr/ingenannot/usecases/add_utrs.html),
 [UTR command](https://bioger.pages-forge.inrae.fr/ingenannot/tools/UTRRefine.html),
 [study](https://pubmed.ncbi.nlm.nih.gov/40971313/).
+
+## Uncertain RNA protocol handling
+
+Accepted unresolved libraries use effective unstranded processing. The BAM FOF
+third column is `False`; the paired column is unchanged. Readset inference,
+fallback source and `ingenannot_stranded` are retained in prepared inputs and
+`utr_status.json`. Forward effective settings remain unsupported.
+
+Verified against the PyPI **0.0.20 wheel**, SHA256
+`3c59b7fc1ec43b0b8453f88f01c4e5fc4f7a5d2c7b59212cd75f612df79d918d`:
+`ingenannot/commands/isoform_ranking.py` parses the FOF booleans in
+`get_bam_files_to_analyze`; `base_counter`, `junction_counter` and `read_callback`
+apply reverse-protocol filtering only when stranded is true. With false they
+accept reads without an orientation restriction. This confirms the existing
+reverse/unstranded adapter; no forward coercion or native algorithm change is made.
+[Package release](https://pypi.org/project/ingenannot/0.0.20/) and
+[FOF documentation](https://bioger.pages-forge.inrae.fr/ingenannot/usecases/add_utrs.html).

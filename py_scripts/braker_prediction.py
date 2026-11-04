@@ -49,6 +49,7 @@ def plan(preflight, repeats, proteins, rna):
     requested_reads = {r['readset_id']: r for r in preflight['rna_readsets']}
     requested_pairs = {(row['assembly_id'], rid) for row in preflight['assemblies'] for rid in row['rna_readsets']}
     bam_paths = {}
+    library_settings = {}
     for library in rna['libraries']:
         if not any((library['assembly_id'], rid) in requested_pairs for rid in library['readsets']):
             continue
@@ -60,7 +61,10 @@ def plan(preflight, repeats, proteins, rna):
             key = (library['assembly_id'], rid)
             if key in bam_paths:
                 raise ValueError('Duplicate RNA library readset')
+            if library['library_id'] != alignments.get(key, {}).get('library_id'):
+                raise ValueError('RNA library/readset identity differs')
             bam_paths[key] = (bam, index)
+            library_settings[key] = library
     jobs = []
     for row in preflight['assemblies']:
         aid = row['assembly_id']
@@ -84,17 +88,28 @@ def plan(preflight, repeats, proteins, rna):
                 raise ValueError(f'{aid}/{rid}: current RNA sheet differs from accepted BAM metadata')
             strand = alignment['strand']
             if alignment['status'] != 'ready' or strand['status'] != 'ready':
-                raise ValueError(f'{aid}/{rid}: BAM or strand inference is not ready')
-            if strand['strandedness'] not in ('forward', 'reverse', 'unstranded'):
-                raise ValueError(f'{aid}/{rid}: unresolved strandedness')
-            if current['strandedness'] != 'auto' and current['strandedness'] != strand['strandedness']:
+                raise ValueError(f'{aid}/{rid}: BAM QC or strand processing policy is not ready')
+            effective = strand.get('effective_strandedness', strand.get('strandedness'))
+            if effective not in ('forward', 'reverse', 'unstranded'):
+                raise ValueError(f'{aid}/{rid}: no accepted effective strandedness')
+            if current['strandedness'] != 'auto' and current['strandedness'] != effective:
                 raise ValueError(f'{aid}/{rid}: current strand setting differs from accepted RNA QC; rerun alignment reporting')
+            if strand.get('requested_strandedness', current['strandedness']) != current['strandedness']:
+                raise ValueError(f'{aid}/{rid}: current strand setting differs from accepted RNA QC; rerun alignment reporting')
+            library = library_settings[(aid, rid)]
+            if library.get('effective_strandedness', effective) != effective:
+                raise ValueError(f'{aid}/{rid}: library processing setting differs from readset')
             if alignment['reference_identity'] != ref['repeats']['reference_identity']:
                 raise ValueError(f'{aid}/{rid}: alignment and masked reference identities differ')
             if alignment.get('spliced_primary_reads', 0) < 1:
                 raise ValueError(f'{aid}/{rid}: no spliced RNA evidence')
+            if alignment.get('spliced_xs_reads', 0) < 1:
+                raise ValueError(f'{aid}/{rid}: no usable splice-derived XS tags; rerun RNA alignment QC with current helpers')
             selected.append({key: alignment[key] for key in ('readset_id', 'library_id', 'sample_id', 'layout')})
-            selected[-1]['strandedness'] = strand['strandedness']
+            selected[-1].update(strandedness=effective, effective_strandedness=effective,
+                                strand_provenance=dict(strand),
+                                effective_setting_source=strand.get('effective_setting_source', 'legacy'),
+                                inferred_strandedness=strand.get('inferred_strandedness', 'unrecorded'))
             selected[-1]['bam'], selected[-1]['bam_index'] = bam_paths[(aid, rid)]
         if len({r['bam'] for r in selected}) != len(selected):
             raise ValueError(f'{aid}: multiple readsets reference the same BAM')
