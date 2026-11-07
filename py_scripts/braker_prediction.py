@@ -174,7 +174,7 @@ def command(spec, genome, proteins, bams, threads, rounds, workdir, augustus, ab
             f'--species={spec["species"]}', '--gff3',
             f'--AUGUSTUS_CONFIG_PATH={Path(augustus).resolve()}',
             f'--workingdir={Path(workdir).resolve()}', f'--rounds={rounds}',
-            f'--translation_table={spec["genetic_code"]}', '--verbosity=3']
+            f'--translation_table={spec["genetic_code"]}', '--verbosity=4']
     if has_proteins:
         args.append(f'--prot_seq={Path(proteins).resolve()}')
     if has_rna:

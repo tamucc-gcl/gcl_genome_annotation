@@ -38,7 +38,7 @@ class BrakerHandoff(unittest.TestCase):
         self.assertEqual(bam_arg.count(','), 1)
         self.assertIn('--rounds=8', args)
         self.assertFalse(any(a.startswith(('--stranded', '--UTR', '--busco_lineage')) for a in args))
-        self.assertIn('--verbosity=3', args)
+        self.assertIn('--verbosity=4', args)
 
     def test_incomplete_reference_and_wrong_assembly_identity_block(self):
         for index in range(4):
