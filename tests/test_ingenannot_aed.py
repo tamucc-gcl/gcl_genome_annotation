@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'py_scripts'))
-from ingenannot_inputs import check
+from ingenannot_inputs import check, partition
 from final_annotation import aed
 from annotation_fixtures import native_aed_fixture
 from prepare_protein_evidence import checksum
@@ -16,6 +16,36 @@ from prepare_protein_evidence import checksum
 
 
 class NativeAedContracts(unittest.TestCase):
+    def test_split_pools_preserve_scores_and_source_ids(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            gff,validation,identity,native=native_aed_fixture(root)
+            evidence=root/'protein.gff'
+            evidence.write_text(
+                'chr1\tminiprot\tmRNA\t101\t400\t.\t+\t.\tID=p1;Target=ref__1 1 100\n'
+                'chr1\tminiprot\tCDS\t101\t400\t.\t+\t0\tParent=p1\n'
+                'chr1\tminiprot\tmRNA\t101\t400\t.\t+\t.\tID=p2;Target=db__1 1 100\n'
+                'chr1\tminiprot\tCDS\t101\t400\t.\t+\t0\tParent=p2\n')
+            provenance=root/'sources.json'
+            provenance.write_text(json.dumps({'sources':[
+                {'source_id':'ref','request':{'kind':'local'}},
+                {'source_id':'db','request':{'kind':'orthodb'}},
+            ]}))
+            inputs=root/'inputs.json'
+            data=check(gff,validation,root/'rna.gtf',evidence,inputs)
+            partition(data,evidence,provenance,root)
+            self.assertNotIn('Parent=p2',(root/'reference.gff').read_text())
+            self.assertIn('Parent=p2',(root/'orthodb.gff').read_text())
+            folder=root/'native';folder.mkdir()
+            shutil.copyfile(native,folder/'reference.aed.gff3')
+            (folder/'orthodb.aed.gff3').write_text(native.read_text().replace('ev_pr=p1','ev_pr=p2').replace('0.1000','0.2000'))
+            (folder/'ingenannot_version.txt').write_text('0.0.25\n')
+            aed(gff,folder,identity,inputs,True,.25,root/'out')
+            with (root/'out/aed_scores.tsv').open() as handle:
+                row=next(csv.DictReader(handle,delimiter='\t'))
+            self.assertEqual((row['rna_aed'],row['protein_aed'],row['proteinDB_aed']),('0.3','0.1','0.2'))
+            self.assertEqual((row['protein_aed_source_id'],row['proteinDB_aed_source_id']),('ref','db'))
+
     def test_preparation_requires_matching_final_annotation_and_evidence_mode(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);gff,validation,identity,native=native_aed_fixture(root)

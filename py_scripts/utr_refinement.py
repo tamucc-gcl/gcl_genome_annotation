@@ -259,7 +259,10 @@ def validate(original,refined,identity,genome,inputs,old_cds,new_cds,old_protein
     rejected=audit['rejected_candidates'] if audit.get('schema_version')==1 else audit
     completed=audit.get('completed_boundary_utr_labels',{}) if audit.get('schema_version')==1 else {}
     normalized=audit.get('normalized_duplicate_exon_records',{}) if audit.get('schema_version')==1 else {}
-    restored=set(rejected)|set(normalized)
+    withheld=audit.get('support_withheld',{}) if audit.get('schema_version')==1 else {}
+    restored=set(rejected)|set(normalized)|set(audit.get('retained_original_transcripts',[]))
+    if not restored<=set(before):
+        raise ValueError('UTR screening refers to unknown transcript')
     if not set(rejected)<=set(before): raise ValueError('UTR rejection refers to unknown transcript')
     if not set(completed)<=set(before): raise ValueError('UTR label completion refers to unknown transcript')
     if not set(normalized)<=set(before) or set(normalized)&set(rejected):
@@ -315,7 +318,7 @@ def validate(original,refined,identity,genome,inputs,old_cds,new_cds,old_protein
         for kind,blocks in expected.items():
             if not skipped and tid not in restored and merged(utrs[tid][kind])!=subtract(blocks,stops.get(tid,[])): raise ValueError('UTR orientation/coordinates differ from exons or include stop codon')
         summary.append(dict(transcript_id=tid,gene_id=a['gene_id'],changed=sorted(a['exons'])!=sorted(b['exons']),
-            rejected_candidate_reason=rejected.get(tid,'.'),
+            rejected_candidate_reason=rejected.get(tid,withheld.get(tid,'.')),
             duplicate_exon_records_normalized=tid in normalized,
             boundary_utr_labels_completed=sum(len(v) for v in completed.get(tid,{}).values()),
             evidence_id=b['attrs'].get('utr_refine_evidence','.'),
@@ -333,6 +336,8 @@ def validate(original,refined,identity,genome,inputs,old_cds,new_cds,old_protein
         reference_identity=reference['reference_identity'],readsets=accepted['readsets'])
     status['rna_transcripts']=accepted.get('rna_transcripts',0)
     status['rejected_utr_candidates']=rejected
+    status['withheld_utr_proposals']=withheld
+    status['utr_support_policy']=audit.get('support_policy')
     status['completed_boundary_utr_labels']=completed
     status['normalized_duplicate_exon_records']=normalized
     warnings=coding_overlap_warnings(before,after,stops)
@@ -349,14 +354,15 @@ def validate(original,refined,identity,genome,inputs,old_cds,new_cds,old_protein
     (output/'README.md').write_text('# UTR refinement\n\nStatus: **ready**\n\n'+
         ('Refinement skipped: disabled or no RNA evidence.\n\n' if skipped else 'Native clusterize, BAM-based isoform ranking and utr_refine --utr_mode rank --onlynew.\n\n')+
         f"Changed transcripts: {status['changed_transcripts']}. CDS coordinates, phases and extracted CDS/protein sequences are unchanged. "
-        f"Rejected UTR candidates: {len(rejected)}; original BRAKER transcripts retained. "
+        f"Rejected native UTR candidates: {len(rejected)}. Proposals withheld by RNA evidence screening: {len(withheld)}. "
         f"Transcripts with duplicate exon records normalized: {len(normalized)} (not rejected extensions). "
         f"Transcripts with missing boundary UTR labels completed: {len(completed)}. "
         'Original BRAKER models remain preserved. Separately annotated stop codons are retained and excluded from UTR lengths.\n\n'
         '[Changes](utr_changes.tsv) | [Validation](utr_status.json) | [Coding overlap warnings](utr_warnings.tsv)\n\n'
+        + ('[RNA support and proposal decisions](support/utr_support.tsv) | [Proposed overlaps](support/utr_proposal_conflicts.tsv)\n\n' if status['utr_support_policy'] else '') +
         f"UTR additions overlap another gene CDS in {len(warnings)} transcript/gene pairs, "
         f"including {status['same_strand_coding_overlap_warning_pairs']} on the same strand. "
-        'These are review warnings, not automatic rejection criteria; RNA support does not establish coding assignment.\n\n'
+        'Short-read support screens proposed extensions. Exact mature transcript ends remain uncertain.\n\n'
         'Review extensions before promotion. Protein BUSCO/OMArk inputs are unchanged; final AGAT/AED assessment follows. No models were filtered.\n')
     return status
 

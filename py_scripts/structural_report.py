@@ -86,7 +86,7 @@ def report(aid,identified,selection,before_table,before_status,before_qc,after_q
                 row=dict(gene_id=gid,original_gene_id=rs[0]['original_gene_id'],transcripts=len(rs),
                     best_structure_flag=min(flags,key=rank.get),worst_structure_flag=max(flags,key=rank.get),
                     te_flagged=any(r['te_gene_flag']=='True' for r in rs) if any(r['te_gene_flag']!='.' for r in rs) else '.',functional_support='pending')
-                for metric in ('rna_aed','protein_aed','junction_coding_pass_fraction'):
+                for metric in ('rna_aed','protein_aed','proteinDB_aed','junction_coding_pass_fraction'):
                     v=numbers(rs,metric);row[metric+'_min']=min(v) if v else '.';row[metric+'_max']=max(v) if v else '.'
                 gene_rows.append(row)
     write_table(out/'structural_qc.tsv',list(assembly_rows[0]),assembly_rows)
@@ -133,8 +133,8 @@ def report(aid,identified,selection,before_table,before_status,before_qc,after_q
         if ax.lines:ax.legend()
         else:ax.text(.5,.5,'No applicable introns',ha='center',transform=ax.transAxes)
     save(fig,'complexity','Intron and isoform structure','Intron counts include single-exon transcripts at zero. Minimum intron length excludes single-exon transcripts. Isoform counts use genes as their denominator.')
-    fig,axes=plt.subplots(1,2,figsize=(11,4))
-    for ax,key,title in zip(axes,['rna_aed','protein_aed'],['RNA AED','Protein AED']):
+    fig,axes=plt.subplots(1,3,figsize=(15,4))
+    for ax,key,title in zip(axes,['rna_aed','protein_aed','proteinDB_aed'],['RNA AED','Reference protein AED','OrthoDB AED']):
         for rows,label,color in zip([before,after],['Before','After'],colors):
             v=np.sort(numbers(rows,key))
             if len(v):ax.step(v,np.arange(1,len(v)+1)/len(v),where='post',label=f'{label} (n={len(v):,})',color=color)
@@ -163,9 +163,9 @@ def report(aid,identified,selection,before_table,before_status,before_qc,after_q
         if available:ax.legend()
         else:ax.text(.5,.5,'RNA support unavailable',ha='center',transform=ax.transAxes)
     save(fig,'junction_occurrences','Splice-junction outcomes','These are occurrences across transcripts, not distinct genomic junctions or read counts. Shared isoforms repeat a junction in this population. Distinct-junction and readset-level results remain in the native Portcullis report.')
-    fig,axes=plt.subplots(1,2,figsize=(11,4))
-    for ax,key,title in zip(axes,['rna_aed','protein_aed'],['RNA AED','Protein AED']):
-        pairs=[(float(r[key]),float(r['junction_coding_pass_fraction'])) for r in after if r[key]!='.' and r['junction_coding_pass_fraction']!='.']
+    fig,axes=plt.subplots(1,3,figsize=(15,4))
+    for ax,key,title in zip(axes,['rna_aed','protein_aed','proteinDB_aed'],['RNA AED','Reference protein AED','OrthoDB AED']):
+        pairs=[(float(r[key]),float(r['junction_coding_pass_fraction'])) for r in after if r.get(key,'.')!='.' and r['junction_coding_pass_fraction']!='.']
         if pairs:
             x,y=zip(*pairs);h=ax.hist2d(x,y,bins=30,range=[[0,1],[0,1]],cmap='Blues',cmin=1);fig.colorbar(h[3],ax=ax,label='Transcripts per bin')
         else:ax.text(.5,.5,'Paired evidence unavailable',ha='center',transform=ax.transAxes)

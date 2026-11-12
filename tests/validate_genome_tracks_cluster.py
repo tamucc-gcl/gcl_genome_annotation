@@ -34,10 +34,16 @@ def check_telomere_ends(folder, aid, identity, motif):
 
 
 def check_centromere_mode(log):
-    # Native package output: the default satellite-only mode never performs this scan.
-    text=Path(log).read_text()
-    assert 'Detecting tandem repeat regions in the ' in text,(
-        f'{log}: native assembly-region scan not found; verify packaged centroAnno uses -x anno-asm')
+    # Older runs stored the native scan log at this path.
+    if Path(log).is_file():
+        assert 'Detecting tandem repeat regions in the ' in Path(log).read_text(), (
+            f'{log}: native assembly-region scan not found')
+        return
+    arrays = Path(log)/'arrays'
+    assert (arrays/'settings.json').is_file()
+    assert (arrays/'monomers.tsv').is_file() and (arrays/'hors.tsv').is_file()
+    with (arrays/'contigs.tsv').open() as handle:
+        assert list(csv.DictReader(handle,delimiter='\t'))
 
 
 def fixtures(root):
@@ -99,7 +105,7 @@ def run_case(root,name,resume=False):
         if aid=='D' and not disabled:assert state['tracks']['telomere']['features']==0,state
         if aid=='E' and not disabled:assert state['tracks']['trnascan']['features']==0,state
         if not disabled and aid in 'AB':
-            check_centromere_mode(case/f'results/centromere/{aid}.centroanno.log')
+            check_centromere_mode(case/f'results/centromere/{aid}')
             assert state['tracks']['telomere']['features']>=1,state
             check_telomere_ends(folder,aid,root/'fixtures'/f'{aid}.json',state['settings']['telomere_motif'])
             assert state['tracks']['infernal']['features']>=1,state

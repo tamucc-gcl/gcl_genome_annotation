@@ -1,6 +1,6 @@
 # InGenAnnot UTR refinement and integration
 
-Production uses pinned InGenAnnot 0.0.20 for optional UTR refinement and native
+Production uses pinned InGenAnnot 0.0.25 for optional UTR refinement and native
 RNA/protein AED. The earlier custom-score benchmark is complete as a method
 selection exercise; it is not run on every annotation. See
 [AED semantics](evidence-scoring.md) for the implemented scoring profile.
@@ -42,9 +42,16 @@ settings. `environments/ingenannot.yaml` is active production configuration.
 - Remove separately annotated stop-codon bases from native UTR labels. Complete
   missing labels only for the known pinned-tool coding-boundary equality cases,
   using native-selected exons and unchanged CDS. Unexpected labels still fail.
-- `utr_warnings.tsv` records accepted UTR additions overlapping other genes' CDS,
-  including strand/overlap context. These warnings do not filter models or prove
-  coding assignment. There is no species-specific UTR length exclusion.
+- The production workflow screens each proposal against the current run's
+  RNA alignments. The default policy requires 80% pooled breadth over added
+  exonic bases, a maximum 100-base uncovered run per added block, and three
+  uniquely mapped alignments (MAPQ ≥20) at new junctions with eight-base anchors.
+  At least one physical library must meet the breadth and new junction checks
+  and support each assessed exon-extension boundary with three alignments.
+  Added same-strand CDS overlap blocks acceptance. Withheld proposals retain the
+  original BRAKER model. `utr_support_policy` sets the screening thresholds.
+  The support tables record proposal lengths, coverage, reasons and conflicts
+  for review. Exact transcript termini remain uncertain.
 
 ## Outputs
 

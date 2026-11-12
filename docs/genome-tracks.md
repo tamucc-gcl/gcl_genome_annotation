@@ -44,16 +44,17 @@ setting does not replace a populated store; use a separate store for a new relea
   complete ordered windows, clips the final window to the actual contig length,
   merges adjacent above-threshold windows and classifies terminal/interstitial
   regions against that length. It does not infer length from rounded windows.
-- The existing qjh96 package is pinned to **centroAnno 1.0.2 build 0**. Inspection
-  of its executable confirms `-x anno-asm` is its assembly mode, as in the original
-  module; its default is `anno-sat-asm`. The rework's replacement with `-G true`
-  was incorrect. The package recipe builds a developer-local source folder, not
-  the upstream `v1.0.2` tag, so identical version numbers do not establish identical
-  command-line behavior. Acceptance now checks native assembly-region scanning
-  in the captured `<assembly>.centroanno.log`, not merely a zero exit and files.
-  Native monomer/HOR CSV ends are zero-based **inclusive**. Both ends are converted
-  to one-based inclusive GFF3, with declared row lengths checked. These are
-  satellite/HOR candidates, not experimental evidence of active centromeres.
+- Production builds the pinned centroAnno revision in `centromere_revision`.
+  Assembly mode produces the monomer decomposition, followed by native HOR
+  reconstruction and array localization. The array caller applies the
+  verified correction from inclusive monomer ends to half-open BED bounds.
+  The main track reports candidate satellite arrays. The separate monomer and
+  HOR tables under `centromere/<assembly>/arrays/` use half-open coordinates.
+  Contigs shorter than the 50 kb localization window are recorded in the
+  contig report. Array locations are hypotheses for functional follow-up.
+- The selected tRNA context table reports copy count, local clustering,
+  contig-edge distance and union overlap by repeat class. It accompanies
+  the selected sequences in the release.
 - The original Infernal converter is retained. Validated output preserves its
   Rfam family in `Name` and uses feature type `ncRNA`. tRNAscan and Rfam can report
   overlapping loci; no unvalidated deduplication or gene exclusion is introduced.
@@ -78,7 +79,7 @@ invalidate their native tasks.
 | Telomere | At least 50% motif coverage in each native window; merged dense region within 10 kb of a contig end | `telomere_filter`, `telomere_filter_min_density=0.50`, `telomere_filter_max_end_distance=10000` |
 | tRNA | Native EukHighConfidenceFilter `high confidence set`, with children following their parent | `trna_filter`; native score cutoffs listed below |
 | Rfam ncRNA | Native inclusion `!`; remove lower-ranked native overlaps `=` | `ncrna_filter`, `ncrna_filter_remove_overlaps=true` |
-| Centromeric repeats | Native identity at least 0.80; HORs additionally require native `high` confidence | `centromere_filter`, `centromere_filter_min_identity=0.80`, `centromere_filter_high_confidence_hor=true` |
+| Satellite arrays | Corrected native array localization | `centromere_revision`, `centromere_min_monomer_length=80` |
 
 Set any filter's enable parameter to `false` to use its validated raw features.
 These switches do not disable the search itself. The existing `run_*` switches

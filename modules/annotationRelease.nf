@@ -7,14 +7,17 @@ process PACKAGE_ANNOTATION_RELEASE {
         path(repeats,stageAs:'repeat_source.gff3'), path(repeat_status), path(track_status),
         path(tracks,stageAs:'selected_tracks/*'), val(functional_enabled),
         path(functional_gff,stageAs:'functional/coding.gff3'), path(functional_table,stageAs:'functional/table.tsv'),
-        path(functional_genes,stageAs:'functional/genes.tsv'), path(functional_status,stageAs:'functional/status.json')
+        path(functional_genes,stageAs:'functional/genes.tsv'), path(functional_status,stageAs:'functional/status.json'),
+        path(trna_context,stageAs:'trna_context/*')
     path helpers
     output:
     tuple val(aid), path("${aid}"), emit: bundle
     script:
     def trackFiles=tracks instanceof Collection ? tracks : [tracks]
+    def contextFiles=trna_context instanceof Collection ? trna_context : [trna_context]
     def request=[aid:aid,identified:identified.toString(),genome:genome.toString(),masked:masked.toString(),identity:identity.toString(),
         repeats:repeats.toString(),repeat_status:repeat_status.toString(),track_status:track_status.toString(),tracks:trackFiles.collect { it.toString() },
+        trna_context:contextFiles.collect { it.toString() },
         functional_enabled:functional_enabled,functional:functional_enabled ? [gff:functional_gff.toString(),table:functional_table.toString(),
             genes:functional_genes.toString(),status:functional_status.toString()] : [:]]
     def encoded=groovy.json.JsonOutput.toJson(request).getBytes('UTF-8').encodeBase64().toString()

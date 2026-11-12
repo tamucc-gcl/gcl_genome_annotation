@@ -14,5 +14,5 @@ workflow {
         r.tracks.collect { p -> tuple(r.aid,new File(p).name.split('\\.')[1],file(p)) }
     }
     def statuses=Channel.fromList(rows).map { r -> tuple(r.aid,file(r.track_status)) }
-    ANNOTATION_RELEASE(references,identified,functions,tracks,statuses)
+    ANNOTATION_RELEASE(references,identified,functions,tracks,statuses,Channel.empty())
 }

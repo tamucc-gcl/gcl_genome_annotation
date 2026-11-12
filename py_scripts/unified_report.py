@@ -266,7 +266,7 @@ def build(request, outdir):
         # Reuse accepted source-specific evidence; do not calculate a combined AED.
         assessment = tsv(payload('tables/transcript_assessment.tsv'))
         evidence_rows=[]
-        for key,label in [('rna_aed','RNA AED'),('protein_aed','Protein AED'),('junction_coding_pass_fraction','Coding junction pass fraction'),('junction_utr_pass_fraction','UTR-associated junction pass fraction')]:
+        for key,label in [('rna_aed','RNA AED'),('protein_aed','Reference protein AED'),('proteinDB_aed','OrthoDB AED'),('junction_coding_pass_fraction','Coding junction pass fraction'),('junction_utr_pass_fraction','UTR-associated junction pass fraction')]:
             values=[float(r[key]) for r in assessment if r.get(key) not in (None,'','.')] 
             if any(not math.isfinite(v) or not 0<=v<=1 for v in values): raise ValueError('Invalid evidence metric')
             evidence_rows.append([label,len(values),len(assessment)-len(values),statistics.median(values) if values else None])

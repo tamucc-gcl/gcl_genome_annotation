@@ -240,6 +240,15 @@ def package(request, outdir):
             gc.collect()
     finally:
         map_handle.close()
+    context = request.get('trna_context', [])
+    if context:
+        if len(context) != 1 or selected_trnas is None:
+            raise ValueError('tRNA context must match one selected track')
+        with Path(context[0]).open() as handle:
+            ids = [r['feature_id'] for r in csv.DictReader(handle,delimiter='\t')]
+        if len(ids) != len(set(ids)) or set(ids) != set(selected_trnas):
+            raise ValueError('tRNA context IDs differ from selected loci')
+        copy(context[0], 'tables/trna_context.tsv')
     exports = [('transcripts', tx, out/f'{aid}_transcripts.fa')]
     if selected_trnas is not None: exports.append(('trna', selected_trnas, out/f'{aid}_tRNA.fa'))
     sequence_counts = extract_spliced(request['genome'], exports)
@@ -251,6 +260,7 @@ def package(request, outdir):
         '- [Complete gene ID map](id_maps/gene_id_map.tsv), [transcript ID map](id_maps/transcript_id_map.tsv), [feature ID map](id_maps/feature_id_map.tsv), [track ID map](id_maps/track_id_map.tsv).',
         '- [Transcript assessment](tables/transcript_assessment.tsv).', '']
     if selected_trnas is not None: lines += [f'[Selected spliced tRNAs]({aid}_tRNA.fa): {len(selected_trnas):,} sequences.', '']
+    if context: lines += ['[Selected tRNA context](tables/trna_context.tsv) includes repeat overlap, copy count, clustering and contig-edge flags.', '']
     lines += ['Transcript sequences join the final selected exons, including accepted UTRs. tRNA sequences join annotated exons, or use the tRNA span when no exons are present. Both exports use the unmasked reference, transcript orientation and final feature IDs; headers contain identifiers only. Disabled tRNA tracks have no sequence deliverable; enabled no-hit tracks have an empty FASTA.', '']
     if request['functional_enabled']: lines += ['[Functional annotations](tables/functional_annotations.tsv) · [Gene products](tables/gene_product_summary.tsv)', '']
     lines += ['| Track | Status | Feature records | File |', '|---|---|---:|---|']

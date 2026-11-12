@@ -47,6 +47,8 @@ def report(aid,metrics,outdir,aed_status=None,aed_scores=None,junction_status=No
     jstate,junctions=evidence(junction_status,junction_scores,metrics,'transcript_id',tx)
     tstate,te=evidence(te_status,te_scores,metrics,'gene_id',by_gene)
     if astate and astate.get('stage')!='native_aed':raise ValueError('Expected production native AED')
+    if astate and astate.get('schema_version')==2 and checksum(aed_scores)!=astate.get('score_table_sha256'):
+        raise ValueError('AED score table checksum mismatch')
     if jstate and jstate.get('stage')!='junction_qc':raise ValueError('Expected junction QC')
     if tstate:
         if tstate.get('stage')!='te_flags' or checksum(te_scores)!=tstate['report_sha256']:raise ValueError('TE report changed or wrong stage')
@@ -54,11 +56,13 @@ def report(aid,metrics,outdir,aed_status=None,aed_scores=None,junction_status=No
     for tid,metric in sorted(tx.items()):
         row=dict(metric);gid=row['gene_id']
         row.update(aed_assessed=bool(astate),junction_qc_enabled=bool(jstate),te_assessed=bool(tstate))
-        for key in ('rna_aed','protein_aed','rna_evidence_id','protein_evidence_id','rna_penalty'):
+        for key in ('rna_aed','protein_aed','proteinDB_aed','rna_evidence_id','protein_evidence_id','proteinDB_evidence_id','rna_penalty',
+                    'protein_aed_protein_id','protein_aed_source_id','protein_aed_match_status',
+                    'proteinDB_aed_protein_id','proteinDB_aed_source_id','proteinDB_aed_match_status'):
             row[key]=aed.get(tid,{}).get(key,'.')
         if astate:
-            for kind in ('rna','protein'):
-                value=row[kind+'_aed'];available=astate['evidence'][kind]['available']
+            for kind in ('rna','protein','proteinDB'):
+                value=row[kind+'_aed'];available=astate['evidence'].get(kind,{}).get('available',False)
                 if (value!='.')!=available:raise ValueError('AED availability mismatch')
                 if available and (not math.isfinite(float(value)) or not 0<=float(value)<=1):raise ValueError('Invalid AED value')
         jrow=junctions.get(tid)

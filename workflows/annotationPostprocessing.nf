@@ -1,5 +1,5 @@
 // Native scientific modules shared with the accepted development entries.
-include { PREPARE_UTR_INPUTS; RUN_UTR_REFINEMENT; FINALIZE_UTR_ANNOTATION; EXTRACT_UTR_SEQUENCES; VALIDATE_UTR_REFINEMENT } from '../modules/utrRefinement.nf'
+include { PREPARE_UTR_INPUTS; RUN_UTR_REFINEMENT; FINALIZE_UTR_ANNOTATION; SCREEN_UTR_SUPPORT; EXTRACT_UTR_SEQUENCES; VALIDATE_UTR_REFINEMENT } from '../modules/utrRefinement.nf'
 include { ASSEMBLE_AED_RNA; MERGE_AED_RNA; ALIGN_AED_PROTEINS } from '../modules/evidenceAed.nf'
 include { FINALIZE_ANNOTATION; REPORT_FINAL_AED } from '../modules/finalAnnotation.nf'
 include { PREPARE_INGENANNOT_EVIDENCE; RUN_INGENANNOT_AED } from '../modules/ingenannotAed.nf'
@@ -60,12 +60,22 @@ workflow ANNOTATION_POSTPROCESSING {
     }.join(RUN_UTR_REFINEMENT.out.annotation).map { aid,skipped,original,identity,raw ->
         tuple(aid,skipped,original,raw,identity)
     },utrHelpers)
+    screeningRequests = utrRequests.filter { it[1] }.map { aid,enabled,readsets,gff,validation,identity,rna,bams,indices ->
+        tuple(aid,gff,identity,bams,indices)
+    }.join(PREPARE_UTR_INPUTS.out.status).join(FINALIZE_UTR_ANNOTATION.out.annotation)
+        .join(FINALIZE_UTR_ANNOTATION.out.rejections).map { aid,original,identity,bams,indices,inputs,proposal,audit ->
+            tuple(aid,original,proposal,identity,inputs,audit,bams,indices)
+        }
+    SCREEN_UTR_SUPPORT(screeningRequests, file("${params.pipeline_root}/py_scripts/utr_support.py",checkIfExists:true))
+    skippedAssemblies = utrRequests.filter { !it[1] }.map { tuple(it[0]) }
+    refinedAnnotations = FINALIZE_UTR_ANNOTATION.out.annotation.join(skippedAssemblies).mix(SCREEN_UTR_SUPPORT.out.annotation)
+    refinementAudits = FINALIZE_UTR_ANNOTATION.out.rejections.join(skippedAssemblies).mix(SCREEN_UTR_SUPPORT.out.rejections)
     genomes = jobs.map { aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices -> tuple(aid,genome) }
     modelFiles = utrRequests.map { aid,enabled,readsets,gff,validation,identity,rna,bams,indices -> tuple(aid,!enabled,gff,identity) }
-        .join(genomes).join(FINALIZE_UTR_ANNOTATION.out.annotation)
+        .join(genomes).join(refinedAnnotations)
     EXTRACT_UTR_SEQUENCES(modelFiles.map { aid,skipped,original,identity,genome,refined -> tuple(aid,genome,original,refined) })
     VALIDATE_UTR_REFINEMENT(modelFiles.join(PREPARE_UTR_INPUTS.out.status).join(EXTRACT_UTR_SEQUENCES.out.sequences)
-        .join(FINALIZE_UTR_ANNOTATION.out.rejections).map {
+        .join(refinementAudits).map {
             aid,skipped,original,identity,genome,refined,inputs,sequences,rejections ->
             tuple(aid,skipped,original,refined,identity,genome,inputs,sequences,rejections)
         },utrHelpers)
@@ -106,17 +116,19 @@ workflow ANNOTATION_POSTPROCESSING {
         ALIGN_AED_PROTEINS(proteinRequests,['prepare_protein_evidence.py','reference_repeats.py'].collect {
             file("${params.pipeline_root}/py_scripts/${it}", checkIfExists: true)
         })
-        proteinSources = ALIGN_AED_PROTEINS.out.alignment.toList().map { rows -> [rows] }
+        proteinSources = ALIGN_AED_PROTEINS.out.alignment.join(proteinRequests.map { aid,genome,proteins,identity,provenance ->
+            tuple(aid,provenance)
+        }).toList().map { rows -> [rows] }
         aedRequests = jobs.join(FINALIZE_ANNOTATION.out.bundle).join(rnaSources).combine(proteinSources).map {
             aid,settings,mode,readsets,genome,prediction,validation,identity,bams,indices,folder,rna,proteinRows ->
             def match = proteinRows.find { it[0] == aid }
             if (mode in ['protein','rna_protein'] && !match) error "Missing protein alignment for ${aid}"
-            tuple(aid,file("${folder}/${aid}.gff3"),file("${folder}/annotation_status.json"),rna,match ? [match[1]] : [])
+            tuple(aid,file("${folder}/${aid}.gff3"),file("${folder}/annotation_status.json"),rna,match ? [match[1]] : [],match ? [match[2]] : [])
         }
         PREPARE_INGENANNOT_EVIDENCE(aedRequests,['ingenannot_inputs.py','prepare_protein_evidence.py'].collect {
             file("${params.pipeline_root}/py_scripts/${it}", checkIfExists: true)
         })
-        aedReady = aedRequests.map { aid,gff,validation,rna,protein -> tuple(aid,gff) }
+        aedReady = aedRequests.map { aid,gff,validation,rna,protein,provenance -> tuple(aid,gff) }
             .join(PREPARE_INGENANNOT_EVIDENCE.out.evidence)
         RUN_INGENANNOT_AED(aedReady)
         REPORT_FINAL_AED(aedReady.join(RUN_INGENANNOT_AED.out.annotated).join(jobs.map {

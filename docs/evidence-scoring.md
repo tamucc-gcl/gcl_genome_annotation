@@ -1,8 +1,10 @@
 # Native RNA and protein AED
 
-Production uses InGenAnnot 0.0.20 directly to assess accepted post-UTR models.
-It reports **`rna_aed`** and **`protein_aed`**, selected evidence IDs and the
-RNA penalty indicator. Lower values indicate closer agreement with the evidence
+Production uses InGenAnnot 0.0.25 directly to assess accepted post-UTR models.
+It reports **`rna_aed`**, **`protein_aed`** for supplied reference proteins
+(NCBI and local FASTAs), and **`proteinDB_aed`** for OrthoDB. Protein pool
+membership comes from the prediction evidence manifest. The score table also
+records selected evidence IDs and the RNA penalty indicator. Lower values indicate closer agreement with the evidence
 chosen by that method; they are not probabilities of gene correctness.
 Missing evidence is unavailable (`.`), never an invented AED of 1 or 0.
 There is no production combined AED, duplicate alias or custom legacy AED.
@@ -41,7 +43,7 @@ Markdown. Structural assessment joins them to the exact transcript population;
 final selection re-keys retained rows without rerunning AED.
 
 `run_aed=false` disables assessment. AED filtering is separately opt-in using
-`filter_aed_source=rna|protein`, `filter_max_aed`, and the chosen action. Current
+`filter_aed_source=rna|protein|proteinDB`, `filter_max_aed`, and the chosen action. Current
 selection is per transcript with gene rescue by a surviving isoform; absent
 evidence for a mode is explicitly skipped. See [selection](model-selection.md).
 Portcullis junction QC is complementary and does not alter the native AED formula.

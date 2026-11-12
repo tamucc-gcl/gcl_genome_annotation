@@ -418,7 +418,7 @@ def annotate(args):
                 qual_note = f"quality_issues:{qr_safe}"
                 attrs["Note"] = (existing_note + "%3B" + qual_note) if existing_note else qual_note
 
-            for score_key in ('rna_aed', 'protein_aed'):
+            for score_key in ('rna_aed', 'protein_aed', 'proteinDB_aed'):
                 value = func_rec.get(score_key, '.')
                 if value not in ('', '.', '-'):
                     attrs[score_key] = value

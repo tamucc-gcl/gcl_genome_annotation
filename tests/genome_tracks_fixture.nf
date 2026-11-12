@@ -31,5 +31,5 @@ workflow {
         tuple(row.assembly_id,settings,file("${root}/${row.assembly_id}.fa"),file("${root}/${row.assembly_id}.json"))
     }
     def masked = Channel.fromList(rows).map { row -> tuple(row.assembly_id,file("${root}/${row.assembly_id}.masked.fa")) }
-    GENOME_TRACKS(jobs,masked)
+    GENOME_TRACKS(jobs,masked,Channel.empty())
 }

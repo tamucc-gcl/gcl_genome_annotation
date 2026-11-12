@@ -20,7 +20,7 @@ All triggered rules are recorded, rather than stopping at the first reason.
 | Single-exon CDS | `filter_min_cds_length=300` | Exclude a single-exon transcript with CDS below 300 bp. |
 | Gene span | `filter_min_gene_length=200` | Exclude transcripts belonging to a gene spanning less than 200 bp. |
 | All introns very short | `filter_min_intron_length=10` | Exclude a spliced transcript if every intron is below 10 bp. |
-| AED | `filter_max_aed=null` | Off until a maximum and `filter_aed_source='rna'` or `'protein'` are supplied. |
+| AED | `filter_max_aed=null` | Off until a maximum and `filter_aed_source='rna'`, `'protein'`, or `'proteinDB'` are supplied. |
 | Coding junction support | `filter_min_junction_fraction=null` | Off until a minimum coding junction pass fraction is supplied. |
 | TE association | `filter_te_action='flag'` | Report the assessed gene-level flag without removing models. |
 

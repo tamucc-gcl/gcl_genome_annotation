@@ -53,6 +53,24 @@ process FILTER_GENOME_TRACK {
     """
 }
 
+process REPORT_TRNA_CONTEXT {
+    tag "${aid}"
+    label 'genome_track_report'
+    publishDir "${params.outdir}/genome_tracks/${aid}", mode: 'copy', overwrite: true
+    input:
+    tuple val(aid), path(selected), path(nativeTable), path(decisions), path(identity), path(repeats, stageAs:'repeats/*')
+    path helper
+    output:
+    tuple val(aid), path('trna_context.tsv'), emit: table
+    script:
+    def paths = repeats instanceof Collection ? repeats : [repeats]
+    def option = paths ? "--repeats '${paths[0]}'" : ''
+    """
+    python '${helper}' --selected '${selected}' --native '${nativeTable}' --decisions '${decisions}' \\
+      --identity '${identity}' ${option} --out trna_context.tsv
+    """
+}
+
 process REPORT_GENOME_TRACKS {
     tag "${aid}"
     label 'genome_track_report'

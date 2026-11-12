@@ -32,6 +32,8 @@ def fixtures(root):
                 target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,target)
             row=dict(assembly_id=aid,status='ready',mode='ab_initio',readsets=[])
         else:row=json.loads((accepted/f'structural_annotation/braker_status/{aid}.prediction.json').read_text())
+        for readset in row['readsets']:
+            readset['library_id'] = readset['readset_id']
         directory=accepted/f'structural_annotation/braker/{aid}'
         amino='F' if aid=='C' else 'K';nucleotide='T' if aid=='C' else 'A'
         proteins=directory/f'{aid}_proteins.fa';proteins.write_text('>t1\n'+amino*100+'\n')
@@ -43,8 +45,12 @@ def fixtures(root):
         rows.append(row)
         if row['mode'] in ('rna_protein','protein'):
             source=accepted/f'protein_evidence/{aid}/proteins.fa';source.parent.mkdir(parents=True)
-            source.write_text('>evidence1\n'+'K'*100+'\n')
-            dump(source.parent/'evidence.json',dict(status='ready',proteins_sha256=checksum(source)))
+            source.write_text('>reference__000000001\n'+'K'*100+'\n'+
+                ('>database__000000001\n'+'K'*100+'\n' if aid=='A' else ''))
+            sources = [dict(source_id='reference',request=dict(kind='local'))]
+            if aid=='A':
+                sources.append(dict(source_id='database',request=dict(kind='orthodb')))
+            dump(source.parent/'evidence.json',dict(status='ready',proteins_sha256=checksum(source),sources=sources))
     dump(accepted/'fixtures.json',rows)
 
 
@@ -70,10 +76,12 @@ def run_case(root,name,resume=False,enabled=True):
         scoring=case/f'results/structural_annotation/aed/{aid}'
         assessed=json.loads((scoring/'aed_status.json').read_text())
         assert assessed['status']=='ready' and assessed['model_sha256']==state['gff3_sha256']
-        assert (scoring/'native/native.aed.gff3').is_file()
+        assert (scoring/'native/reference.aed.gff3').is_file()
+        assert (scoring/'native/orthodb.aed.gff3').is_file()==(aid=='A')
         with (scoring/'aed_scores.tsv').open() as h:row=next(csv.DictReader(h,delimiter='\t'))
         assert (row['rna_aed']!='.')==(mode in ('rna_protein','rna'))
         assert (row['protein_aed']!='.')==(mode in ('rna_protein','protein'))
+        assert (row['proteinDB_aed']!='.')==(aid=='A')
         assert not any('combined' in key or 'legacy' in key for key in row)
         selection=json.loads((case/f'results/qc/final/{aid}/selection/selection.json').read_text())
         assert selection['gff3_sha256']==state['gff3_sha256'] and selection['model_source']=='final_annotation'

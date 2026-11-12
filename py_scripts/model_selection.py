@@ -40,8 +40,8 @@ def settings(values):
             if v>1: raise ValueError('Evidence cutoff must be between 0 and 1')
         elif not v.is_integer(): raise ValueError('Length cutoffs must be whole base pairs')
         result[key]=v
-    if result['max_aed'] is not None and result['aed_action']!='off' and result['aed_source'] not in ('rna','protein'):
-        raise ValueError('Set filter_aed_source to rna or protein when AED filtering is enabled')
+    if result['max_aed'] is not None and result['aed_action']!='off' and result['aed_source'] not in ('rna','protein','proteinDB'):
+        raise ValueError('Set filter_aed_source to rna, protein or proteinDB when AED filtering is enabled')
     return result
 
 

@@ -336,7 +336,7 @@ workflow {
     // Independent genome tracks reuse native reference channels; no prediction dependency.
     if (!params.braker_check_only) GENOME_TRACKS(preparedReferences.join(assemblies).join(FILTER_ASSEMBLY.out.bundle).map { aid,genome,state,row,folder ->
         tuple(aid,row.settings,genome,file("${folder}/${aid}.contigs.json",checkIfExists:true))
-    },REPEAT_MASK_PARALLEL.out.masked_fasta)
+    },REPEAT_MASK_PARALLEL.out.masked_fasta,REPEAT_MASK_PARALLEL.out.repeat_gff)
     // Gene prediction: join scientific files by assembly, never read asynchronous publishDir outputs.
     PLAN_BRAKER_INPUTS(RESOLVE_ANNOTATION_INPUTS.out.bundle, REPORT_REFERENCE_REPEATS.out.status,
         REPORT_PROTEIN_EVIDENCE.out.status, REPORT_RNA_ALIGNMENT.out.status, brakerHelpers)
@@ -399,7 +399,7 @@ workflow {
                 .join(FILTER_ASSEMBLY.out.bundle).join(REPEAT_MASK_PARALLEL.out.repeat_gff)
                 .join(VALIDATE_REFERENCE_REPEATS.out.status).map { aid,genome,state,masked,folder,repeats,status ->
                     tuple(aid,genome,masked,file("${folder}/${aid}.contigs.json",checkIfExists:true),repeats,status)
-                },ANNOTATION_POSTPROCESSING.out.identified_annotation,functionalRelease,GENOME_TRACKS.out.gff3,GENOME_TRACKS.out.status)
+                },ANNOTATION_POSTPROCESSING.out.identified_annotation,functionalRelease,GENOME_TRACKS.out.gff3,GENOME_TRACKS.out.status,GENOME_TRACKS.out.trna_context)
             unifiedStructural = ANNOTATION_POSTPROCESSING.out.structural_reports
             unifiedStages = RESOLVE_ANNOTATION_INPUTS.out.bundle.map { tuple('preflight','run',file("${it}/resolved_inputs.json",checkIfExists:true)) }
                 .mix(REPORT_PROTEIN_EVIDENCE.out.status.map { tuple('protein','run',it) })

@@ -73,6 +73,30 @@ process FINALIZE_UTR_ANNOTATION {
     """
 }
 
+process SCREEN_UTR_SUPPORT {
+    tag "${aid}"
+    label 'utr_support'
+    publishDir "${params.outdir}/structural_annotation/utr/${aid}/support", mode: 'copy', overwrite: true,
+        saveAs: { name -> name.endsWith('.tsv') ? name : null }
+    input:
+    tuple val(aid), path(original, stageAs: 'original.gff3'), path(proposed), path(identity), path(inputs),
+        path(audit), path(bams, stageAs: 'bams/readset??.bam'), path(indices, stageAs: 'bams/readset??.bam.csi')
+    path helper
+    output:
+    tuple val(aid), path('screened/screened.gff3'), emit: annotation
+    tuple val(aid), path('screened/screened.rejections.json'), emit: rejections
+    path 'screened/*.tsv', emit: reports
+    script:
+    def bamArgs = (bams instanceof Collection ? bams : [bams]).collect { "'${it}'" }.join(' ')
+    def indexArgs = (indices instanceof Collection ? indices : [indices]).collect { "'${it}'" }.join(' ')
+    def policy = groovy.json.JsonOutput.toJson(params.utr_support_policy)
+    """
+    python '${helper}' --original '${original}' --proposed '${proposed}' --identity '${identity}' \\
+      --inputs '${inputs}' --native-audit '${audit}' --outdir screened --policy '${policy}' \\
+      --bams ${bamArgs} --indices ${indexArgs}
+    """
+}
+
 process EXTRACT_UTR_SEQUENCES {
     tag "${aid}"
     label 'utr_sequences'
