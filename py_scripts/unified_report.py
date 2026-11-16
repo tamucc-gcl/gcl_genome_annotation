@@ -15,6 +15,7 @@ from urllib.parse import unquote
 
 from generate_annotation_report import fmt, table
 from reference_repeats import sha, dump
+from report_protein_evidence import protein_source_link
 
 
 def read(path): return json.loads(Path(path).read_text(encoding='utf-8'))
@@ -44,6 +45,7 @@ def final_downloads_table(aid, outputs):
     files = [
         ('Reference genome FASTA', f'{aid}.reference.fa',
          'Reference used for annotation, with sequence IDs matching the GFF3'),
+        ('Softmasked reference FASTA', f'{aid}.softmasked.fa', 'Reference with repeat-masked bases in lowercase'),
         ('Full annotation GFF3', f'{aid}.gff3',
          'Coding models, repeats, and enabled selected genome tracks'),
         ('Protein-coding annotation GFF3', f'{aid}.coding.gff3',
@@ -51,6 +53,13 @@ def final_downloads_table(aid, outputs):
         ('Protein FASTA', f'{aid}_proteins.fa', 'Translated protein sequences'),
         ('Transcript FASTA', f'{aid}_transcripts.fa', 'Spliced coding transcripts, including accepted UTRs'),
         ('CDS FASTA', f'{aid}_cds.fa', 'Coding nucleotide sequences'),
+        ('Repeats GFF3', f'tracks/{aid}.repeats.gff3', 'RepeatMasker annotations'),
+        ('tRNA GFF3', f'tracks/{aid}.trnascan.gff3', 'Selected tRNA loci and exons'),
+        ('tRNA FASTA', f'{aid}_tRNA.fa', 'Spliced sequences for selected tRNAs'),
+        ('tRNA context TSV', 'tables/trna_context.tsv', 'Repeat overlap, copy count, clustering, and contig-edge flags'),
+        ('Rfam ncRNA GFF3', f'tracks/{aid}.infernal.gff3', 'Selected Infernal hits to Rfam models'),
+        ('Telomere GFF3', f'tracks/{aid}.telomere.gff3', 'Selected telomeric repeat regions'),
+        ('Centromeric repeats GFF3', f'tracks/{aid}.centromere.gff3', 'Candidate centromeric repeat arrays'),
         ('Gene product summary', 'tables/gene_product_summary.tsv', 'Gene-level product names'),
         ('Functional annotations', 'tables/functional_annotations.tsv', 'Transcript-level functional assignments'),
     ]
@@ -134,13 +143,6 @@ def selection_rules(options):
         f'Pass fraction < {cutoff:.1%}' if cutoff is not None else 'Not set', action)
     add('Gene repeat association', options['te_action'] != 'off', 'Assessed repeat-association flag', options['te_action'])
     return md_table(['Rule','Active?','Threshold / criterion','Action'], rows)
-
-def protein_source_label(source):
-    request = source.get('request', {}); kind = request.get('kind')
-    if kind == 'orthodb': return 'OrthoDB'+(' '+request['clade'] if request.get('clade') else '')
-    if kind == 'ncbi': return 'NCBI'+(' '+request['accession'] if request.get('accession') else ' proteome')
-    if kind == 'local': return 'Local FASTA'+(' '+Path(request['local_path']).name if request.get('local_path') else '')
-    return kind or source['source_id']
 
 def track_breakdown(track, release):
     rows = []
@@ -310,8 +312,10 @@ def build(request, outdir):
                  ['RNA readsets',len(prepared.get('rna_readsets',[]))]]), '',
              'N50 uses the retained reference contig lengths. Protein evidence records are database sequences, not predicted genes. Paired RNA read units are pairs; alignment fractions use primary individual reads.', '']
         if proteins.get('sources'):
-            p += [md_table(['Protein source','Status','Protein records'],[[f'[{protein_source_label(s)}](protein_sources/{s["source_id"]}/source.json)',s['status'],s.get('protein_count')] for s in proteins['sources']]), '',
-                  'Source identifiers, acquisition requests and checksums are retained in the linked provenance.', '']
+            p += [md_table(['Protein source', 'Status', 'Protein records'], [
+                [protein_source_link(source), source['status'], source.get('protein_count')]
+                for source in proteins['sources']
+            ]), '']
         ids = set(prepared.get('rna_readsets', []))
         read_units = {r['readset_id']:r for r in stages['rna','run'].get('readsets',[]) if r['readset_id'] in ids}
         mapping = [r for r in stages['rna_alignment','run'].get('readsets',[]) if r.get('assembly_id', r.get('strand',{}).get('assembly_id')) == aid]

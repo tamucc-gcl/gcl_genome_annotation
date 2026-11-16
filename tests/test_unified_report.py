@@ -8,6 +8,7 @@ import unittest
 
 from test_annotation_release import release_fixture
 from package_annotation import package
+from report_protein_evidence import summarize
 from unified_report import build, md_table, setting_rows, track_breakdown, track_policy_table, utr_summary
 from reference_repeats import sha
 
@@ -101,6 +102,39 @@ class ReportFormattingTests(unittest.TestCase):
 
 @unittest.skipUnless(importlib.util.find_spec('matplotlib'),'Unified report plotting environment required')
 class UnifiedReportTests(unittest.TestCase):
+    def test_protein_sources_link_to_provider_pages_in_both_reports(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            request = report_fixture(root, 'protein')
+            status = root / 'statuses/protein.run.json'
+            assembly = json.loads(status.read_text())['assemblies'][0]
+            catalogue = 'https://bioinf.uni-greifswald.de/bioinf/partitioned_odb12/'
+            assembly['sources'] = [
+                dict(source_id='p1', status='ready', protein_count=9,
+                     request=dict(kind='orthodb', clade='Vertebrata', release='odb12',
+                                  url=catalogue + 'Vertebrata.fa.gz')),
+                dict(source_id='p2', status='ready', protein_count=2,
+                     request=dict(kind='ncbi', accession='GCF_024713975.1')),
+                dict(source_id='p3', status='ready', protein_count=1,
+                     request=dict(kind='local', local_path='/private/input/custom.fa')),
+            ]
+            bundle = root / 'evidence'
+            bundle.mkdir()
+            (bundle / 'evidence.json').write_text(json.dumps(assembly), encoding='utf-8')
+            summarize([bundle], status, root / 'protein_evidence.md')
+            build(request, root / 'report')
+
+            for report in (root / 'protein_evidence.md', root / 'report/annotation_report.md'):
+                with self.subTest(report=report.name):
+                    text = report.read_text(encoding='utf-8')
+                    self.assertIn(f'[OrthoDB Vertebrata (odb12)]({catalogue})', text)
+                    self.assertIn('[NCBI GCF_024713975.1]'
+                                  '(https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_024713975.1/)', text)
+                    self.assertIn('| Local FASTA custom.fa |', text)
+                    self.assertNotIn('/private/input/', text)
+                    self.assertNotIn('protein_sources/', text)
+                    self.assertNotIn('Vertebrata.fa.gz', text)
+
     def test_four_modes_results_methods_only_and_assets(self):
         for mode in ('rna_protein','rna','protein','ab_initio'):
             with self.subTest(mode=mode),tempfile.TemporaryDirectory() as tmp:

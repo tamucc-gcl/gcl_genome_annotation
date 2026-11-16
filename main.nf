@@ -430,6 +430,6 @@ workflow {
             reportStructural.map { it.collect { row -> row[0] } }, reportStructural.map { it.collect { row -> row[1] } },
             reportStages.map { it.collect { row -> [row[0],row[1]] } }, reportStages.map { it.collect { row -> row[2] } },reportConfiguration,
             UTR_REVIEW_REPORT.out.review.toList().map { it.sort { row -> row[0] }.collect { row -> row[1] } },
-            ['generate_annotation_report.py','unified_report.py','reference_repeats.py'].collect { file("${projectDir}/py_scripts/${it}",checkIfExists:true) })
+            ['generate_annotation_report.py','unified_report.py','reference_repeats.py','report_protein_evidence.py'].collect { file("${projectDir}/py_scripts/${it}",checkIfExists:true) })
     }
 }
