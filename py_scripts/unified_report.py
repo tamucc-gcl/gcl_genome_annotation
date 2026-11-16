@@ -40,6 +40,26 @@ def md_table(headers, rows):
 def tsv(path):
     with Path(path).open(encoding='utf-8') as h: return list(csv.DictReader(h, delimiter='\t'))
 
+def final_downloads_table(aid, outputs):
+    files = [
+        ('Reference genome FASTA', f'{aid}.reference.fa',
+         'Reference used for annotation, with sequence IDs matching the GFF3'),
+        ('Full annotation GFF3', f'{aid}.gff3',
+         'Coding models, repeats, and enabled selected genome tracks'),
+        ('Protein-coding annotation GFF3', f'{aid}.coding.gff3',
+         'Final protein-coding models with functional attributes when available'),
+        ('Protein FASTA', f'{aid}_proteins.fa', 'Translated protein sequences'),
+        ('Transcript FASTA', f'{aid}_transcripts.fa', 'Spliced coding transcripts, including accepted UTRs'),
+        ('CDS FASTA', f'{aid}_cds.fa', 'Coding nucleotide sequences'),
+        ('Gene product summary', 'tables/gene_product_summary.tsv', 'Gene-level product names'),
+        ('Functional annotations', 'tables/functional_annotations.tsv', 'Transcript-level functional assignments'),
+    ]
+    return md_table(['Download', 'Contents'], [
+        [f'[{label}](release/{aid}/{path})', description]
+        for label, path, description in files if path in outputs
+    ])
+
+
 def completeness_table(rows):
     metrics = {}
     for r in rows:
@@ -281,7 +301,9 @@ def build(request, outdir):
             reference_bases=bases, retained_contigs=len(lengths), n50_bp=n50,
             repeat_union_bases=repeat.get('repeat_interval_union_bases'), functional_enabled=release['functional_enabled'])
         overview.append([aid,prediction['mode'],release['genes'],release['coding_transcripts'],f'[Release](release/{aid}/README.md)'])
-        p = [f'## Assembly {ordinal}: {aid}', '', f'[Final deliverables](release/{aid}/README.md) · [Checksums](release/{aid}/checksums.sha256) · [Release manifest](release/{aid}/release_status.json)', '',
+        p = [f'## Assembly {ordinal}: {aid}', '',
+             '### Final annotation downloads', '', final_downloads_table(aid, release['outputs']),
+             f'[Complete release](release/{aid}/README.md) · [Release manifest](release/{aid}/release_status.json) · [Checksums](release/{aid}/checksums.sha256)', '',
              '### Reference and evidence inputs', '', md_table(['Metric','Value'],[
                  ['Species',settings.get('species')],['NCBI taxid',settings.get('taxid')],['Evidence mode', prediction['mode']], ['Retained contigs',len(lengths)], ['Retained reference bases',bases],['Retained-reference N50 (bp)',n50],
                  ['Excluded contigs',assembly_stats.get('excluded_contigs')], ['Protein evidence records',proteins.get('protein_count')],
