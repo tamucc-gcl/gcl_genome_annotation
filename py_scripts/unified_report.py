@@ -132,13 +132,29 @@ def track_breakdown(track, release):
         kinds = set(selected) | set(raw or {})
         order = [k for k in labels if k in kinds]+sorted(kinds-set(labels))
         for kind in order:
-            rows.append([TRACK_LABELS[key],labels.get(kind,kind.replace('_',' ')),raw.get(kind,0) if raw is not None else None,selected.get(kind,0)])
+            label = labels.get(kind, kind.replace('_', ' '))
+            if (key == 'centromere' and kind == 'repeat_region'
+                    and state.get('filter_policy', {}).get('method') == 'candidate_satellite_array_localization'):
+                label = 'Candidate satellite arrays'
+            rows.append([TRACK_LABELS[key],label,raw.get(kind,0) if raw is not None else None,selected.get(kind,0)])
     return md_table(['Track','Feature class','Raw records','Selected records'],rows) if rows else ''
 
 def by_assembly(state, aid):
     rows = [r for r in state.get('assemblies', []) if r['assembly_id'] == aid]
     if len(rows) != 1: raise ValueError('Missing/duplicate assembly in stage report: '+aid)
     return rows[0]
+
+
+def utr_summary(utr):
+    screened = utr.get('utr_support_policy') is not None
+    return md_table(['UTR operation', 'Value'], [
+        ['Refinement skipped', utr['skipped']],
+        ['Changed transcripts', utr['changed_transcripts']],
+        ['UTR proposals rejected during native-output validation', len(utr.get('rejected_utr_candidates', {}))],
+        ['UTR proposals withheld by RNA evidence screening', len(utr['withheld_utr_proposals']) if screened else 'Not run'],
+        ['CDS sequences preserved', utr.get('cds_sequences_unchanged')],
+        ['Protein sequences preserved', utr.get('protein_sequences_unchanged')],
+    ])
 
 
 def build(request, outdir):
@@ -244,9 +260,7 @@ def build(request, outdir):
             '### Prediction, UTR refinement and selection', '', md_table(['Model set','Genes','Coding transcripts'],[
                 ['BRAKER predictions',prediction.get('genes'),prediction.get('coding_transcripts')],
                 *[['Before selection' if r['model_set']=='before' else 'Final selected',r['genes'],r['transcripts']] for r in sqs['model_sets']]]), '',
-            md_table(['UTR operation','Value'],[['Refinement skipped',utr['skipped']],['Changed transcripts',utr['changed_transcripts']],
-                ['Rejected UTR proposals',len(utr.get('rejected_utr_candidates',{}))],['CDS sequences preserved',utr.get('cds_sequences_unchanged')],
-                ['Protein sequences preserved',utr.get('protein_sequences_unchanged')]]), '',
+            utr_summary(utr), '',
             'Before/after below means accepted post-UTR models before selection versus the selected final-ID set.', '',
             f'![Model retention](qc/structural/{aid}/plots/retention.png)', '',
             'Selection rules and resolved thresholds:', '', selection_rules(selection['settings']), '',
@@ -286,7 +300,7 @@ def build(request, outdir):
         for t,s in track['tracks'].items():
             reasons += [[TRACK_LABELS[t],s.get('decision_unit','').replace('_',' '),reason_label(k),n] for k,n in s.get('reasons',{}).items() if k not in ('passed','filter_disabled')]
         p += [md_table(['Track','Decision unit','Rejection reason','Count'],reasons) if reasons else 'No rejected feature/window decisions were recorded.', '',
-              'Feature records can include exons and repeat fragments. Telomere decisions use candidate windows; selected regions merge adjacent qualifying windows. Centromeric satellite/HOR records are repeat predictions, not counts of functional centromeres.', '',
+              'Feature records can include exons and repeat fragments. Telomere decisions use candidate windows and merge adjacent qualifying windows into selected regions. Candidate satellite arrays indicate regions for follow-up. Their functional centromere status remains unverified.', '',
               f'[Raw calls, selected tracks, resolved filters and audits](genome_tracks/{aid}/README.md) · [Repeat preparation](reference_repeats/README.md)', '']
         present=[(t,s) for t,s in track['tracks'].items() if s['status']=='ready' and 'raw_features' in s]
         if present:

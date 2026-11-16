@@ -8,7 +8,7 @@ import unittest
 
 from test_annotation_release import release_fixture
 from package_annotation import package
-from unified_report import build, md_table, setting_rows, track_policy_table
+from unified_report import build, md_table, setting_rows, track_breakdown, track_policy_table, utr_summary
 from reference_repeats import sha
 
 
@@ -60,6 +60,28 @@ def report_fixture(root, mode='rna_protein', sources=None, functional=True):
 
 
 class ReportFormattingTests(unittest.TestCase):
+    def test_native_rejections_and_screened_proposals_are_counted_separately(self):
+        utr = dict(skipped=False, changed_transcripts=1, rejected_utr_candidates={'t1': 'invalid proposal'})
+        self.assertIn('| UTR proposals withheld by RNA evidence screening | Not run |', utr_summary(utr))
+        utr.update(withheld_utr_proposals={'t2': 'weak support', 't3': 'coding overlap'},
+                   utr_support_policy={'min_breadth': 0.8})
+        text = utr_summary(utr)
+        self.assertIn('| UTR proposals rejected during native-output validation | 1 |', text)
+        self.assertIn('| UTR proposals withheld by RNA evidence screening | 2 |', text)
+        utr['withheld_utr_proposals'] = {}
+        self.assertIn('| UTR proposals withheld by RNA evidence screening | 0 |', utr_summary(utr))
+
+    def test_centromere_repeat_region_label_follows_track_method(self):
+        counts = {'repeat_region': 147}
+        state = dict(status='ready', raw_feature_types=counts)
+        track = {'tracks': {'trnascan': {'status': 'disabled'}, 'centromere': state}}
+        release = {'tracks': {'centromere': {'feature_types': counts}}}
+        self.assertIn('| HOR records | 147 | 147 |', track_breakdown(track, release))
+        state['filter_policy'] = {'method': 'candidate_satellite_array_localization'}
+        text = track_breakdown(track, release)
+        self.assertIn('| Candidate satellite arrays | 147 | 147 |', text)
+        self.assertNotIn('HOR records', text)
+
     def test_text_and_numeric_alignment(self):
         text=md_table(['Tool','Count','Fraction','Status'],[
             ['DIAMOND',1200,'75.0%','ready'],['DeepSig',None,None,'disabled']])
@@ -90,6 +112,7 @@ class UnifiedReportTests(unittest.TestCase):
                 self.assertIn('| AED | no | Not set | Not applied |',text)
                 self.assertIn('| Coding junction support | no | Not set | Not applied |',text)
                 self.assertIn('| tRNA | tRNA loci |',text)
+                self.assertIn('| UTR proposals withheld by RNA evidence screening | Not run |',text)
                 self.assertIn('| DIAMOND | 1 | 1 | 0 | 0 |',text)
                 self.assertIn('| InterProScan | 0 | 0 | 0 | 2 |',text)
                 self.assertIn('Exact genome-track filter policies',text)
