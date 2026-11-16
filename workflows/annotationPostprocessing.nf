@@ -169,6 +169,13 @@ workflow ANNOTATION_POSTPROCESSING {
     identified_annotation = identifiedAnnotations
     omark_classes = selectedOmarkClasses
     utr_status = VALIDATE_UTR_REFINEMENT.out.status
+    utr_review_inputs = utrRequests.filter { it[1] }.map { aid,enabled,readsets,gff,validation,identity,rna,bams,indices ->
+        tuple(aid,gff,bams,indices)
+    }.join(SCREEN_UTR_SUPPORT.out.annotation).join(RUN_UTR_REFINEMENT.out.ranking)
+        .join(VALIDATE_UTR_REFINEMENT.out.status).map { aid,gff,bams,indices,screened,ranking,status ->
+        tuple(aid,gff,bams,indices,screened,file("${screened.parent}/utr_support.tsv",checkIfExists:true),
+            file("${ranking}/clustered.gtf",checkIfExists:true),status)
+    }
     structural_reports = structuralReports
     selection_status = selectedAnnotations.map { aid,folder -> tuple(aid,file("${folder}/selection_status.json",checkIfExists:true)) }
 }

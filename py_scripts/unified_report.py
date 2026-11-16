@@ -8,6 +8,7 @@ import json
 import math
 import re
 from pathlib import Path
+import shutil
 import statistics
 import textwrap
 from urllib.parse import unquote
@@ -157,6 +158,39 @@ def utr_summary(utr):
     ])
 
 
+def utr_review_section(source, data, aid, ref, release_hash, provenance):
+    status = read(source/'utr_review_status.json')
+    if status['reference_identity'] != ref or status['release_status_sha256'] != release_hash:
+        raise ValueError('UTR review was generated for a different release: '+aid)
+    names = ('utr_review.tsv','utr_junction_support.tsv','utr_cds_overlap_coverage.tsv','utr_review_status.json')
+    for name in names:
+        path = source/name
+        provenance[f'utr_review/{aid}/{name}'] = sha(path)
+        shutil.copyfile(path, data/f'{aid}.{name}')
+    prefix = f'reports/annotation_report_data/{aid}.'
+    labels = {
+        'new_junction_supported_only_by_unstranded_reads': 'New junction supported only by unstranded reads',
+        'weak_stranded_junction_support_across_libraries': 'Weak stranded junction support across libraries',
+        'weak_stranded_junction_support': 'Weak stranded junction support',
+        'new_junction_support_split_across_stranded_libraries': 'New junction support split across stranded libraries',
+        'stranded_rna_unavailable_for_new_junction': 'Stranded RNA unavailable for a new junction',
+        'opposite_cds_without_stranded_library_pass': 'Opposite-strand CDS overlap without a fully stranded library passing the screen',
+        'opposite_strand_rna_model': 'Matching RNA model on the opposite strand',
+        'opposite_strand_rna_model_without_stranded_library_pass': 'Matching opposite-strand RNA model without a fully stranded library passing the screen',
+    }
+    counts = [['Released UTR extensions',status['released_extensions']],
+              ['Extensions flagged for review',status['flagged_transcripts']],
+              ['Stranded RNA libraries',status['stranded_library_count']],
+              ['Exact opposite-strand RNA matches',status['mirror_exact']],
+              ['Near-only opposite-strand RNA matches',status['mirror_near_only']],
+              ['Extensions without a matching source RNA model for this comparison',status['mirror_evidence_models_missing']]]
+    flags = [[labels[key],value] for key,value in sorted(status['flags'].items())]
+    return ['#### UTR evidence review', '', md_table(['Measure','Count'], counts), '',
+            md_table(['Review flag','Released transcripts'], flags) if flags else 'No released extensions triggered a review flag.', '',
+            'These flags are diagnostic. A transcript can carry multiple flags. Near matches share the same splice junctions and at least 95% reciprocal exonic overlap. Junction tables contain alignment counts in each library. CDS overlap tables use zero-based, half-open coordinates and report covered bases and summed depth by readset and strand.', '',
+            f'[Flagged release transcripts]({prefix}utr_review.tsv) · [Per-library splice evidence]({prefix}utr_junction_support.tsv) · [Strand coverage over CDS overlaps]({prefix}utr_cds_overlap_coverage.tsv) · [Review status]({prefix}utr_review_status.json)', '']
+
+
 def build(request, outdir):
     out = Path(outdir); out.mkdir(parents=True, exist_ok=True)
     assets = out/'annotation_report_plots'; assets.mkdir(exist_ok=True)
@@ -174,6 +208,13 @@ def build(request, outdir):
     expected = sorted(r['assembly_id'] for r in preflight['assemblies'])
     releases = {Path(p).name: Path(p) for p in request['releases']}
     if len(releases) != len(request['releases']) or sorted(releases) != expected: raise ValueError('Report releases differ from requested assemblies')
+    review_paths = request.get('utr_reviews', [])
+    reviews = {Path(p).name: Path(p) for p in review_paths}
+    if len(reviews) != len(review_paths) or set(reviews) - set(expected):
+        raise ValueError('Duplicate or unexpected UTR review input')
+    if 'utr_reviews' in request and set(reviews) != {aid for aid in expected
+            if stages.get(('utr',aid), {}).get('utr_support_policy') is not None}:
+        raise ValueError('Missing or unexpected UTR review for a screened assembly')
     structural = {aid: Path(p) for aid, p in request['structural']}
     if len(structural) != len(request['structural']) or sorted(structural) != expected: raise ValueError('Missing/duplicate structural report')
     import matplotlib
@@ -261,6 +302,7 @@ def build(request, outdir):
                 ['BRAKER predictions',prediction.get('genes'),prediction.get('coding_transcripts')],
                 *[['Before selection' if r['model_set']=='before' else 'Final selected',r['genes'],r['transcripts']] for r in sqs['model_sets']]]), '',
             utr_summary(utr), '',
+            *(utr_review_section(reviews[aid], data, aid, ref, provenance['release/'+aid], provenance) if aid in reviews else []),
             'Before/after below means accepted post-UTR models before selection versus the selected final-ID set.', '',
             f'![Model retention](qc/structural/{aid}/plots/retention.png)', '',
             'Selection rules and resolved thresholds:', '', selection_rules(selection['settings']), '',

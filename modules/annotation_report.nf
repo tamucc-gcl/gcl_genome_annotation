@@ -1,4 +1,25 @@
 // Unified Markdown results/methods report. No searches or model changes.
+process UTR_REVIEW_REPORT {
+    tag "${aid}"
+    label 'utr_support'
+    input:
+    tuple val(aid), path(original, stageAs:'original.gff3'),
+        path(bams, stageAs:'bams/readset??.bam'), path(indices, stageAs:'bams/readset??.bam.csi'),
+        path(screened), path(support), path(clustered), path(status), path(release, stageAs:'release/*')
+    path helpers
+    output:
+    tuple val(aid), path("${aid}"), emit: review
+    script:
+    def asList = { value -> value instanceof Collection ? value : [value] }
+    def bamArgs = asList(bams).collect { "'${it}'" }.join(' ')
+    def indexArgs = asList(indices).collect { "'${it}'" }.join(' ')
+    """
+    python report_utr_review.py --original '${original}' --screened '${screened}' \\
+        --support '${support}' --clustered '${clustered}' --status '${status}' --release '${release}' \\
+        --bams ${bamArgs} --indices ${indexArgs} --outdir '${aid}'
+    """
+}
+
 process ANNOTATION_REPORT {
     label 'annotation_report'
     publishDir "${params.outdir}", mode:'copy', overwrite:true, pattern:'annotation_report.md'
@@ -11,6 +32,7 @@ process ANNOTATION_REPORT {
     val stage_keys
     path stages, stageAs:'stage??/*'
     val configuration
+    path utr_reviews, stageAs:'utr_review_inputs/*'
     path helpers
     output:
     path 'annotation_report.md', emit: report
@@ -23,6 +45,7 @@ process ANNOTATION_REPORT {
     def structuralFiles=asList(structural)
     def stageFiles=asList(stages)
     def request=[releases:asList(releases).collect { it.toString() },
+        utr_reviews:asList(utr_reviews).collect { it.toString() },
         structural:structural_ids.withIndex().collect { aid,i -> [aid,structuralFiles[i].toString()] },
         stages:stage_keys.withIndex().collect { key,i -> [key[0],key[1],stageFiles[i].toString()] },configuration:configuration]
     def encoded=groovy.json.JsonOutput.toJson(request).bytes.encodeBase64().toString()

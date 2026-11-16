@@ -22,7 +22,7 @@ include { ANNOTATION_POSTPROCESSING } from './workflows/annotationPostprocessing
 include { FUNCTIONAL_ANNOTATION } from './workflows/functionalAnnotation.nf'
 include { GENOME_TRACKS } from './workflows/genomeTracks.nf'
 include { ANNOTATION_RELEASE } from './workflows/annotationRelease.nf'
-include { ANNOTATION_REPORT } from './modules/annotation_report.nf'
+include { ANNOTATION_REPORT; UTR_REVIEW_REPORT } from './modules/annotation_report.nf'
 
 workflow {
     if (!params.sample_sheet) error 'Provide --sample_sheet'
@@ -424,9 +424,12 @@ workflow {
          'interproscan_version','eggnog_version','diamond_version','kofamscan_version'].each { key ->
             if (params.containsKey(key)) reportConfiguration[key]=params[key]
         }
+        UTR_REVIEW_REPORT(ANNOTATION_POSTPROCESSING.out.utr_review_inputs.join(ANNOTATION_RELEASE.out.annotation),
+            ['report_utr_review.py','utr_support.py','reference_repeats.py'].collect { file("${projectDir}/py_scripts/${it}",checkIfExists:true) })
         ANNOTATION_REPORT(ANNOTATION_RELEASE.out.annotation.toList().map { it.sort { row -> row[0] }.collect { row -> row[1] } },
             reportStructural.map { it.collect { row -> row[0] } }, reportStructural.map { it.collect { row -> row[1] } },
             reportStages.map { it.collect { row -> [row[0],row[1]] } }, reportStages.map { it.collect { row -> row[2] } },reportConfiguration,
+            UTR_REVIEW_REPORT.out.review.toList().map { it.sort { row -> row[0] }.collect { row -> row[1] } },
             ['generate_annotation_report.py','unified_report.py','reference_repeats.py'].collect { file("${projectDir}/py_scripts/${it}",checkIfExists:true) })
     }
 }

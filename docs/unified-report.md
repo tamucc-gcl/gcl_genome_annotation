@@ -18,6 +18,16 @@ Open `annotation_report.md` at the output root. Supporting outputs are:
 - `reports/annotation_report_data/`: source stage-manifest snapshots.
 - `reports/annotation_report_status.json`: inputs, output checksums and scope.
 
+For assemblies screened using RNA alignments, the UTR evidence review links
+three TSVs under `reports/annotation_report_data/`. The review table uses final
+release transcript IDs. It flags unstranded-only or weak stranded junction
+support, opposite-strand CDS overlaps without a stranded library passing the
+screen, and exact or near matches to an opposite-strand assembled RNA model.
+Near matches share a splice chain and at least 95% reciprocal exonic overlap.
+Companion tables give junction counts by library and exact CDS-overlap
+coordinates and depth by readset for flagged transcripts. Coordinates are
+zero-based and half-open. The review flags have no effect on model selection.
+
 The report retains the shared Markdown table/number-formatting helpers in
 `generate_annotation_report.py`; unused legacy parsing and plotting helpers were removed. The production entry now
 uses `unified_report.py` and the accepted keyed manifests. Legacy filename/source
@@ -77,7 +87,9 @@ Failed or missing required inputs block reporting; they cannot become zeros or
 an all-clear statement. No additional scientific filtering is performed.
 
 `main.nf` invokes reporting after validated release packaging and the required
-source reports. Report-helper edits rerun only reporting. Existing publication
+source reports. Resume from the original launch and work directories with the
+same parameters to reuse cached annotation and alignment tasks. The UTR review
+and unified report run as downstream reporting tasks. Existing publication
 paths and release payloads are unchanged. Keep the output hierarchy together to
 resolve relative links; plotting/report outputs are published as copies.
 
